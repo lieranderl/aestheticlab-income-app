@@ -258,6 +258,13 @@ go run ./cmd/import opening -project <project> -database aestheticlab-income -st
 ```
 Always pass `-start-month 2026-10`: the tool's default is the code default `2026-11`, and production uses October.
 
+## Renaming a kassa account
+The app has no screen for account names. `cmd/renameaccount` changes only the display name, audited as `cli:renameaccount`. Run the dry run, then the real command after approval:
+```bash
+go run ./cmd/renameaccount -project <project> -id kassa_card -name "Касса — карта салона" -dry-run
+go run ./cmd/renameaccount -project <project> -id kassa_card -name "Касса — карта салона"
+```
+
 ## Logins
 - **Lockout:** after 5 wrong passwords in a row, an account locks for 15 minutes. The login page answers the same way for unknown, wrong and locked logins, so it never reveals which usernames exist. Its message states the rule, and the lock shows only in the logs (`account locked after failed logins`). Resetting the password on «Сотрудники» also unlocks the account.
 - **Password reset and deactivation:** both log the person out on every device at once.

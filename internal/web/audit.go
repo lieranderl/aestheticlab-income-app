@@ -89,8 +89,11 @@ func auditString(fields map[string]json.RawMessage, key string) string {
 
 func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.Category) views.AuditCard {
 	p := views.AuditCard{Actor: personName(users, row.ActorID), At: a.store.LocalTime(row.At).Format("02.01.2006 · 15:04")}
-	if row.ActorID == "" || row.ActorID == "login" {
+	switch {
+	case row.ActorID == "" || row.ActorID == "login":
 		p.Actor = "Система"
+	case strings.HasPrefix(row.ActorID, "cli:"): // cmd/resetpass, cmd/renameaccount…
+		p.Actor = "Командная строка (" + strings.TrimPrefix(row.ActorID, "cli:") + ")"
 	}
 	for _, option := range auditEntities {
 		if option.Value == string(row.Entity) {
