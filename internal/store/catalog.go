@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 )
@@ -261,6 +262,37 @@ func (s *Store) createAccount(t tx, actorID string, a Account) (Account, error) 
 		return Account{}, err
 	}
 	return a, s.audit(t, EntityAccount, a.ID, ActionCreate, actorID, nil, rec)
+}
+
+// RenameAccount changes a kassa account's display name, nothing else, in one
+// transaction with its audit row. Only the admin may.
+func (s *Store) RenameAccount(ctx context.Context, actor Actor, id, name string) (Account, error) {
+	if !actor.Admin {
+		return Account{}, ErrForbidden
+	}
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > 80 {
+		return Account{}, fmt.Errorf("%w: an account name is 1–80 characters", ErrInvalid)
+	}
+	var out Account
+	err := s.db.run(ctx, false, func(t tx) error {
+		var before accountRecord
+		found, err := t.get(accountPath(id), &before)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return ErrNotFound
+		}
+		after := before
+		after.Name = name
+		if err := t.set(accountPath(id), after); err != nil {
+			return err
+		}
+		out = after.account(id)
+		return s.audit(t, EntityAccount, id, ActionUpdate, actor.UID, before, after)
+	})
+	return out, err
 }
 
 // Accounts lists the kassa accounts in order.

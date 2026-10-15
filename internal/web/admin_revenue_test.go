@@ -237,3 +237,16 @@ func TestAdminEditsAnotherPersonsReportWithTheirTermsAndAudit(t *testing.T) {
 	values.Set("version", "2")
 	wantPage(t, "closed admin save", s.post(path, values, anna), http.StatusUnprocessableEntity, "Месяц закрыт — изменения недоступны")
 }
+
+// A change made by a command-line tool names the tool, not an unknown person.
+func TestChangeLogNamesCommandLineChanges(t *testing.T) {
+	s := newSite(t)
+	if _, err := s.st.RenameAccount(ctx, store.Actor{UID: "cli:renameaccount", Admin: true}, domain.KassaCard, "Касса — карта студии"); err != nil {
+		t.Fatal(err)
+	}
+	page := s.get("/admin/audit?entity=account", s.login("anna", annaPass))
+	wantPage(t, "account rename", page, http.StatusOK, "Командная строка (renameaccount)", "Касса — карта студии")
+	if strings.Contains(page.Body.String(), "Неизвестный сотрудник") {
+		t.Fatal("the command's change is attributed to an unknown person")
+	}
+}
