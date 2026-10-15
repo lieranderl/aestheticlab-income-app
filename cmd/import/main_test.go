@@ -164,3 +164,53 @@ func TestTheDryRunNamesTheMonthBeforeTheStart(t *testing.T) {
 		t.Fatalf("dry run:\n%s", out.String())
 	}
 }
+
+func TestWithoutAnAdminNameTheOnlyAdminRecordsTheRows(t *testing.T) {
+	st := salon(t, firstMorning)
+	var out bytes.Buffer
+	if err := runOpening(ctx, st, options{dryRun: true}, strings.NewReader(openingFile), &out); err != nil {
+		t.Fatalf("no -admin with one admin: %v", err)
+	}
+}
+
+func TestTheAdminMustBeAnActiveAdmin(t *testing.T) {
+	st := salon(t, firstMorning)
+	var out bytes.Buffer
+	for name, want := range map[string]string{"maria": `"maria" is not an admin`, "nobody": `no user "nobody"`} {
+		err := runOpening(ctx, st, options{admin: name, dryRun: true}, strings.NewReader(openingFile), &out)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("-admin %s: %v, want %q", name, err, want)
+		}
+	}
+}
+
+func TestWithTwoAdminsTheAdminMustBeNamed(t *testing.T) {
+	st := salon(t, firstMorning)
+	anna, err := st.UserByUsername(ctx, "anna")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CreateUser(ctx, anna.Actor(), store.NewUser{Username: "olga", DisplayName: "Ольга", Role: store.RoleAdmin, PasswordHash: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runOpening(ctx, st, options{dryRun: true}, strings.NewReader(openingFile), &out); err == nil || !strings.Contains(err.Error(), "-admin") {
+		t.Fatalf("two admins, no -admin: %v, want a request for -admin", err)
+	}
+}
+
+func TestWithoutAnActiveAdminNothingCanBeRecorded(t *testing.T) {
+	st := salon(t, firstMorning)
+	anna, err := st.UserByUsername(ctx, "anna")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpdateUser(ctx, anna.Actor(), anna.ID, func(u *store.User) error { u.Active = false; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	err = runOpening(ctx, st, options{dryRun: true}, strings.NewReader(openingFile), &out)
+	if err == nil || !strings.Contains(err.Error(), "no active admin") || strings.Contains(err.Error(), "-admin") {
+		t.Fatalf("no active admin: %v, want «no active admin» without -admin advice", err)
+	}
+}
