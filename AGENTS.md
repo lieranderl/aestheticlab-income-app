@@ -58,7 +58,7 @@ For multi-session or delegated work, use [docs/agent-workflow.md](docs/agent-wor
    - Squash-merge a PR (`gh pr merge --squash --delete-branch`) only after its `CI passed` check is green.
    - Before merging, read every review, inline review thread, and discussion comment on the PR. Resolve all actionable issues and verify the final changes; a green CI check alone is insufficient. Never merge with unresolved review issues.
    - A quota/availability message from automated review is not a completed review. Perform an independent code review and applicable money/mobile reviews before merging.
-   - GitHub branch rulesets and auto-merge aren't available on this private repo (they need GitHub Pro). The `.githooks/pre-push` hook blocks direct pushes to `main` instead. `make hooks` installs it, and so does any `make assets`, `templ`, `test`, `web`, `web-dev`, `lint` or `ci` run.
+   - A branch ruleset on `main` enforces this: changes arrive only by pull request, the `CI passed` check must be green, every review thread must be resolved, and `main` can't be deleted or force-pushed. The `.githooks/pre-push` hook also blocks direct pushes to `main` locally. `make hooks` installs it, and so does any `make assets`, `templ`, `test`, `web`, `web-dev`, `lint` or `ci` run.
    - Record progress in `docs/progress.md`.
 
 Run a milestone end to end with **`/milestone M<N>`**.

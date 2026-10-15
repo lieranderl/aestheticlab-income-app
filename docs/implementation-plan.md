@@ -36,7 +36,7 @@ Based on [technical-solution.md](technical-solution.md) and [system-design.md](s
 
 | # | Item | Status |
 |---|---|---|
-| 1 | GitHub repo `lieranderl/aestheticlab-income-app` (private) | ✅ Created in M0; stays private. |
+| 1 | GitHub repo `lieranderl/aestheticlab-income-app` (public) | ✅ Created in M0 as a private repo; republished 2026-10-15 as a public repo with fresh history and no personal data (the old history is in a private archive). |
 | 2 | GCP access | ✅ `<owner-email>` has `roles/owner` on `<project>`. I run the setup with the gcloud CLI. |
 | 3 | DNS | ✅ `<domain>` is in Cloud DNS zone `aestheticlab` in the same project. The domain is already verified, and two Cloud Run domain mappings already work. I add `kassa` myself. |
 | 4 | Staff | ✅ Four staff (fictional here): Anna (admin, submits reports, 45%, €1,200 salary, dividend share 1), Maria (65%, 1), Olga (65%, 1), Vera (40%, no dividends). |
@@ -51,7 +51,7 @@ Estimates are working days, with Claude Code implementing and you reviewing.
 ### M0 — Repo and app skeleton (1 day)
 - **Repo:**
   - Create the private repo with `gh repo create`.
-  - Squash merges only. Branch rulesets need GitHub Pro for a private repo, so `.githooks/pre-push` (`make hooks`) blocks direct pushes to `main`, and PRs are merged only after `CI passed` is green.
+  - Squash merges only. While the repo was private, branch rulesets needed GitHub Pro, so `.githooks/pre-push` (`make hooks`) blocked direct pushes to `main`. Since the repo went public (2026-10-15) a ruleset on `main` also enforces this: PR only, `CI passed` green, review threads resolved, no deletion or force push.
 - **Go module:** pin the same versions as datastar-webapp: Go 1.27.1, datastar-go v1.2.2, templ v0.3.1020 (as a `go tool`), Tailwind 4.3.3, daisyUI 5, Bun 1.4.2.
 - **Tooling copied from datastar-webapp:**
   - `Makefile` (`web-dev`, `web`, `firestore`, `test`, `test-store`, `lint`, `security`, `ci`, `image`). Local containers use Apple's `container` CLI.

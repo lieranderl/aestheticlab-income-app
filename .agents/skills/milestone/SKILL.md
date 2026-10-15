@@ -43,7 +43,7 @@ List the milestone's tasks as a checklist, plus the test seams you'll use (see t
   - the milestone checklist;
   - verification evidence;
   - new Firestore queries or indexes, if any.
-- **Merging:** this repo has no auto-merge or branch rulesets (they need GitHub Pro for a private repo). Wait for the PR's `CI passed` check. When it's green, run `gh pr merge --squash --delete-branch`, but only with the user's go-ahead for that PR.
+- **Merging:** a branch ruleset on `main` requires a pull request, a green `CI passed` check and every review thread resolved; auto-merge is not used. Wait for the PR's `CI passed` check and read every review. When it's green, run `gh pr merge --squash --delete-branch`, but only with the user's go-ahead for that PR.
 - Update `docs/progress.md`: milestone, status, PR link, date, notes and follow-ups.
 
 ## Rules
