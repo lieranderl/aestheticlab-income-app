@@ -219,7 +219,7 @@ go run ./cmd/seed -project <project> -database aestheticlab-income
 ```
 Then, signed in as Anna:
 1. Add Maria, Olga and Vera on «Ещё → Сотрудники», each with a temporary password. Hand each password over in person. Everyone sets their own password at first login.
-2. Set everyone's terms from the start month (November 2026), Anna's included: «Себе» %, monthly salary and dividend share. Reports and the month close are refused for a person without terms.
+2. Set everyone's terms from the start month (October 2026 in production), Anna's included: «Себе» %, monthly salary and dividend share. Reports and the month close are refused for a person without terms.
 
 Try it against the emulator first (`make firestore`):
 ```bash

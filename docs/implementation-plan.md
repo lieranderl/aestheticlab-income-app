@@ -22,15 +22,32 @@ Based on [technical-solution.md](technical-solution.md) and [system-design.md](s
 - Real data starts on **1 October 2026**. Openings are dated 2026-10-01, and 1–14 October is backfilled from the sheet. The start month stays `2026-10`.
 - **October is the parallel month** (it was November): the sheet stays the record, and October is closed in both and compared early November (M12).
 - The October practice entries were already voided in the app; no cleanup or cut-off change is needed (MAINTAINING.md → Real October).
-- M11 is done (#45, #46). M10 imports April–September 2026, since October lives in the app.
+- M11 is done (archive PR 45 and the restore drill). M10 imports April–September 2026, since October lives in the app.
 
-### Current release sequence (2026-10-13)
-- M0–M8 implementation and per-client reporting (PR #24) are merged; the signed-in identity change (PR #25) passed CI and deployed. Keep the existing candidate/readiness/traffic deployment workflow. Neither change requires a financial reset for release.
-- **Next: pre-November M11 readiness.** Provide and verify a pause of all financial writes, including admin writes, for the controlled cleanup/opening window. Check the client-entry and kassa flows on real phones, finish mobile CI/security/offline checks, and complete the restore drill.
-- **UI clarity pass before onboarding:** [implemented and verified locally](reviews/2026-10-13-mobile-ui/REVIEW.md), pending release and real-phone comprehension check. Entry/help/results, redemption/sales, grouped analytical metrics, current/projected settlement and invalid-input previews follow system-design §6.1a. No deployment architecture change or data migration is needed.
-- ~~**Before real November entries:**~~ superseded by the 2026-10-14 decision above. Was: while writes are paused, export, clear only approved practice financial records/counters and whole closed test-month state documents, preserve accounts/settings/November–December terms, set cutoff `2026-11`, and load confirmed openings using the dry-run procedure. Check balances before resuming writes. Till/card/certificates are captured on 1 November; person balances follow the final October settlement.
-- M9 is paused: adapt its categories, trends and exports to the agreed client-entry model before resuming the preserved worktree. The original dynamic revenue/payment-form acceptance criterion below needs a new design decision; it must not restore the replaced daily payment model or change frozen legacy records. M9 can remain after cutover if needed.
-- M10 imports April–September 2026. October is the parallel month; retire the sheet only after October reconciles and Anna signs off (M12).
+### Status (2026-10-15)
+Per-milestone detail is in [progress.md](progress.md); this table must agree with it.
+
+| Milestone | Status |
+|---|---|
+| M0 Skeleton · M1 Infrastructure · M2 Domain rules · M3 Storage · M4 Login and staff | ✅ done |
+| M5 Daily form, opening balances, installable app (Release 1) | 🚧 code merged and in real use since 14 October; the 1 October openings and the real-phone checks are still open |
+| M6 Admin revenue screens | ✅ done |
+| M7 Kassa | ✅ done; the October backfill of movements and the till/card reconciliation are cutover work |
+| M8 Settlement | ✅ done |
+| M9 Categories, trends, export | ✅ done (archive PR 34), adapted to the client-entry model |
+| M10 History import | ⏳ not started: April–September 2026 |
+| M11 Offline and hardening | ✅ done (archive PR 45, restore drill 2026-10-14); real-phone checks stay with M5 |
+| M12 Parallel month and cutover | ⏳ October is the parallel month |
+
+### Outstanding cutover work
+1. **October openings (M5):** Anna's 1 October till, salon card, outstanding certificates and September person balances — `cmd/import opening` dry run, Anna confirms, then load (MAINTAINING.md → Real October).
+2. **Backfill 1–14 October (M12):** client entries and kassa movements from the sheet, each with its real date; afterwards the kassa matches the till count and the salon card.
+3. **Real-phone acceptance (M5):** the 60-second one-handed entry on a real iPhone, and installing on each person's own iPhone/Android phone (standalone, brand icon, stays logged in).
+4. **History import (M10):** April–September 2026 from the sheet, checked against its Trend Dashboard.
+5. **October reconciliation (M12):** close October in the sheet and the app early November, compare per person, explain every difference, and Anna signs off. Only then is the sheet retired.
+
+### Superseded: release sequence before 2026-10-14
+Kept for history; do not follow. Until 2026-10-14 the plan was a November go-live: pause financial writes, export, clear the practice financial records and closed test months, set the cutoff to `2026-11`, load openings captured on 1 November, and reconcile November before retiring the sheet. October replaced all of this: nothing is cleared, the cutoff stays `2026-10`, openings are dated 2026-10-01 and October is the parallel month. The write pause (`INCOME_PAUSE_FINANCIAL_WRITES`) still exists and can be used for the openings load. M9 was paused at that time for adaptation to client entries; it has since shipped.
 
 ## 2. Inputs
 
@@ -172,7 +189,7 @@ Everything is scripted in `docs/MAINTAINING.md` so it can be repeated (system-de
 - The app installs to the Home Screen on an iPhone and an Android phone, opens standalone with the brand icon, and stays logged in.
 - The 1 October till, card, certificate and person figures are loaded and confirmed by Anna.
 
-**➜ Release 1:** from the 2026-10-14 decision, staff enter real October data on **<app-host>**, from 1 October, in the app *and* the sheet. Until M7, deposits, expenses and payouts are still recorded only in the sheet. The admin enters November's movements into the app in M7, dated when they happened (November is still open).
+**➜ Release 1:** from the 2026-10-14 decision, staff enter real October data on **<app-host>**, from 1 October, in the app *and* the sheet. M7 has shipped, so deposits, expenses and payouts are entered in the app too; those from 1–14 October are backfilled with their real dates (October is still open).
 
 ### M6 — Admin: day, month (revenue), report editing, history, change log (3 days)
 - **День:** salon card, a card per person, «Не сдали отчёт»; a table from `lg`.
@@ -182,7 +199,7 @@ Everything is scripted in `docs/MAINTAINING.md` so it can be repeated (system-de
 - **Журнал изменений.**
 - **Admin bottom bar:** Отчёт · День · Месяц · Касса · Ещё.
 
-**Done when:** the day and month figures match hand-calculated totals for the first November days.
+**Done when:** the day and month figures match hand-calculated totals for the first days of a month (HTTP tests use November fixtures with an injected clock).
 
 ### M7 — Kassa, movements, balances (3 days)
 - **«Касса»:**
@@ -194,11 +211,11 @@ Everything is scripted in `docs/MAINTAINING.md` so it can be repeated (system-de
   - **«Пересчитать»** (recount, which writes an adjustment row).
 - **История → «Движения»:** filters for type, status, person and period.
 - **«Мои записи» for staff:** the balance card, plus the «+ Внести в кассу» and «+ Расход за свой счёт» sheets (pending until the admin confirms), and movement cards (system-design §6.4).
-- **Backfill:** enter November's deposits, expenses and payouts so far from the sheet, each with its real date.
+- **Backfill:** enter October's deposits, expenses and payouts so far from the sheet, each with its real date (cutover work, see §1).
 
 **Done when:**
 - After the backfill, kassa balances match the till count and the salon's card.
-- Outstanding certificates equal the opening amount + November sales − November redemptions.
+- Outstanding certificates equal the opening amount + October sales − October redemptions.
 - A person's pending expense only changes their balance after it is confirmed.
 
 ### M8 — Month result, settlement, close (2.5 days)
@@ -217,7 +234,7 @@ Everything is scripted in `docs/MAINTAINING.md` so it can be repeated (system-de
 **Done when:** an October-style dry run on test data matches the sheet's Debit Credit tab line by line.
 
 ### M9 — Categories, trends, export (2.5 days)
-**Paused pending adaptation to client entries.** The scope below is the original daily-form proposal; revise its revenue/payment configuration and acceptance criteria before implementation. See the current release sequence above and [plans/client-entries.md](plans/client-entries.md).
+**Done (archive PR 34), adapted to client entries.** The scope below is the original daily-form proposal. As shipped, the client form has fixed service/extra fields (see [plans/client-entries.md](plans/client-entries.md)), so the first "Done when" item no longer applies: categories can be renamed, reordered and archived, and the base categories (`services`, `creams`, `oil`, `certificates`, `card`, `cash`, `paid_by_certificate`) are protected. The chart and exports criteria hold.
 
 - **«Категории»:** «Выручка», «Оплата» and «Расходы» tabs, with the «учитывать в “Себе”» flag, the certificate-sale flag, the payment destination, ↑ ↓ reordering, and archive or delete.
 - **«Динамика»:** 3 / 6 / 12 months; metrics for revenue, per person, creams, certificates, «Себе», salon income, expenses, profit, dividends; an SVG chart plus a table.
@@ -288,7 +305,7 @@ Since the 2026-10-14 decision the parallel month is **October**.
 | M9 Categories, trends, export | 2.5 | 23.5 | Everything in the spec |
 | M10 History import | 0.5 | 24 | April–September trends |
 | M11 Offline and hardening | 1.5 | 25.5 | Offline page, tests, restore drill |
-| M12 Cutover | 1 | 26.5 | The sheet is retired (once November reconciles) |
+| M12 Cutover | 1 | 26.5 | The sheet is retired (once October reconciles) |
 
 ### Target dates (starting Monday 12 October 2026)
 - **Release 1 (daily form, opening balances, installable app):** in use from **14 October**, with real data from **1 October** (decision 2026-10-14). Staff enter daily data in both the app and the sheet; 1–14 October is backfilled.
@@ -306,9 +323,9 @@ M2 can run in parallel with M1. M6 and M7 can overlap. M9 can move after cutover
 | Staff disagree about how certificates are paid out (the spec example changes from 375/375 to 325/425). | Confusion in the first month. | Explain it at onboarding. The certificate-sale flag is a setting if the owners change their minds. |
 | Rounding differs from the sheet (floats vs cents). | ±1 cent differences. | Integer cents with largest-remainder dividends. Differences up to 1 cent per person are documented as expected. |
 | A mistake found in an older closed month. | It has to be reopened. | Only the newest closed month can be reopened, so later months are reopened first (newest to oldest) and closed again in order. Rare, audited, needs a confirmation, and no snapshot can ever be stale. |
-| Opening figures missed or wrong (especially outstanding certificates). | Kassa or certificate totals off from day one. | Captured on the morning of 1 November with a checklist (technical-solution §5.6). `--dry-run` confirmed by Anna. Negative outstanding certificates show a warning. A weekly recount catches cash differences. |
+| Opening figures missed or wrong (especially outstanding certificates). | Kassa or certificate totals off from day one. | Captured for the morning of 1 October with a checklist (technical-solution §5.6). `--dry-run` confirmed by Anna. Negative outstanding certificates show a warning. A weekly recount catches cash differences. |
 | Cloud Run domain mapping is still a preview feature. | Delay. | Already used for `<domain>` and `staging.<domain>` in this project. Fallback: an HTTPS load balancer with a serverless NEG. |
-| iOS PWA quirks (keyboard, separate cookies). | Annoying daily form. | `sticky` bar, real-iPhone checks in M5 and M11, one login inside the installed app. |
+| iOS PWA quirks (keyboard, separate cookies). | Annoying daily form. | `sticky` bar, real-iPhone checks in M5 (still open), one login inside the installed app. |
 | Staff don't build the habit. | Gaps in data. | Early Release 1, in-person onboarding, under 60 seconds per day, «Не сдали отчёт» on the admin's day screen. |
 
 ## 6. Not in this plan

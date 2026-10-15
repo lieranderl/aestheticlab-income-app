@@ -24,7 +24,7 @@ Home is today's own client list/summary + add client form. Owner/admin edit clie
 ## Task4 Verification and release
 make ci, emulator race contracts, 375both themes/short save/long names, native/noJS, delayed/lost save, multiple client records sum, independent money/mobile/code review and all issues fixed. Docs/progress/system-design/money-rules updated. PR reviews/comments all read/resolved, exact-head CIpassed then squash/CIdeploy and prodreadyz. No live financial test rows.
 
-Open questions: none. M9 paused with changes preserved in its worktree; resume categories/trends/exports after this model ships.
+Open questions: none. M9 was paused during this work; it later shipped adapted to this model (archive PR 34).
 
 ## Test database authorization (2026-10-13 follow-up)
 User explicitly permits restructuring/optimizing test financial records, adding new attributes and removing obsolete ones, including recreation if necessary. Preserve accounts, settings and intended staff terms. Main Firestore only; other salon services/(default) stay out of scope. Current additive client metadata and counter fit existing indexes; no financial reset is required to implement this change. This permission also covers necessary controlled test-data cleanup before real use, with read/export/verification first.
