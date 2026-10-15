@@ -198,3 +198,19 @@ func TestWithTwoAdminsTheAdminMustBeNamed(t *testing.T) {
 		t.Fatalf("two admins, no -admin: %v, want a request for -admin", err)
 	}
 }
+
+func TestWithoutAnActiveAdminNothingCanBeRecorded(t *testing.T) {
+	st := salon(t, firstMorning)
+	anna, err := st.UserByUsername(ctx, "anna")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpdateUser(ctx, anna.Actor(), anna.ID, func(u *store.User) error { u.Active = false; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	err = runOpening(ctx, st, options{dryRun: true}, strings.NewReader(openingFile), &out)
+	if err == nil || !strings.Contains(err.Error(), "no active admin") || strings.Contains(err.Error(), "-admin") {
+		t.Fatalf("no active admin: %v, want «no active admin» without -admin advice", err)
+	}
+}

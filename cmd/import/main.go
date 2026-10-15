@@ -108,7 +108,11 @@ func recordingAdmin(ctx context.Context, st *store.Store, username string) (stor
 				admins = append(admins, u)
 			}
 		}
-		if len(admins) != 1 {
+		switch len(admins) {
+		case 0:
+			return store.User{}, errors.New("no active admin: an admin account must be active (reactivated or created) before openings can be recorded")
+		case 1:
+		default:
 			return store.User{}, fmt.Errorf("%d active admins: name one with -admin", len(admins))
 		}
 		return admins[0], nil
