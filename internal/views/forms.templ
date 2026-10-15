@@ -1,0 +1,84 @@
+package views
+
+// Form building blocks shared by every screen. Forms post as plain HTML
+// (work without JS) and Datastar enhances them: data-on:submit sends the
+// same fields with @post(…, {contentType: 'form'}) and the server patches
+// the form back by its id, or navigates on success.
+
+// sendForm is the Datastar expression that posts a form's fields to url.
+// url is always a server-built path, never user data.
+func sendForm(url string) string { return "@post('" + url + "', {contentType: 'form'})" }
+
+// sendFinancialForm disables automatic retries after a possibly committed write.
+// URLs are server-built. An ambiguous response requires checking the ledger before repeating.
+func sendFinancialForm(action string) string {
+	return "@post('" + action + "', {contentType: 'form', retry: 'never', retryMaxCount: 0})"
+}
+
+const onFinancialFetch = `if (evt.detail.el === el) { if (evt.detail.type === 'started') { $_financialunknown = false } else if (evt.detail.type === 'error' || evt.detail.type === 'retries-failed') { $_financialunknown = true } }`
+
+templ FinancialResponseNotice() {
+	@FinancialResponseNoticeWithAdvice("Проверьте движения и текущий баланс перед повторным сохранением.")
+}
+
+templ FinancialResponseNoticeWithAdvice(advice string) {
+	<p role="alert" class="alert alert-warning alert-soft hidden" data-class:hidden="!$_financialunknown">Не удалось получить ответ. { advice }</p>
+}
+
+templ Alert(errorText, doneText string) {
+	if errorText != "" {
+		<div role="alert" class="alert alert-error alert-soft">
+			@Icon("circle-alert", "size-5")
+			<span>{ errorText }</span>
+		</div>
+	}
+	if doneText != "" {
+		<div role="status" class="alert alert-success alert-soft">
+			@Icon("circle-check", "size-5")
+			<span>{ doneText }</span>
+		</div>
+	}
+}
+
+// Field is a labelled input row; inputs keep ≥ 16 px text so iOS never zooms.
+// The <label> wraps the input, so screen readers and password managers
+// know what each field is.
+templ Field(label, hint string) {
+	<fieldset class="fieldset">
+		<label class="flex flex-col gap-1">
+			<span class="fieldset-legend text-sm">{ label }</span>
+			{ children... }
+		</label>
+		if hint != "" {
+			<p class="label whitespace-normal">{ hint }</p>
+		}
+	</fieldset>
+}
+
+// SubmitButton is the form's main action, disabled while a request runs.
+templ SubmitButton(label string) {
+	<button type="submit" class="btn btn-primary btn-lg btn-block" data-attr:disabled="$_busy">
+		<span class="loading loading-spinner loading-sm" data-show="$_busy"></span>
+		{ label }
+	</button>
+}
+
+// PageHeader is a screen title with an optional back link.
+templ PageHeader(title, backHref string) {
+	<header class="flex min-h-16 items-center gap-2 py-3 lg:pb-6">
+		if backHref != "" {
+			<a href={ templ.SafeURL(backHref) } class="btn btn-ghost btn-square min-w-11 min-h-11 shrink-0 -ml-2" aria-label="Назад">
+				@Icon("chevron-left", "size-6")
+			</a>
+		}
+		<h1 class="min-w-0 text-xl font-semibold lg:text-2xl [overflow-wrap:anywhere]">{ title }</h1>
+	</header>
+}
+
+// FinancialActionRow keeps the save button in view: above the bottom bar on a
+// full page, and at the bottom of a long native sheet's scrollport in a dialog.
+templ FinancialActionRow() {
+	<div class="sticky bottom-dock z-10 bg-base-100 pt-2 lg:bottom-0 in-[dialog]:bottom-0 in-[dialog]:pb-safe">
+		{ children... }
+	</div>
+}

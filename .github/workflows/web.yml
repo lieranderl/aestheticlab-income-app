@@ -1,0 +1,102 @@
+name: Deploy
+
+# Deploys the app to the Cloud Run service aestheticlab-income
+# (https://kassa.aestheticlab.be). Only the CI workflow calls this, as its
+# last job on main after «CI passed», so it deploys exactly the commit CI
+# tested; a red CI run never deploys. CI runs on main queue in push order,
+# and a run whose commit is no longer the head of main skips the deploy,
+# so an older commit can never replace a newer one. This builds the image,
+# deploys a revision without traffic, checks its /readyz, then moves all
+# traffic to it. Service settings (env, secret, scaling) live on the
+# service itself (docs/MAINTAINING.md); this workflow only changes the image.
+# Re-run: Actions → CI → «Run workflow» on main.
+#
+# Roll back: gcloud run services update-traffic aestheticlab-income
+#   --project <project> --region europe-west1 --to-revisions <revision>=100
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+# Project-specific identifiers are repository variables (Settings → Secrets
+# and variables → Actions → Variables): GCP_PROJECT, GCP_WIF_PROVIDER (the
+# full provider resource name) and GCP_DEPLOYER (the deployer account email).
+# They are not secrets; keeping them out of the code keeps the repo generic.
+env:
+  PROJECT: ${{ vars.GCP_PROJECT }}
+  REGION: europe-west1
+  SERVICE: aestheticlab-income
+  IMAGE: europe-west1-docker.pkg.dev/${{ vars.GCP_PROJECT }}/aestheticlab-income/income
+  # Keyless: only this repo's main branch in the production environment
+  # (the provider's attribute condition) becomes the deployer account.
+  WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+  DEPLOYER: ${{ vars.GCP_DEPLOYER }}
+
+jobs:
+  current:
+    name: Is this still the head of main
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      current: ${{ steps.head.outputs.current }}
+    steps:
+      - id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          head="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "main is at $head, not $GITHUB_SHA: its own CI run deploys it."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Build and deploy to Cloud Run
+    needs: current
+    if: needs.current.outputs.current == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://kassa.aestheticlab.be
+    permissions:
+      contents: read
+      id-token: write # sign in to Google Cloud
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Build before signing in, so no credential file is in the build context.
+      - name: Build the image
+        run: docker build -t "$IMAGE:$GITHUB_SHA" .
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - name: Push the image
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker push "$IMAGE:$GITHUB_SHA"
+      - name: Deploy a revision without traffic
+        run: |
+          gcloud run deploy "$SERVICE" --project "$PROJECT" --region "$REGION" \
+            --image "$IMAGE:$GITHUB_SHA" --no-traffic --tag candidate --quiet
+      # /readyz, not /healthz: Cloud Run answers paths like /healthz itself.
+      - name: Check the new revision
+        run: |
+          url="$(gcloud run services describe "$SERVICE" --project "$PROJECT" --region "$REGION" --format=json \
+            | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url/readyz"
+      - name: Move all traffic to it
+        run: |
+          gcloud run services update-traffic "$SERVICE" --project "$PROJECT" --region "$REGION" --to-latest --quiet

@@ -1,0 +1,120 @@
+package views
+
+type ExportFormData struct {
+	From   string // YYYY-MM-DD
+	To     string // YYYY-MM-DD
+	Format string // xlsx, csv_records, csv_movements
+	Error  string
+}
+
+templ ExportPage(nav Nav, d ExportFormData) {
+	@Layout("Экспорт", nav) {
+		@PageHeader("Экспорт", "/more")
+		<div class="flex flex-col gap-4">
+			if d.Error != "" {
+				<div class="alert alert-error" role="alert">
+					<span>{ d.Error }</span>
+				</div>
+			}
+
+			<section class="card bg-base-100 shadow-sm">
+				<div class="card-body p-4 gap-4">
+					<h2 class="font-semibold text-base">Выгрузка данных</h2>
+					<p class="text-sm text-base-content/70">
+						Скачайте финансовые записи, движения по кассе и сводные отчёты в формате Excel или CSV для бухгалтерии.
+					</p>
+
+					<form method="GET" action="/admin/export/download" class="flex flex-col gap-4">
+						<!-- Date range -->
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							<div class="form-control flex flex-col gap-1">
+								<label for="export-from" class="label text-sm font-semibold p-0">С даты</label>
+								<input
+									type="date"
+									id="export-from"
+									name="from"
+									value={ d.From }
+									required
+									class="input input-lg w-full min-h-11 text-base"
+								/>
+							</div>
+							<div class="form-control flex flex-col gap-1">
+								<label for="export-to" class="label text-sm font-semibold p-0">По дату</label>
+								<input
+									type="date"
+									id="export-to"
+									name="to"
+									value={ d.To }
+									required
+									class="input input-lg w-full min-h-11 text-base"
+								/>
+							</div>
+						</div>
+
+						<!-- Format Selection -->
+						<fieldset class="fieldset flex flex-col gap-2">
+							<legend class="fieldset-legend text-sm font-semibold p-0">Формат файла</legend>
+							
+							<label class="label cursor-pointer justify-start gap-3 p-2 rounded-lg hover:bg-base-200 min-h-11 whitespace-normal">
+								<input
+									type="radio"
+									name="format"
+									value="xlsx"
+									class="radio radio-primary"
+									checked?={ d.Format == "" || d.Format == "xlsx" }
+								/>
+								<div class="flex min-w-0 flex-col">
+									<span class="font-medium text-sm">Excel-книга (.xlsx)</span>
+									<span class="text-xs text-base-content/60">Все листы: Записи, Движения, По сотрудникам, Итоги месяца, По месяцам</span>
+								</div>
+							</label>
+
+							<label class="label cursor-pointer justify-start gap-3 p-2 rounded-lg hover:bg-base-200 min-h-11 whitespace-normal">
+								<input
+									type="radio"
+									name="format"
+									value="csv_records"
+									class="radio radio-primary"
+									checked?={ d.Format == "csv_records" }
+								/>
+								<div class="flex min-w-0 flex-col">
+									<span class="font-medium text-sm">CSV (.csv) — Записи</span>
+									<span class="text-xs text-base-content/60">Поклиентские записи выручки, оплат и отчислений мастера</span>
+								</div>
+							</label>
+
+							<label class="label cursor-pointer justify-start gap-3 p-2 rounded-lg hover:bg-base-200 min-h-11 whitespace-normal">
+								<input
+									type="radio"
+									name="format"
+									value="csv_movements"
+									class="radio radio-primary"
+									checked?={ d.Format == "csv_movements" }
+								/>
+								<div class="flex min-w-0 flex-col">
+									<span class="font-medium text-sm">CSV (.csv) — Движения</span>
+									<span class="text-xs text-base-content/60">Все выплаты, расходы, внесения и переводы по кассе</span>
+								</div>
+							</label>
+						</fieldset>
+
+						<button type="submit" class="btn btn-primary min-h-11 w-full mt-2">
+							Скачать файл
+						</button>
+					</form>
+				</div>
+			</section>
+
+			<!-- Information card -->
+			<section class="card bg-base-100 shadow-sm">
+				<div class="card-body p-4 gap-2 text-xs text-base-content/70">
+					<h3 class="font-semibold text-sm text-base-content">Особенности форматов:</h3>
+					<ul class="list-disc list-inside space-y-1">
+						<li>Файлы CSV формируются с разделителем «;» и европейским десятичным форматом (запятая) для совместимости с бельгийским Excel.</li>
+						<li>Кодировка UTF-8 с меткой BOM корректно открывается в Microsoft Excel и в приложении «Файлы» на iPhone без искажения кириллицы.</li>
+					</ul>
+				</div>
+			</section>
+		</div>
+	}
+}

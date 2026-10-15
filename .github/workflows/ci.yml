@@ -1,0 +1,200 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # A docs-only pull request (docs/, *.md, agent setup) skips the heavy jobs
+  # below; private-repo Actions minutes are limited. Every push to main runs
+  # everything and deploys: a docs-only merge right after a code merge must
+  # still deploy that code, since the older run skips a superseded commit.
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Anything besides docs?
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base=""
+          case "$EVENT" in
+            pull_request) base="$PR_BASE" ;;
+          esac
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "Not a pull request with a known base: run everything"
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "$base" HEAD)
+          echo "$files"
+          code=$(printf '%s\n' "$files" | grep -Ev '^(docs/|\.agents/|\.claude/)|\.md$' | grep -c . || true)
+          if [ "$code" -gt 0 ]; then echo "code=true" >> "$GITHUB_OUTPUT"; else echo "Docs only: skipping tests, phone checks and deploy"; echo "code=false" >> "$GITHUB_OUTPUT"; fi
+
+  quality:
+    name: Lint, test, security, build
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install frontend tools
+        run: bun install --frozen-lockfile
+      - name: Quality gate (generated files, lint, race tests, govulncheck, gosec, build)
+        run: make ci
+      - name: The image builds
+        run: docker build -t aestheticlab-income:ci .
+
+  store:
+    name: Store against the Firestore emulator
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Start the Firestore emulator
+        run: make firestore CONTAINER_TOOL=docker
+      - name: Store contract tests on Firestore and in memory
+        run: make test-store
+
+  secrets:
+    name: Secret scan (whole history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # gitleaks-action lists a pull request's commits
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_COMMENTS: false
+
+  workflows:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          advanced-security: false
+          version: 1.30.1
+
+  mobile:
+    name: Phone checks (Playwright)
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install frontend tools
+        run: bun install --frozen-lockfile
+      - name: Reuse the phone browsers
+        id: browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: Install the phone browsers (WebKit for iPhone, Chromium for Pixel)
+        if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: bunx playwright install --with-deps chromium webkit
+      - name: Install only their system libraries (browsers came from the cache)
+        if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
+        run: bunx playwright install-deps chromium webkit
+      - name: Every screen and flow at iPhone SE, iPhone 15 and Pixel 7, light and dark
+        run: make mobile
+      - name: Keep the screenshots and report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: phone-checks
+          path: tmp/playwright/
+          retention-days: 7
+
+  # The one check a merge waits for: it passes only when every job above
+  # did, so jobs can be added without changing what to wait for.
+  passed:
+    name: CI passed
+    if: ${{ always() }}
+    needs: [changes, quality, store, secrets, workflows, mobile]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every job succeeded (or was skipped for a docs-only change)
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+          CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+        run: |
+          echo "Results: $RESULTS (code changed: $CODE)"
+          [ "$CHANGES" = success ] || exit 1
+          for result in $RESULTS; do
+            [ "$result" = success ] && continue
+            [ "$result" = skipped ] && [ "$CODE" = false ] && continue
+            exit 1
+          done
+
+  # On main only: deploy the commit that just passed (.github/workflows/web.yml).
+  deploy:
+    name: Deploy
+    needs: passed
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    permissions:
+      contents: read
+      id-token: write # sign in to Google Cloud
+    # ./ rather than GitHub's newer $/ form, which actionlint does not know yet.
+    uses: ./.github/workflows/web.yml # zizmor: ignore[self-repository]

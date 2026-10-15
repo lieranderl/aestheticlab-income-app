@@ -1,0 +1,122 @@
+package views
+
+import "strings"
+
+// PasswordForm is the change-password form's state.
+type PasswordForm struct {
+	Error string
+	Done  string
+}
+
+// Profile is what the profile screen shows about the person.
+type Profile struct {
+	Name     string
+	Username string
+	Role     string
+	Forced   bool // first login: the temporary password must be changed
+	Password PasswordForm
+}
+
+// ProfilePage shows the person's account, the password change and «Выйти».
+templ ProfilePage(nav Nav, p Profile) {
+	@Layout("Профиль", nav) {
+		@PageHeader("Профиль", "")
+		<div class="flex flex-col gap-4">
+			<section class="card bg-base-100 shadow-sm">
+				<div class="card-body flex-row items-center gap-4">
+					<div class="avatar avatar-placeholder">
+						<div class="size-12 rounded-full bg-primary text-primary-content">
+							<span class="text-lg">{ initial(p.Name) }</span>
+						</div>
+					</div>
+					<div class="min-w-0">
+						<p class="truncate text-lg font-semibold">{ p.Name }</p>
+						<p class="truncate text-sm text-base-content/60">{ p.Username } · { p.Role }</p>
+					</div>
+				</div>
+			</section>
+			if p.Forced {
+				<div role="alert" class="alert alert-warning alert-soft">
+					@Icon("key-round", "size-5")
+					<span>Это временный пароль. Придумайте свой, чтобы продолжить.</span>
+				</div>
+			}
+			@PasswordFormView(p.Password)
+			@InstallCard()
+			<form method="post" action="/logout">
+				<button type="submit" class="btn btn-ghost btn-lg btn-block text-error">
+					@Icon("log-out", "size-5")
+					Выйти
+				</button>
+			</form>
+		</div>
+	}
+}
+
+// InstallCard explains how to put the app on the Home Screen; the installed
+// app hides it. It keeps its own login, so each person signs in once inside it.
+templ InstallCard() {
+	<section id="install-app" class="card bg-base-100 shadow-sm standalone:hidden">
+		<div class="card-body gap-2">
+			<h2 class="card-title">
+				@Icon("smartphone", "size-5 text-primary")
+				Приложение на телефоне
+			</h2>
+			<p class="text-sm text-base-content/70">Кассу можно открывать с экрана «Домой», как обычное приложение. После установки войдите в нём один раз.</p>
+			<details class="collapse-arrow collapse rounded-box border border-base-300">
+				<summary class="collapse-title min-h-12 font-medium">Как установить на iPhone</summary>
+				<ol class="collapse-content list-decimal space-y-1 pl-9 text-sm">
+					<li>Откройте эту страницу в Safari.</li>
+					<li>Нажмите «Поделиться» — квадрат со стрелкой вверх (если его не видно, он в меню «⋯»).</li>
+					<li>Выберите «На экран „Домой“» и нажмите «Добавить».</li>
+				</ol>
+			</details>
+			<details class="collapse-arrow collapse rounded-box border border-base-300">
+				<summary class="collapse-title min-h-12 font-medium">Как установить на Android</summary>
+				<ol class="collapse-content list-decimal space-y-1 pl-9 text-sm">
+					<li>Откройте эту страницу в Chrome.</li>
+					<li>Нажмите меню ⋮ в правом верхнем углу.</li>
+					<li>Выберите «Установить приложение» (или «Добавить на главный экран»).</li>
+				</ol>
+			</details>
+		</div>
+	</section>
+}
+
+// PasswordFormView is the change-password form alone, for Datastar patches.
+templ PasswordFormView(f PasswordForm) {
+	<form
+		id="password-form"
+		method="post"
+		action="/profile/password"
+		class="card bg-base-100 shadow-sm"
+		data-signals="{ _busy: false }"
+		data-indicator="_busy"
+		data-on:submit={ sendForm("/profile/password") }
+	>
+		<div class="card-body gap-2">
+			<h2 class="card-title">Сменить пароль</h2>
+			@Alert(f.Error, f.Done)
+			<input type="text" name="username" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true"/>
+			@Field("Текущий пароль", "") {
+				<input type="password" name="current" class="input input-lg w-full text-base" autocomplete="current-password" enterkeyhint="next" required/>
+			}
+			@Field("Новый пароль", "Не короче 8 символов.") {
+				<input type="password" name="new" minlength="8" class="input input-lg w-full text-base" autocomplete="new-password" enterkeyhint="next" required/>
+			}
+			@Field("Новый пароль ещё раз", "") {
+				<input type="password" name="repeat" minlength="8" class="input input-lg w-full text-base" autocomplete="new-password" enterkeyhint="done" required/>
+			}
+			<div class="pt-4">
+				@SubmitButton("Сохранить пароль")
+			</div>
+		</div>
+	</form>
+}
+
+func initial(name string) string {
+	for _, r := range strings.TrimSpace(name) {
+		return string(r)
+	}
+	return "?"
+}

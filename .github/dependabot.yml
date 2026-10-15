@@ -1,0 +1,28 @@
+# Weekly dependency updates, grouped per ecosystem, for versions out at least
+# a week. Security updates are not grouped or delayed.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
+    commit-message: { prefix: "build(deps)" }
+    groups:
+      go:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
+    commit-message: { prefix: "ci(deps)" }
+    groups:
+      actions:
+        update-types: [minor, patch]
+  - package-ecosystem: bun
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
+    commit-message: { prefix: "build(deps)" }
+    groups:
+      bun:
+        update-types: [minor, patch]

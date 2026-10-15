@@ -1,0 +1,21 @@
+# Keep secrets, local data and build output out of the image build context.
+.git
+.github
+.claude
+.agents
+.gemini
+.zed
+.worktrees
+.env
+.env.*
+*.pem
+# google-github-actions/auth writes these into the workspace
+gha-creds-*.json
+*.csv
+bin
+tmp
+node_modules
+coverage.out
+build-errors.log
+*.log
+docs

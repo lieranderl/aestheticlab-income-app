@@ -1,0 +1,8 @@
+{
+  "id": "fictional-color-picker",
+  "source_revision": "example-v1",
+  "jev_text": "In a fictional color picker, select blue and click Apply. The preview stays red; expected it to become blue.",
+  "brief": "This is a fictional routing example, not an application bug. Replace this brief with an authorized project task before approving implementation.",
+  "acceptance": ["Replace this example with the real task's observable acceptance requirements."],
+  "allowed_paths": ["internal/", "frontend/", "static/"]
+}

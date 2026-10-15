@@ -1,0 +1,59 @@
+package views
+
+type MonthActionData struct {
+	Action, Back, Title, Revision, Consequence, Error string
+	Figures                                           []MoneyRow
+	Blocked                                           bool
+}
+
+templ MonthActionPage(nav Nav, p MonthActionData) {
+	@Layout(p.Title, nav) {
+		@PageHeader(p.Title, p.Back)
+		@MonthActionForm(p)
+	}
+}
+
+templ MonthActionForm(p MonthActionData) {
+	<form
+		id="month-action-form"
+		method="post"
+		action={ templ.SafeURL(p.Action) }
+		data-on:submit={ sendFinancialForm(p.Action) }
+		data-indicator:_busy
+		data-signals:_financialunknown__ifmissing="false"
+		data-on:datastar-fetch__window={ onFinancialFetch }
+		class="flex flex-col gap-4"
+	>
+		@Alert(p.Error, "")
+		@FinancialResponseNoticeWithAdvice("Обновите страницу и проверьте состояние месяца перед повторным подтверждением.")
+		<input type="hidden" name="revision" value={ p.Revision }/>
+		@adminFigures(p.Figures)
+		<p>
+			{ p.Consequence }
+		</p>
+		@FinancialActionRow() {
+			if p.Blocked {
+				<a
+					class="btn btn-primary btn-lg w-full"
+					href={ templ.SafeURL(p.Back) }
+				>Обновить расчёт</a>
+			} else {
+				@SubmitButton(p.Title)
+			}
+		}
+	</form>
+}
+
+templ MonthActionSheet(p MonthActionData) {
+	<a
+		class="btn btn-primary min-h-11"
+		href={ templ.SafeURL(p.Action) }
+		data-on:click__prevent="$_monthdialog = true"
+	>{ p.Title }</a>
+	<dialog class="modal modal-bottom sm:modal-middle" data-signals:_monthdialog__ifmissing="false" data-effect="$_monthdialog ? el.showModal() : el.close()" data-on:close="$_monthdialog = false" aria-label={ p.Title }>
+		<div class="modal-box pb-safe">
+			<h2 class="text-lg font-semibold">{ p.Title }</h2><button type="button" class="btn btn-ghost min-h-11" data-on:click="$_monthdialog = false">Закрыть</button>@MonthActionForm(p)
+		</div>
+		<form method="dialog" class="modal-backdrop"><button>Закрыть</button></form>
+	</dialog>
+}

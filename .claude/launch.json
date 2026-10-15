@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kassa-web",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd \"$(git rev-parse --show-toplevel)\" && make dev"
+      ],
+      "port": 8080,
+      "autoPort": true
+    },
+    {
+      "name": "kassa-web-memory",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd \"$(git rev-parse --show-toplevel)\" && make dev-memory"
+      ],
+      "port": 8080,
+      "autoPort": true
+    },
+    {
+      "name": "kassa-web-trial",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd \"$(git rev-parse --show-toplevel)\" && INCOME_START_MONTH=2026-10 make dev-memory"
+      ],
+      "port": 8080,
+      "autoPort": true
+    }
+  ]
+}

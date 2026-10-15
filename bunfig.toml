@@ -1,0 +1,4 @@
+# bun test covers the service worker and draft helpers in static/; the
+# Playwright phone checks in e2e/ run with `make mobile`.
+[test]
+root = "static"

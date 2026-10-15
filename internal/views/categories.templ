@@ -1,0 +1,218 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
+	"github.com/lieranderl/aestheticlab-income-app/internal/store"
+)
+
+type CategoryFormData struct {
+	Category store.Category
+	Action   string
+	New      bool
+	Error    string
+}
+
+func categoryKindLabel(k store.CategoryKind) string {
+	switch k {
+	case store.KindRevenue:
+		return "Выручка"
+	case store.KindPayment:
+		return "Оплата"
+	default:
+		return "Расходы"
+	}
+}
+
+func categoryFlag(c store.Category) string {
+	switch c.Kind {
+	case store.KindRevenue:
+		if c.IsCertificateSale {
+			return "Продажа сертификата · не входит в «Себе»"
+		}
+		if c.CountsTowardSelf {
+			return "Входит в «Себе»"
+		}
+		return "Не входит в «Себе»"
+	case store.KindPayment:
+		switch c.Destination {
+		case domain.ToKassaCard:
+			return "Касса — карта салона"
+		case domain.ToCash:
+			return "Касса — наличные"
+		case domain.Prepaid:
+			return "Оплата сертификатом"
+		}
+	}
+	return ""
+}
+
+templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
+	@Layout("Категории", nav) {
+		@PageHeader("Категории", "/more")
+		<div class="flex flex-col gap-4">
+			<nav class="join w-full" aria-label="Вид категорий">
+				for _, k := range []store.CategoryKind{store.KindExpense, store.KindRevenue, store.KindPayment} {
+					<a
+						href={ templ.SafeURL("/admin/categories?kind=" + string(k)) }
+						class={ "join-item btn min-h-11 flex-1", templ.KV("btn-primary", k == kind) }
+						aria-current={ ariaCurrent(k == kind) }
+					>{ categoryKindLabel(k) }</a>
+				}
+			</nav>
+			<a href={ templ.SafeURL("/admin/categories/new?kind=" + string(kind)) } class="btn btn-primary btn-lg w-full">Добавить категорию</a>
+			<ul class="flex flex-col gap-3">
+				for i, c := range rows {
+					<li class="card min-w-0 bg-base-100 shadow-sm" data-signals="{ _editOpen: false }">
+						<div class="card-body min-w-0 gap-3 p-4">
+							<a href={ templ.SafeURL("/admin/categories/" + c.ID) } class="min-h-11 [overflow-wrap:anywhere] text-lg font-semibold underline-offset-2 hover:underline">{ c.Name }</a>
+							if store.IsFixedCategory(c.ID) {
+								<span class="badge badge-soft badge-neutral">Базовая</span>
+							} else if !c.Active {
+								<span class="badge badge-soft badge-warning">В архиве</span>
+							}
+							if categoryFlag(c) != "" {
+								<p class="text-sm text-base-content/70 [overflow-wrap:anywhere]">{ categoryFlag(c) }</p>
+							}
+							<button type="button" class="btn min-h-11 w-full" data-on:click="$_editOpen = true">Изменить</button>
+							<dialog class="modal modal-bottom sm:modal-middle" aria-label={ "Изменить: " + c.Name } data-effect="$_editOpen ? el.showModal() : el.close()" data-on:close="$_editOpen = false">
+								<div class="modal-box min-w-0 pb-safe">
+									<div class="mb-3 flex items-center justify-between gap-3">
+										<h2 class="min-w-0 text-lg font-semibold [overflow-wrap:anywhere]">{ c.Name }</h2>
+										<button type="button" class="btn btn-ghost btn-square min-h-11" aria-label="Закрыть" data-on:click="$_editOpen = false">×</button>
+									</div>
+									@CategoryForm(CategoryFormData{Category: c, Action: "/admin/categories/" + c.ID})
+									if !store.IsFixedCategory(c.ID) {
+										<a href={ templ.SafeURL("/admin/categories/" + c.ID) } class="btn btn-ghost min-h-11 mt-3 w-full">Архивировать или удалить</a>
+									}
+								</div>
+								<form method="dialog" class="modal-backdrop"><button>Закрыть</button></form>
+							</dialog>
+							<div class="flex gap-2">
+								if i > 0 {
+									@categoryOrderButton(c, rows[i-1], "Выше")
+								} else {
+									<button type="button" class="btn min-h-11 flex-1" disabled>Выше</button>
+								}
+								if i+1 < len(rows) {
+									@categoryOrderButton(c, rows[i+1], "Ниже")
+								} else {
+									<button type="button" class="btn min-h-11 flex-1" disabled>Ниже</button>
+								}
+							</div>
+						</div>
+					</li>
+				}
+				if len(rows) == 0 {
+					<li class="p-4 text-center text-base-content/60">Категорий пока нет.</li>
+				}
+			</ul>
+		</div>
+	}
+}
+
+templ categoryOrderButton(c, neighbor store.Category, label string) {
+	<form method="post" action={ templ.SafeURL("/admin/categories/" + c.ID + "/reorder") } class="flex-1" data-on:submit={ sendForm("/admin/categories/" + c.ID + "/reorder") }>
+		<input type="hidden" name="version" value={ strconv.FormatInt(c.Version, 10) }/>
+		<input type="hidden" name="neighbor" value={ neighbor.ID }/>
+		<input type="hidden" name="neighborVersion" value={ strconv.FormatInt(neighbor.Version, 10) }/>
+		<button type="submit" class="btn min-h-11 w-full">{ label }</button>
+	</form>
+}
+
+templ CategoryPage(nav Nav, f CategoryFormData) {
+	@Layout("Категория", nav) {
+		@PageHeader("Категория", "/admin/categories?kind=" + string(f.Category.Kind))
+		@CategoryForm(f)
+		if !f.New {
+			@categoryActions(f.Category)
+		}
+	}
+}
+
+templ CategoryForm(f CategoryFormData) {
+	<form id={ "category-form-" + f.Category.ID } method="post" action={ templ.SafeURL(f.Action) } class="card bg-base-100 shadow-sm" data-signals="{ _busy: false }" data-indicator="_busy" data-on:submit={ sendForm(f.Action) }>
+		<div class="card-body gap-3 p-4">
+			@Alert(f.Error, "")
+			if f.New {
+				<input type="hidden" name="kind" value={ string(f.Category.Kind) }/>
+			} else {
+				<input type="hidden" name="version" value={ strconv.FormatInt(f.Category.Version, 10) }/>
+			}
+			@Field("Название", "До 120 символов.") {
+				<input name="name" value={ f.Category.Name } maxlength="120" class="input input-lg w-full text-base" required autofocus/>
+			}
+			if store.IsFixedCategory(f.Category.ID) {
+				<div class="rounded-box bg-base-200 p-3 text-sm text-base-content/70">
+					Это базовая категория салона. Изменение названия разрешено; системные флаги влияют на поклиентский учёт.
+				</div>
+			}
+			if f.Category.Kind == store.KindRevenue {
+				<label class="label min-h-12 cursor-pointer justify-between gap-3">Входит в «Себе» <input type="checkbox" name="countsTowardSelf" value="1" class="checkbox checkbox-primary" checked?={ f.Category.CountsTowardSelf }/></label>
+				<label class="label min-h-12 cursor-pointer justify-between gap-3">Продажа сертификата <input type="checkbox" name="isCertificateSale" value="1" class="checkbox checkbox-primary" checked?={ f.Category.IsCertificateSale }/></label>
+				<p class="text-sm text-base-content/70">Продажа сертификата не может входить в «Себе». Для поклиентских записей используются услуги и сопутствующие продажи. Изменения действуют только для будущих отчётов.</p>
+			}
+			if f.Category.Kind == store.KindPayment {
+				@Field("Куда поступают деньги", "") {
+					<select name="destination" class="select select-lg w-full text-base" required>
+						<option value={ string(domain.ToKassaCard) } selected?={ f.Category.Destination == domain.ToKassaCard }>Касса — карта салона</option>
+						<option value={ string(domain.ToCash) } selected?={ f.Category.Destination == domain.ToCash }>Касса — наличные</option>
+						<option value={ string(domain.Prepaid) } selected?={ f.Category.Destination == domain.Prepaid }>Оплата сертификатом</option>
+					</select>
+				}
+				<p class="text-sm text-base-content/70">Изменение действует только для будущих отчётов.</p>
+			}
+			@SubmitButton("Сохранить")
+		</div>
+	</form>
+}
+
+templ categoryActions(c store.Category) {
+	<section class="mt-4 flex flex-col gap-3" aria-label="Действия с категорией">
+		if store.IsFixedCategory(c.ID) {
+			<div class="rounded-box bg-base-100 p-4 text-sm text-base-content/70">
+				Это базовая категория салона. Её нельзя архивировать или удалить.
+			</div>
+		} else {
+			<details class="rounded-box bg-base-100 p-4">
+				<summary class="min-h-11 cursor-pointer font-semibold">
+					if c.Active {
+						Архивировать
+					} else {
+						Вернуть из архива
+					}
+				</summary>
+				<p class="my-3 text-sm">
+					if c.Active {
+						Категория исчезнет из новых форм. Сохранённые суммы останутся.
+					} else {
+						Категория снова появится в формах.
+					}
+				</p>
+				<form method="post" action={ templ.SafeURL("/admin/categories/" + c.ID + "/archive") } data-on:submit={ sendForm("/admin/categories/" + c.ID + "/archive") }>
+					<input type="hidden" name="version" value={ strconv.FormatInt(c.Version, 10) }/>
+					<input type="hidden" name="confirm" value="1"/>
+					if c.Active {
+						<input type="hidden" name="active" value="0"/>
+						<button type="submit" class="btn btn-warning min-h-11 w-full">Подтвердить архивирование</button>
+					} else {
+						<input type="hidden" name="active" value="1"/>
+						<button type="submit" class="btn btn-primary min-h-11 w-full">Вернуть из архива</button>
+					}
+				</form>
+			</details>
+			if c.UsedCount == 0 {
+				<details class="rounded-box bg-base-100 p-4">
+					<summary class="min-h-11 cursor-pointer font-semibold text-error">Удалить категорию</summary>
+					<p class="my-3 text-sm">Категория ещё не использовалась. После удаления она исчезнет из списка и форм.</p>
+					<form method="post" action={ templ.SafeURL("/admin/categories/" + c.ID + "/delete") } data-on:submit={ sendForm("/admin/categories/" + c.ID + "/delete") }>
+						<input type="hidden" name="version" value={ strconv.FormatInt(c.Version, 10) }/>
+						<input type="hidden" name="confirm" value="1"/>
+						<button type="submit" class="btn btn-error min-h-11 w-full">Подтвердить удаление</button>
+					</form>
+				</details>
+			}
+		}
+	</section>
+}

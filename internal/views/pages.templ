@@ -1,0 +1,52 @@
+package views
+
+// MorePage is the admin's «Ещё» list: the screens that don't fit the bar.
+templ MorePage(nav Nav, links []NavItem) {
+	@Layout("Ещё", nav) {
+		@PageHeader("Ещё", "")
+		<ul class="menu menu-lg w-full gap-1 rounded-box bg-base-100 p-2 shadow-sm">
+			for _, l := range links {
+				<li>
+					<a href={ templ.SafeURL(l.Href) } class="min-h-12">
+						@Icon(l.Icon, "size-5 text-primary")
+						{ l.Label }
+						@Icon("chevron-right", "ml-auto size-5 text-base-content/40")
+					</a>
+				</li>
+			}
+		</ul>
+		<form method="post" action="/logout" class="pt-4">
+			<button type="submit" class="btn btn-ghost btn-lg btn-block text-error">
+				@Icon("log-out", "size-5")
+				Выйти
+			</button>
+		</form>
+	}
+}
+
+// SoonPage stands in for a screen a later milestone builds.
+templ SoonPage(nav Nav, title string) {
+	@Layout(title, nav) {
+		@PageHeader(title, "")
+		<section class="card bg-base-100 shadow-sm">
+			<div class="card-body items-center gap-3 py-10 text-center">
+				@Icon("hammer", "size-8 text-primary")
+				<p class="text-base-content/70">Этот раздел появится в следующих версиях приложения.</p>
+			</div>
+		</section>
+	}
+}
+
+// ForbiddenPage is shown when a person opens a screen they may not see.
+templ ForbiddenPage(nav Nav) {
+	@Layout("Нет доступа", nav) {
+		@PageHeader("Нет доступа", "")
+		<section class="card bg-base-100 shadow-sm">
+			<div class="card-body items-center gap-3 py-10 text-center">
+				@Icon("lock", "size-8 text-error")
+				<p class="text-base-content/70">Этот раздел доступен только администратору.</p>
+				<a href="/" class="btn btn-primary btn-lg">На главную</a>
+			</div>
+		</section>
+	}
+}

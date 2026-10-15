@@ -1,0 +1,433 @@
+package views
+
+import "strconv"
+
+type MovementFormData struct {
+	Action, Back, Type, Amount, Date, MinDate, MaxDate, From, To, Category, Note, Error string
+	SettlementMonth, SettlementPerson, SettlementRevision, ContextNotice                string
+	Admin                                                                               bool
+	Sources, Destinations, Categories                                                   []FilterOption
+}
+type MovementCard struct {
+	ID, Title, Date, Amount, Parties, Note, Status, VoidReason, VoidURL, ConfirmURL string
+	Version                                                                         int64
+}
+type AccountCard struct {
+	Name, Balance, Recount, Last string
+	Form                         RecountFormData
+}
+type KassaData struct {
+	Accounts             []AccountCard
+	Certificates, Notice, AsOf string
+	CertificateWarning   bool
+	Pending, Recent      []MovementCard
+	Form                 MovementFormData
+}
+type MovementActionData struct {
+	ID, Title, Action, Back, Reason, Error string
+	Version                                int64
+	Card                                   MovementCard
+	Void                                   bool
+	Processed                              bool
+}
+type RecountFormData struct{ ID, Action, Name, Expected, Counted, Note, Error string }
+type MovementHistoryData struct {
+	Filters HistoryFilters
+	Paging  Paging
+	Cards   []MovementCard
+}
+
+templ MovementFormPage(nav Nav, f MovementFormData) {
+	@Layout("Движение", nav) {
+		@PageHeader("Движение", f.Back)
+		@MovementForm(f)
+	}
+}
+
+templ MovementForm(f MovementFormData) {
+	<form
+		id="movement-form"
+		method="post"
+		action={ templ.SafeURL(f.Action) }
+		data-on:submit={ sendMovementForm(f.Action) }
+		data-indicator:_busy
+		data-signals:_financialunknown__ifmissing="false"
+		data-signals:_movementloading__ifmissing="false"
+		data-signals:_movementready__ifmissing="true"
+		data-on:datastar-fetch__window={ onFinancialFetch }
+		class="flex flex-col gap-3"
+	>
+		<p role="status" class="hidden" data-class:hidden="!$_movementloading"><span class="loading loading-spinner loading-sm"></span> Загружаем форму…</p>
+		<p role="alert" class="alert alert-warning alert-soft hidden" data-class:hidden="$_movementready || $_movementloading">Не удалось загрузить форму. Выберите вид движения ещё раз или откройте форму на отдельной странице.</p>
+		@Alert(f.Error, "")
+		@FinancialResponseNotice()
+		if f.ContextNotice!="" {
+			<p class="alert alert-info alert-soft" role="status">{ f.ContextNotice }</p>
+		}
+		<nav class="flex flex-wrap gap-2" aria-label="Вид движения">
+			if f.Admin {
+				<a
+					class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "payout") }
+					aria-current={ selectedMovementType(f.Type, "payout") }
+					href="/admin/movements/new?type=payout"
+					data-url="/admin/movements/new?type=payout"
+					data-on:click__prevent={ loadMovementForm(false) }
+					data-on:datastar-fetch__window={ onMovementLoad }
+					data-attr:aria-disabled="$_movementloading"
+					data-attr:tabindex="$_movementloading ? -1 : 0"
+				>Выдать</a>
+				<a
+					class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "transfer") }
+					aria-current={ selectedMovementType(f.Type, "transfer") }
+					href="/admin/movements/new?type=transfer"
+					data-url="/admin/movements/new?type=transfer"
+					data-on:click__prevent={ loadMovementForm(false) }
+					data-on:datastar-fetch__window={ onMovementLoad }
+					data-attr:aria-disabled="$_movementloading"
+					data-attr:tabindex="$_movementloading ? -1 : 0"
+				>Перевести</a>
+			}
+			<a
+				class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "deposit") }
+				aria-current={ selectedMovementType(f.Type, "deposit") }
+				href={ templ.SafeURL(movementNewURL(f, "deposit")) }
+				data-url={ movementNewURL(f, "deposit") }
+				data-on:click__prevent={ loadMovementForm(false) }
+				data-on:datastar-fetch__window={ onMovementLoad }
+				data-attr:aria-disabled="$_movementloading"
+				data-attr:tabindex="$_movementloading ? -1 : 0"
+			>Внести в кассу</a>
+			<a
+				class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "expense") }
+				aria-current={ selectedMovementType(f.Type, "expense") }
+				href={ templ.SafeURL(movementNewURL(f, "expense")) }
+				data-url={ movementNewURL(f, "expense") }
+				data-on:click__prevent={ loadMovementForm(false) }
+				data-on:datastar-fetch__window={ onMovementLoad }
+				data-attr:aria-disabled="$_movementloading"
+				data-attr:tabindex="$_movementloading ? -1 : 0"
+			>Расход</a>
+		</nav>
+		<fieldset class="flex min-w-0 flex-col gap-3" data-attr:disabled="$_movementloading || !$_movementready" data-attr:aria-busy="$_movementloading">
+			<input type="hidden" name="type" value={ f.Type }/>
+			if f.SettlementMonth!="" {
+				<input type="hidden" name="settlement" value={ f.SettlementMonth }/>
+				<input type="hidden" name="settlementPerson" value={ f.SettlementPerson }/>
+				<input type="hidden" name="settlementRevision" value={ f.SettlementRevision }/>
+			}
+			@Field("Дата", "") {
+				<input type="date" name="date" autofocus data-effect="if (!$_movementloading && $_movementready && (!el.closest('dialog') || el.closest('dialog').open)) { el.focus() }" value={ f.Date } min={ f.MinDate } max={ f.MaxDate } class="input input-lg w-full min-w-0 text-base" required/>
+			}
+			@Field("Сумма, €", "") {
+				<input name="amount" value={ f.Amount } inputmode="decimal" enterkeyhint="next" autocomplete="off" class="input input-lg w-full text-base" required/>
+			}
+			@Field("Откуда", "") {
+				@movementSelect("from", f.From, f.Sources)
+			}
+			@Field("Куда", "") {
+				@movementSelect("to", f.To, f.Destinations)
+			}
+			if f.Type == "expense" {
+				@Field("Категория расхода", "") {
+					@movementSelect("expenseCategory", f.Category, f.Categories)
+				}
+			}
+			@Field(movementCommentLabel(f.Type), "") {
+				<textarea name="note" class="textarea textarea-lg w-full text-base" required?={ f.Type == "expense" }>{ f.Note }</textarea>
+			}
+			@FinancialActionRow() {
+				@SubmitButton("Сохранить")
+			}
+		</fieldset>
+	</form>
+}
+
+func movementCommentLabel(kind string) string {
+	if kind == "expense" {
+		return "Комментарий (обязательно)"
+	}
+	return "Комментарий (необязательно)"
+}
+
+// Block stale input synchronously before the GET starts. Successful server patches
+// explicitly restore readiness; a failed GET never enables the previous form.
+const onMovementLoad = `if (evt.detail.el === el && (evt.detail.type === 'error' || evt.detail.type === 'retries-failed')) { $_movementloading = false; $_movementready = false }`
+
+func loadMovementForm(sheet bool) string {
+	open := ""
+	if sheet {
+		open = "$_movementOpen = true; "
+	}
+	return "if (!$_movementloading && !$_busy) { $_movementready = false; $_movementloading = true; " + open + "@get(el.dataset.url, {retry: 'never', retryMaxCount: 0}) }"
+}
+
+func sendMovementForm(action string) string {
+	return "if ($_movementready && !$_movementloading) { " + sendFinancialForm(action) + " }"
+}
+
+func selectedMovementType(selected, kind string) string {
+	if selected == kind {
+		return "true"
+	}
+	return "false"
+}
+
+func movementActionID(p MovementActionData) string {
+	if p.Void {
+		return "movement-action-" + p.ID + "-void"
+	}
+	return "movement-action-" + p.ID + "-confirm"
+}
+func voidForm(c MovementCard) MovementActionData {
+	return MovementActionData{ID: c.ID, Version: c.Version, Void: true, Title: "Отменить движение", Action: c.VoidURL}
+}
+func movementNewURL(f MovementFormData, kind string) string {
+	if f.Admin {
+		return "/admin/movements/new?type=" + kind
+	}
+	return "/movements/new?type=" + kind
+}
+
+templ movementSelect(name, selected string, options []FilterOption) {
+	<select name={ name } class="select select-lg w-full text-base" required>
+		for _, o := range options {
+			<option value={ o.Value } selected?={ selected == o.Value }>{ o.Label }</option>
+		}
+	</select>
+}
+
+templ MovementSheet(f MovementFormData) {
+	<section data-signals="{ _movementOpen: false }">
+		<a
+			href={ templ.SafeURL(movementNewURL(f, f.Type)) }
+			class="btn btn-primary btn-lg w-full"
+			data-url={ movementNewURL(f, f.Type) }
+			data-on:click__prevent={ loadMovementForm(true) }
+			data-on:datastar-fetch__window={ onMovementLoad }
+			data-attr:aria-disabled="$_movementloading"
+			data-attr:tabindex="$_movementloading ? -1 : 0"
+		>
+			if f.Admin {
+				+ Движение
+			} else {
+				+ Внести в кассу
+			}
+		</a>
+		if !f.Admin {
+			<a
+				href="/movements/new?type=expense"
+				class="btn min-h-11 w-full"
+				data-on:click__prevent={ loadMovementForm(true) }
+				data-on:datastar-fetch__window={ onMovementLoad }
+				data-attr:aria-disabled="$_movementloading"
+				data-attr:tabindex="$_movementloading ? -1 : 0"
+				data-url="/movements/new?type=expense"
+			>+ Расход за свой счёт</a>
+		}
+		<dialog class="modal modal-bottom sm:modal-middle" data-effect="$_movementOpen ? el.showModal() : el.close()" data-on:close="$_movementOpen = false" aria-label="Движение">
+			<div class="modal-box pb-safe">
+				<div class="flex items-center justify-between"><h2 class="text-lg font-semibold">Движение</h2><button type="button" class="btn btn-ghost min-h-11" data-on:click="$_movementOpen = false">Закрыть</button></div>
+				@MovementForm(f)
+			</div>
+			<form method="dialog" class="modal-backdrop"><button>Закрыть</button></form>
+		</dialog>
+	</section>
+}
+
+templ movementCards(cards []MovementCard) {
+	for _, c := range cards {
+		@movementCard(c)
+	}
+}
+
+templ movementCard(c MovementCard) {
+	<article class="card bg-base-100 shadow-sm">
+		<div class="card-body min-w-0 gap-2 p-4">
+			<div class="flex flex-wrap justify-between gap-2"><h3 class="font-semibold">{ c.Title }</h3><p class="min-w-0 max-w-full text-lg font-semibold [overflow-wrap:anywhere]">{ c.Amount }</p></div>
+			<p class="min-w-0 text-sm [overflow-wrap:anywhere]">{ c.Date } · { c.Parties }</p>
+			<p class="badge badge-soft h-auto whitespace-normal">{ c.Status }</p>
+			if c.Note != "" {
+				<p class="break-words">{ c.Note }</p>
+			}
+			if c.VoidReason != "" {
+				<p class="break-words">Причина отмены: { c.VoidReason }</p>
+			}
+			if c.ConfirmURL != "" {
+				<form
+					id={ "movement-action-" + c.ID + "-confirm" }
+					method="post"
+					action={ templ.SafeURL(c.ConfirmURL) }
+					data-on:submit={ sendFinancialForm(c.ConfirmURL) }
+					data-signals:_financialunknown__ifmissing="false"
+					data-on:datastar-fetch__window={ onFinancialFetch }
+				>
+					@FinancialResponseNotice()
+					<input
+						type="hidden"
+						name="version"
+						value={ strconv.FormatInt(c.Version, 10) }
+					/><button class="btn btn-primary min-h-11 w-full">Подтвердить</button>
+				</form>
+			}
+			if c.VoidURL != "" {
+				<a class="btn btn-ghost min-h-11" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger">Отменить движение</a>
+				<dialog data-signals:_voidid__ifmissing="''" class="modal modal-bottom sm:modal-middle" data-ledger={ c.ID } data-effect="$_voidid === el.dataset.ledger ? el.showModal() : el.close()" data-on:close="$_voidid = ''" aria-label="Причина отмены">
+					<div class="modal-box pb-safe">
+						<button type="button" class="btn btn-ghost min-h-11" data-on:click="$_voidid = ''">Закрыть</button>
+						@MovementActionForm(voidForm(c))
+					</div>
+					<form method="dialog" class="modal-backdrop"><button>Закрыть</button></form>
+				</dialog>
+			}
+		</div>
+	</article>
+}
+
+templ KassaPage(nav Nav, p KassaData) {
+	@Layout("Касса", nav) {
+		@PageHeader("Касса", "")
+		<div class="flex flex-col gap-4">
+			@Alert("", p.Notice)
+			<p class="text-base-content/70">Текущие остатки на { p.AsOf }</p>
+			<section class="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Счета кассы">
+				for _, c := range p.Accounts {
+					<article class="card bg-base-100">
+						<div class="card-body p-4">
+							<h2 class="min-w-0 font-semibold [overflow-wrap:anywhere]">{ c.Name }</h2>
+							<p class="min-w-0 text-2xl font-semibold [overflow-wrap:anywhere]">{ c.Balance }</p>
+							<p class="text-sm text-base-content/60">{ c.Last }</p><a href={ templ.SafeURL(c.Recount) } data-account={ c.Form.ID } data-on:click__prevent="$_recountid = el.dataset.account" class="btn min-h-11">Пересчитать</a>
+							<dialog data-signals:_recountid__ifmissing="''" class="modal modal-bottom sm:modal-middle" data-account={ c.Form.ID } data-effect="$_recountid === el.dataset.account ? el.showModal() : el.close()" data-on:close="$_recountid = ''" aria-label="Пересчёт кассы">
+								<div class="modal-box pb-safe">
+									<button class="btn btn-ghost min-h-11" type="button" data-on:click="$_recountid = ''">Закрыть</button>
+									@RecountForm(c.Form)
+								</div>
+								<form method="dialog" class="modal-backdrop"><button>Закрыть</button></form>
+							</dialog>
+						</div>
+					</article>
+				}
+			</section>
+			@figure("Неиспользованные сертификаты", p.Certificates)
+			if p.CertificateWarning {
+				<section role="alert" class="alert alert-warning alert-soft">
+					<div class="flex min-w-0 flex-col gap-2">
+						<h2 class="font-semibold">Проверьте сертификаты</h2>
+						<p>Использовано больше, чем учтено. Проверьте начальный остаток, продажи и использование сертификатов.</p>
+						<a class="btn min-h-11" href="/admin/history">Открыть записи</a>
+					</div>
+				</section>
+			}
+			<h2 class="text-lg font-semibold">Ожидают подтверждения</h2>
+			if len(p.Pending) == 0 {
+				<p>Нет движений для подтверждения.</p>
+			}
+			@movementCards(p.Pending)
+			@MovementSheet(p.Form)
+			<h2 class="text-lg font-semibold">Последние движения</h2>
+			@movementCards(p.Recent)
+			<a href="/admin/history/movements" class="btn min-h-11">История движений</a>
+		</div>
+	}
+}
+
+templ MovementActionPage(nav Nav, p MovementActionData) {
+	@Layout(p.Title, nav) {
+		@PageHeader(p.Title, p.Back)
+		@movementCard(p.Card)
+		@MovementActionForm(p)
+	}
+}
+
+templ MovementActionForm(p MovementActionData) {
+	<form
+		id={ movementActionID(p) }
+		method="post"
+		action={ templ.SafeURL(p.Action) }
+		data-on:submit={ sendFinancialForm(p.Action) }
+		data-indicator:_busy
+		data-signals:_financialunknown__ifmissing="false"
+		data-on:datastar-fetch__window={ onFinancialFetch }
+		class="flex flex-col gap-3"
+	>
+		@Alert(p.Error, "")
+		@FinancialResponseNotice()
+		<input
+			type="hidden"
+			name="version"
+			value={ strconv.FormatInt(p.Version, 10) }
+		/>
+		if p.Void {
+			@Field("Причина отмены", "Обязательно") {
+				<textarea name="reason" autofocus class="textarea textarea-lg w-full text-base" required>{ p.Reason }</textarea>
+			}
+		}
+		@FinancialActionRow() {
+			if p.Processed {
+				<a href={ templ.SafeURL(p.Back) } class="btn btn-primary btn-lg w-full">К движениям</a>
+			} else {
+				@SubmitButton(p.Title)
+			}
+		}
+	</form>
+}
+
+templ RecountPage(nav Nav, p RecountFormData) {
+	@Layout("Пересчёт кассы", nav) {
+		@PageHeader("Пересчёт кассы", "/admin/kassa")
+		@RecountForm(p)
+	}
+}
+
+templ RecountForm(p RecountFormData) {
+	<form
+		id={ "recount-" + p.ID }
+		method="post"
+		action={ templ.SafeURL(p.Action) }
+		data-on:submit={ sendFinancialForm(p.Action) }
+		data-indicator:_busy
+		data-signals:_financialunknown__ifmissing="false"
+		data-on:datastar-fetch__window={ onFinancialFetch }
+		class="flex flex-col gap-3"
+	>
+		@Alert(p.Error, "")
+		@FinancialResponseNotice()
+		<h2 class="min-w-0 text-lg font-semibold [overflow-wrap:anywhere]">{ p.Name }</h2>
+		<p class="min-w-0 [overflow-wrap:anywhere]">По расчёту: { p.Expected }</p>
+		@Field("Фактически", "Ноль — допустимая сумма") {
+			<input name="counted" value={ p.Counted } inputmode="decimal" enterkeyhint="next" autocomplete="off" autofocus class="input input-lg w-full text-base" required/>
+		}
+		@Field("Комментарий", "Обязательно, если сумма отличается") {
+			<textarea name="note" class="textarea textarea-lg w-full text-base">{ p.Note }</textarea>
+		}
+		@FinancialActionRow() {
+			@SubmitButton("Сохранить пересчёт")
+		}
+	</form>
+}
+
+templ historyTabs(movements bool) {
+	<nav class="tabs tabs-box" aria-label="Раздел истории">
+		<a
+			href="/admin/history"
+			class={ "tab min-h-11", templ.KV("tab-active", !movements) }
+		>Записи</a><a
+	href="/admin/history/movements"
+	class={ "tab min-h-11", templ.KV("tab-active", movements) }
+>Движения</a>
+	</nav>
+}
+
+templ MovementHistoryPage(nav Nav, p MovementHistoryData) {
+	@Layout("История движений", nav) {
+		@PageHeader("История", "/more")
+		<div class="flex flex-col gap-4">
+			@historyTabs(true)
+			@historyFilters(p.Filters)
+			if len(p.Cards)==0 {
+				<p>По этим фильтрам движений нет.</p>
+			}
+			@movementCards(p.Cards)
+			@paging(p.Paging)
+		</div>
+	}
+}

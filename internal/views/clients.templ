@@ -1,0 +1,305 @@
+package views
+
+import (
+	"encoding/json"
+	"strconv"
+)
+
+type ClientForm struct {
+	Bad                                                                              map[string]bool
+	FieldErrors                                                                      map[string]string
+	User, Date, Token, Entry, Title, Action, Back, Error, Done, Locked, Acknowledged string
+	CanNext                                                                          bool
+	OtherEmployee                                                                    bool
+	Incomplete                                                                       bool
+	Version, Number, Pct                                                             int64
+	Values                                                                           map[string]string
+	Self, Salon, Cash, Card, Held, Effect, DayLabel, SharePct                        string
+}
+
+func clientSignals(f ClientForm) string {
+	b, _ := json.Marshal(map[string]any{"_busy": false, "_financialunknown": false, "_client": f.Values, "_clientPct": f.Pct})
+	return string(b)
+}
+
+const clientExtrasOpen = `if ([$_client.creams, $_client.oil, $_client.certificates].some(v => String(v ?? '').trim() !== '')) { el.open = true }`
+const clientCertificateOpen = `if ([$_client.certificatePaid].some(v => String(v ?? '').trim() !== '')) { el.open = true }`
+
+var clientCents = `Object.fromEntries(Object.entries($_client).filter(([k]) => k !== 'extrasDestination').map(([k,v]) => [k, ((s) => s === '' ? 0 : /^(?=[.,]?\d)(\d{1,3}( \d{3})+|\d{0,7})([.,]\d{1,2})?$/.test(s) && s.split(/[.,]/)[0].replace(/ /g, '').length <= 7 ? Math.round(Number(s.replace(/ /g, '').replace(',', '.')) * 100) : NaN)(String(v ?? '').trim().replace(/^€/, '').replace(/€$/, '').trim().replace(/[ \u00a0\u202f]+/g, ' '))]))`
+const clientErrors = `(() => { const errors = Object.fromEntries(Object.entries($_cc).filter(([k,v]) => !Number.isFinite(v) || v < 0 || v > 999999999).map(([k]) => [k, 'Введите сумму от €0 до €9 999 999,99, например 600,50.'])); if (!errors.services && !errors.certificatePaid && $_cc.certificatePaid > $_cc.services) { errors.certificatePaid = 'Использование сертификата не больше стоимости услуг.' } if (!errors.services && !errors.certificatePaid && !errors.serviceCash && !errors.serviceCard && $_cc.serviceCash + $_cc.serviceCard > $_cc.services - $_cc.certificatePaid) { errors.serviceCash = errors.serviceCard = 'Сумма взносов не больше стоимости услуг за вычетом сертификата.' } if (!['cash', 'kassa_card'].includes($_client.extrasDestination) && ($_ce > 0 || $_client.extrasDestination !== '')) { errors.extrasDestination = 'Выберите, куда внесены дополнительные продажи.' } return errors })()`
+const clientFocusInvalid = `const field = [...el.elements].find(field => $_clientErrors[field.name]); if (field) { field.closest('details')?.setAttribute('open', ''); field.focus({preventScroll: true}); field.scrollIntoView({block: 'center'}) }`
+var clientSelf = `Math.floor((($_cc.services) * $_clientPct + 5000) / 10000)`
+var clientExtras = `($_cc.creams) + ($_cc.oil) + ($_cc.certificates)`
+var clientCash = `($_cc.serviceCash) + ($_client.extrasDestination === 'cash' ? $_ce : 0)`
+var clientCard = `($_cc.serviceCard) + ($_client.extrasDestination === 'kassa_card' ? $_ce : 0)`
+var clientDelta = `$_cashDeposit + $_cardDeposit + ($_cc.certificatePaid) - (($_cc.services) + $_ce - $_clientSelf)`
+
+templ ClientPage(nav Nav, f ClientForm) {
+	@Layout(f.Title, nav) {
+		@PageHeader(f.Title, f.Back)
+		<p class="mb-3 text-base-content/70">{ f.DayLabel }</p>
+		@ClientFormView(f)
+		if f.Version > 0 && f.CanNext && f.Locked == "" {
+			<a class="btn btn-lg w-full mt-4" href={ templ.SafeURL("/clients/new?date=" + f.Date) }>Следующий клиент</a>
+		}
+		if f.Version > 0 && f.Entry != "new" && f.Locked == "" {
+			<a class="btn btn-ghost btn-lg w-full mt-6 text-error" href={ templ.SafeURL(f.Action + "/remove") }>
+				@Icon("trash-2", "size-5")
+				Удалить клиента
+			</a>
+		}
+		<script type="module" src="/static/draft.js"></script>
+	}
+}
+
+templ ClientFormView(f ClientForm) {
+	<form id="client-form" method="post" action={ templ.SafeURL(f.Action) } class="flex flex-col gap-4" data-draft={ f.Date } data-draft-user={ f.User } data-draft-entry={ f.Entry } data-draft-token={ f.Token } data-draft-ack={ f.Acknowledged } data-version={ strconv.FormatInt(f.Version, 10) } data-signals={ clientSignals(f) } data-computed:_cc={ clientCents } data-computed:_ce={ clientExtras } data-computed:_client-errors={ clientErrors } data-computed:_client-ready="Object.keys($_clientErrors).length === 0" data-computed:_client-self={ clientSelf } data-computed:_cash-deposit={ clientCash } data-computed:_card-deposit={ clientCard } data-computed:_client-delta={ clientDelta } data-indicator="_busy" data-on:submit={ clientFocusInvalid + "; " + sendFinancialForm(f.Action) } data-on:datastar-fetch={ onFinancialFetch } data-on:keydown={ nextField }>
+		<input type="hidden" name="date" value={ f.Date }/>
+		<input type="hidden" name="token" value={ f.Token }/>
+		<input type="hidden" name="version" value={ strconv.FormatInt(f.Version, 10) }/>
+		if f.Incomplete {
+			<div id="client-validation-summary" role="alert" class="alert alert-error alert-soft" data-class:hidden="$_clientReady">
+				@Icon("circle-alert", "size-5")
+				<span data-text="Object.keys($_clientErrors).length ? 'Проверьте выделенные поля.' : ''">{ f.Error }</span>
+			</div>
+			@Alert("", f.Done)
+		} else {
+			@Alert(f.Error, f.Done)
+		}
+		if f.Incomplete {
+			<span class="hidden" data-init={ "const form = el.closest('form'); const field = form.querySelector('[aria-invalid=true]'); if (field) { field.closest('details')?.setAttribute('open', ''); field.focus({preventScroll: true}); field.scrollIntoView({block: 'center'}) }" }></span>
+		}
+		if f.Locked != "" {
+			<div role="alert" class="alert alert-warning alert-soft">
+				@Icon("lock", "size-5")
+				<span>{ f.Locked }</span>
+			</div>
+		}
+		<fieldset class="contents" disabled?={ f.Locked != "" }>
+			<section class="card bg-base-100">
+				<div class="card-body p-4">
+					<h2 class="font-semibold">Услуги</h2>
+					@clientField(f, "services", "Стоимость услуг, €", "Включая оплату сертификатом. Если услуг нет — €0.")
+					<details class="collapse collapse-arrow bg-base-200" data-effect={ clientCertificateOpen } open?={ f.Values["certificatePaid"]!="" }>
+						<summary class="collapse-title min-h-12 font-medium">Оплата сертификатом (необязательно)</summary>
+						<div class="collapse-content">
+							@clientField(f, "certificatePaid", "Оплачено сертификатом, € (необязательно)", "Не больше стоимости услуг. Пустое поле — €0.")
+						</div>
+					</details>
+				</div>
+			</section>
+			<details class="collapse collapse-arrow bg-base-100" data-effect={ clientExtrasOpen } open?={ f.Values["creams"]!="" || f.Values["oil"]!="" || f.Values["certificates"]!="" }>
+				<summary class="collapse-title min-h-12 font-medium">Дополнительные продажи (необязательно)</summary>
+				<div class="collapse-content">
+					<p class="text-sm text-base-content/70">Вся сумма продаж — салону. Пустое поле — €0.</p>
+					@clientField(f, "creams", "Кремы, € (необязательно)", "")
+					@clientField(f, "oil", "Масло, € (необязательно)", "")
+					@clientField(f, "certificates", "Продажа сертификатов, € (необязательно)", "")
+					<label class="flex flex-col gap-2 py-2">Куда внесены продажи (обязательно при продаже)
+						<select name="extrasDestination" class={ "select select-lg w-full text-base",templ.KV("select-error",f.Bad["extrasDestination"]) } data-class:select-error="Boolean($_clientErrors[el.name])" aria-invalid={ boolText(f.Bad["extrasDestination"]) } aria-describedby="client-extrasDestination-error" data-attr:aria-invalid="$_clientErrors[el.name] ? 'true' : 'false'" data-bind="_client.extrasDestination">
+							if f.Values["extrasDestination"]!="cash" && f.Values["extrasDestination"]!="kassa_card" {
+								<option value={ f.Values["extrasDestination"] } selected>Выберите кассу</option>
+								}
+							<option value="cash" selected?={ f.Values["extrasDestination"]=="cash" }>Касса — наличные</option>
+							<option value="kassa_card" selected?={ f.Values["extrasDestination"]=="kassa_card" }>Касса — карта салона</option>
+						</select>
+					</label>
+					<p id="client-extrasDestination-error" class={ "text-sm text-error", templ.KV("hidden", !f.Bad["extrasDestination"]) } data-class:hidden="!$_clientErrors.extrasDestination" data-text="$_clientErrors.extrasDestination ?? ''">{ f.FieldErrors["extrasDestination"] }</p>
+				</div>
+			</details>
+			<section class="card bg-base-100">
+				<div class="card-body p-4">
+					<h2 class="font-semibold">Внесено в кассу за услуги</h2>
+					<p class="text-sm text-base-content/70">Без дополнительных продаж.</p>
+					@clientField(f, "serviceCash", "За услуги — наличными, € (необязательно)", "Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.")
+					@clientField(f, "serviceCard", "За услуги — на карту салона, € (необязательно)", "Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.")
+				</div>
+			</section>
+			<section class="card bg-base-100">
+				<div class="card-body p-4 gap-2">
+					if f.SharePct == "" {
+						<p class="text-base-content/70">Условия на этот месяц не настроены.</p>
+					} else {
+					if f.OtherEmployee {
+						<h2 class="font-semibold">Распределение по условиям сотрудника</h2>
+						<p class="text-sm text-base-content/70">Доля сотрудника от услуг — { f.SharePct }.</p>
+					} else {
+						<h2 class="font-semibold">Распределение по вашим условиям</h2>
+						<p class="text-sm text-base-content/70">Ваша доля от услуг — { f.SharePct }.</p>
+					}
+					<p class={ "text-base-content/70", templ.KV("hidden", !f.Incomplete) } data-class:hidden="$_clientReady" role="status">Расчёт не завершён — проверьте выделенные поля.</p>
+					<div id="client-result-values" class={ templ.KV("hidden", f.Incomplete), "flex flex-col gap-2" } data-class:hidden="!$_clientReady">
+					<p>«Себе» <strong data-text={ jsEUR("$_clientSelf") }>{ f.Self }</strong></p>
+					<p>«Салону» <strong data-text={ jsEUR("($_cc.services) + $_ce - $_clientSelf") }>{ f.Salon }</strong></p>
+					<h2 class="font-semibold mt-2">По введённым данным</h2>
+					<p class="font-medium">Итого внесено в кассу</p>
+					<p class="text-sm text-base-content/70">Взносы за услуги и дополнительные продажи.</p>
+					<p>Касса — наличные <strong data-text={ jsEUR("$_cashDeposit") }>{ f.Cash }</strong></p>
+					<p>Касса — карта салона <strong data-text={ jsEUR("$_cardDeposit") }>{ f.Card }</strong></p>
+					<p>Остаётся у вас <strong data-text={ jsEUR("($_cc.services) - ($_cc.certificatePaid) - ($_cc.serviceCash) - ($_cc.serviceCard)") }>{ f.Held }</strong></p>
+					<div class="rounded-box bg-base-200 p-3 mt-2">
+						<p class="font-semibold" data-text={ `$_clientDelta > 0 ? 'По этой записи салон должен вам ' + ` + jsEUR("$_clientDelta") + ` : $_clientDelta < 0 ? 'Оставьте в кассе ' + ` + jsEUR("-$_clientDelta") + ` : 'По этой записи расчёт с салоном — €0'` }>{ f.Effect }</p>
+						<p class="text-sm text-base-content/70 mt-1">Только по этой записи, без учёта общего баланса.</p>
+					</div>
+					</div>
+					}
+				</div>
+			</section>
+		</fieldset>
+		<details class="collapse collapse-arrow bg-base-100">
+			<summary class="collapse-title min-h-12 font-medium">Как заполнить</summary>
+			<div class="collapse-content space-y-3 text-sm text-base-content/70">
+				<p>Укажите полную стоимость услуг. Если часть оплачена сертификатом, раскройте «Оплата сертификатом» и укажите использованную сумму. Это часть стоимости услуг, а не новые деньги в кассе.</p>
+				<p>Кремы, масло и новые сертификаты внесите в «Дополнительные продажи». Выберите кассу, куда поступили деньги. Эти продажи полностью идут салону.</p>
+				<p>В «Внесено в кассу за услуги» укажите только деньги за услуги, которые вы оставляете в кассе или переводите на карту салона. Не добавляйте сюда дополнительные продажи.</p>
+				<p>Например: услуги €100, из них €40 сертификатом; кремы €20 в наличную кассу; взнос за услуги €30 наличными. Итого в кассу поступит €50, у вас останется €30. «Себе» зависит от ваших условий.</p>
+			</div>
+		</details>
+		if f.Locked == "" {
+			<div class="sticky bottom-dock z-10 bg-base-100 p-3 rounded-box shadow-lg lg:bottom-4">
+				@FinancialResponseNoticeWithAdvice("Клиент мог сохраниться. Проверьте список или повторите эту же форму.")
+				<button type="submit" class="btn btn-primary btn-lg w-full" data-attr:disabled="$_busy">Сохранить</button>
+			</div>
+		}
+	</form>
+}
+
+templ clientField(f ClientForm, name, label, hint string) {
+	<div class="flex flex-col gap-1 py-2">
+		<label class="flex flex-col gap-1"><span>{ label }</span><input type="text" name={ name } value={ f.Values[name] } placeholder="0" class={ "input input-lg w-full text-base",templ.KV("input-error",f.Bad[name]) } data-class:input-error="Boolean($_clientErrors[el.name])" aria-invalid={ boolText(f.Bad[name]) } aria-describedby={ "client-" + name + "-hint client-" + name + "-error" } data-attr:aria-invalid="$_clientErrors[el.name] ? 'true' : 'false'" inputmode="decimal" enterkeyhint="next" autocomplete="off" autofocus?={ name=="services" && f.Entry=="new" && f.Locked=="" && !f.Incomplete } data-bind={ "_client." + name }/></label>
+		<p id={ "client-" + name + "-hint" } class="text-sm text-base-content/70">{ hint }</p>
+		<p id={ "client-" + name + "-error" } class={ "text-sm text-error", templ.KV("hidden", !f.Bad[name]) } data-field={ name } data-class:hidden="!$_clientErrors[el.dataset.field]" data-text="$_clientErrors[el.dataset.field] ?? ''">{ f.FieldErrors[name] }</p>
+	</div>
+}
+
+// InstallBanner is a subtle prompt shown in regular browser view (hidden in standalone PWA).
+templ InstallBanner() {
+	<section
+		class="card bg-base-100 shadow-sm border border-base-300/60 mb-2 standalone:hidden"
+		data-signals="{ _installDismissed: Boolean(window.localStorage && localStorage.getItem('kassa_install_banner_dismissed')) }"
+		data-show="!$_installDismissed"
+	>
+		<div class="card-body p-3 flex-row items-center justify-between gap-3">
+			<div class="flex items-center gap-3 min-w-0">
+				<div class="rounded-full bg-primary/10 p-2 text-primary shrink-0">
+					@Icon("smartphone", "size-5")
+				</div>
+				<div class="min-w-0">
+					<p class="text-sm font-semibold truncate">Установите приложение</p>
+					<p class="text-xs text-base-content/70 truncate">Для быстрого входа с экрана «Домой»</p>
+				</div>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<a href="/profile#install-app" class="btn btn-sm btn-primary min-h-11">Инструкция</a>
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost btn-circle min-h-11 min-w-11 text-base-content/60"
+					aria-label="Скрыть подсказку"
+					data-on:click="if (window.localStorage) { localStorage.setItem('kassa_install_banner_dismissed', '1') }; $_installDismissed = true"
+				>
+					@Icon("x", "size-5")
+				</button>
+			</div>
+		</div>
+	</section>
+}
+
+templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, notice string) {
+	@Layout("Клиенты", nav) {
+		@InstallBanner()
+		if notice != "" {
+			<div class="mb-3">
+				@Alert("", notice)
+			</div>
+		}
+		@DateSwitcher(f)
+		if f.Locked != "" {
+			<div role="alert" class="alert alert-warning alert-soft my-3">
+				@Icon("lock", "size-5")
+				<span>{ f.Locked }</span>
+			</div>
+		}
+		if f.Locked == "" {
+			<a class="btn btn-primary btn-lg w-full" href={ templ.SafeURL("/clients/new?date=" + f.Date) }>Добавить клиента</a>
+		}
+		<div class="my-4 flex flex-col gap-4">
+			<h2 class="font-semibold">Итоги дня</h2>
+			@RevenueSummary(totals, "день")
+		</div>
+		<section class="flex flex-col gap-3">
+			for _, r := range cards {
+				@myReportCard(r)
+			}
+			if len(cards) == 0 {
+				<p class="p-4 text-base-content/60">За этот день записей нет.</p>
+			}
+		</section>
+	}
+}
+
+// ClientRemoveForm confirms removing a client entered by mistake.
+type ClientRemoveForm struct {
+	Action, Cancel, Done, Date, Title, DayLabel string
+	Total, Cash, Card, Reason, Error, Locked    string
+	Version                                     int64
+	BadReason                                   bool
+}
+
+templ ClientRemovePage(nav Nav, f ClientRemoveForm) {
+	@Layout("Удалить клиента", nav) {
+		@PageHeader("Удалить клиента?", f.Cancel)
+		<p class="mb-3 text-base-content/70">{ f.DayLabel }</p>
+		<section class="card bg-base-100">
+			<div class="card-body gap-2 p-4">
+				<h2 class="font-semibold">{ f.Title }</h2>
+				<p class="flex justify-between gap-4"><span>Выручка</span><strong>{ f.Total }</strong></p>
+				<p class="flex justify-between gap-4"><span>Касса — наличные</span><strong>{ f.Cash }</strong></p>
+				<p class="flex justify-between gap-4"><span>Касса — карта салона</span><strong>{ f.Card }</strong></p>
+			</div>
+		</section>
+		<p class="my-4 text-base-content/70">Клиент исчезнет из итогов дня и месяца, из кассы и баланса. Номера других клиентов не изменятся. Запись и причина сохранятся в журнале изменений у администратора.</p>
+		if f.Locked != "" {
+			<div role="alert" class="alert alert-warning alert-soft">
+				@Icon("lock", "size-5")
+				<span>{ f.Locked }</span>
+			</div>
+			if f.Error != "" {
+				<div class="mt-3">
+					@Alert(f.Error, "")
+				</div>
+			}
+		} else {
+			<form method="post" action={ templ.SafeURL(f.Action) } class="flex flex-col gap-4">
+				<input type="hidden" name="date" value={ f.Date }/>
+				<input type="hidden" name="version" value={ strconv.FormatInt(f.Version, 10) }/>
+				if !f.BadReason {
+					@Alert(f.Error, "")
+				}
+				@Field("Причина удаления (обязательно)", "Например: добавлен по ошибке или дважды.") {
+					<input type="text" name="reason" value={ f.Reason } required maxlength="200" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" class={ "input input-lg w-full text-base", templ.KV("input-error", f.BadReason) } aria-invalid={ boolText(f.BadReason) } aria-describedby="client-reason-error"/>
+				}
+				<p id="client-reason-error" role="alert" class={ "text-sm text-error", templ.KV("hidden", !f.BadReason) }>
+					if f.BadReason {
+						{ f.Error }
+					}
+				</p>
+				<button type="submit" class="btn btn-error btn-lg w-full">Удалить клиента</button>
+				<a class="btn btn-ghost btn-lg w-full" href={ templ.SafeURL(f.Cancel) }>Отмена</a>
+			</form>
+		}
+	}
+}
+
+// ClientGonePage answers an old link to a removed or unknown client.
+templ ClientGonePage(nav Nav) {
+	@Layout("Клиент не найден", nav) {
+		@PageHeader("Клиент удалён или не найден", "")
+		<section class="card bg-base-100 shadow-sm">
+			<div class="card-body items-center gap-3 py-10 text-center">
+				@Icon("circle-alert", "size-8 text-base-content/60")
+				<p class="text-base-content/70">Эта запись удалена или ссылка устарела.</p>
+				<a href="/" class="btn btn-primary btn-lg">К клиентам</a>
+			</div>
+		</section>
+	}
+}

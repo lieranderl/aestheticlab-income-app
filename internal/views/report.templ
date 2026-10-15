@@ -1,0 +1,423 @@
+package views
+
+import (
+	"encoding/json"
+	"regexp"
+	"strconv"
+)
+
+// AmountRow is one revenue category or payment method on the daily form.
+type AmountRow struct {
+	ID    string
+	Name  string
+	Value string // as typed, or the saved amount
+	Bad   bool   // the server rejected this field
+	// Flags the browser preview needs; the server recomputes everything.
+	CountsTowardSelf  bool
+	IsCertificateSale bool
+	Destination       string // payments: kassa_card, cash or prepaid
+}
+
+// ReportForm is the daily form for one person and day (system-design §6.3).
+type ReportForm struct {
+	Action, PersonName string // admin editor; empty for the personal form
+	PickerAction       string // date picker's GET route; empty means the personal form
+	User               string // whose report: drafts are kept per person and day
+	Date               string // 2026-11-20
+	DayLabel           string // 20.11.2026
+	Weekday            string // «пт, сегодня»
+	Prev, Next         string // the neighbouring days' links; "" when out of range
+	Min, Max           string // the date picker's range
+	Version            int64
+	Editing            bool   // a report for the day exists
+	Locked             string // why the form is read-only; "" when it can be saved
+	SelfPct            int64  // basis points from the person's terms
+	SelfPctText        string // «50%»
+	Revenue            []AmountRow
+	Payments           []AmountRow
+	CashToKassa        string
+	KassaBad           bool
+	// TransferToCard is the part of the salon's share sent to «Касса — карта
+	// Анны» instead of the till; empty means nothing.
+	TransferToCard string
+	TransferBad    bool
+	KassaHint      string // the till's placeholder: the suggestion less the transfer, «60»
+	Suggested      string // what settles the day: «€60»
+	SelfManual     bool
+	SelfValue      string // the «Себе» typed by hand
+	SelfBad        bool
+	// The figures as the server last computed them (the browser updates them live).
+	Total, Self, Salon string
+	HasCash            bool
+	Effect             string
+	Error, Done        string
+}
+
+// signalName keeps category IDs that are safe inside a signal path; the
+// seeded IDs and the ones M9 creates all are.
+var signalName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,40}$`)
+
+// reportSignals start the form's preview: the amounts as typed by category
+// ID, which categories count where, and the person's «Себе» %, all as data.
+func reportSignals(f ReportForm) string {
+	rev, pay := map[string]string{}, map[string]string{}
+	meta := map[string]any{"self": []string{}, "card": []string{}, "pre": []string{}, "cash": []string{}, "pct": f.SelfPct}
+	add := func(k, id string) { meta[k] = append(meta[k].([]string), id) }
+	for _, r := range f.Revenue {
+		if signalName.MatchString(r.ID) {
+			rev[r.ID] = r.Value
+			if r.CountsTowardSelf && !r.IsCertificateSale {
+				add("self", r.ID)
+			}
+		}
+	}
+	for _, p := range f.Payments {
+		if !signalName.MatchString(p.ID) {
+			continue
+		}
+		pay[p.ID] = p.Value
+		switch p.Destination {
+		case "kassa_card":
+			add("card", p.ID)
+		case "prepaid":
+			add("pre", p.ID)
+		case "cash":
+			add("cash", p.ID)
+		}
+	}
+	// Cash fills itself in only when there is exactly one cash method.
+	if cash := meta["cash"].([]string); len(cash) == 1 {
+		meta["cashId"] = cash[0]
+	}
+	b, _ := json.Marshal(map[string]any{ // strings, bools and numbers always marshal
+		"_busy": false, "_offline": false, "_rev": rev, "_pay": pay, "_m": meta,
+		"_toKassa": f.CashToKassa, "_toCard": f.TransferToCard,
+		"_cashEdited": f.Editing, "_manual": f.SelfManual, "_selfOv": f.SelfValue,
+	})
+	return string(b)
+}
+
+func bindPath(group, id string) string {
+	if !signalName.MatchString(id) {
+		return ""
+	}
+	return group + "." + id
+}
+
+// The live preview, composed from constant snippets (never data). Amounts
+// are read as the server reads them ("600", "600,5", ",50", "1 234,50" with
+// spaces only between groups of three), in cents;
+// anything unreadable makes the figure NaN, shown as «—».
+func jsCents(v string) string {
+	return `((s) => s === '' ? 0 : /^(?=[.,]?\d)(\d{1,3}( \d{3})+|\d{0,7})([.,]\d{1,2})?$/.test(s) ? Math.round(Number(s.replace(/ /g, '').replace(',', '.')) * 100) : NaN)(String(` + v + ` ?? '').replace(/€/g, '').replace(/\s+/g, ' ').trim())`
+}
+
+// jsText is cents as the form shows them: «600», «600,50»; zero as empty,
+// or as «0» where empty means something else.
+func jsText(c, zero string) string {
+	return `((c) => c > 0 ? (c / 100).toFixed(2).replace('.', ',').replace(/,00$/, '') : '` + zero + `')(` + c + `)`
+}
+
+// jsEUR is cents as «€1 234,50», «−€2,50» or «—».
+func jsEUR(c string) string {
+	return `((c) => Number.isNaN(c) ? '—' : (c < 0 ? '−' : '') + '€' + (Math.abs(c) / 100).toLocaleString('ru-RU', {minimumFractionDigits: Math.abs(c) % 100 ? 2 : 0, maximumFractionDigits: 2}).replace(/\s/g, '\u202f'))(` + c + `)`
+}
+
+func jsSum(ids, amounts string) string {
+	return ids + `.reduce((s, id) => s + (` + amounts + `[id] ?? 0), 0)`
+}
+
+var (
+	exprR     = `Object.fromEntries(Object.entries($_rev).map(([k, v]) => [k, ` + jsCents("v") + `]))`
+	exprP     = `Object.fromEntries(Object.entries($_pay).map(([k, v]) => [k, ` + jsCents("v") + `]))`
+	exprTotal = `Object.values($_r).reduce((s, c) => s + c, 0)`
+	exprBase  = jsSum("$_m.self", "$_r")
+	exprSelf  = `$_manual ? ` + jsCents("$_selfOv") + ` : Math.floor(($_base * $_m.pct + 5000) / 10000)`
+	exprCard  = jsSum("$_m.card", "$_p")
+	exprPre   = jsSum("$_m.pre", "$_p")
+	exprCash  = jsSum("$_m.cash", "$_p")
+	exprSugg  = `Math.max(0, Math.min($_total - $_self - $_card - $_pre, $_cash))`
+	exprXfer  = `$_cash > 0 ? ` + jsCents("$_toCard") + ` : 0`
+	// An empty «Наличными в кассу» means the suggestion less the transfer, as on the server.
+	exprKassa = `$_cash > 0 ? (String($_toKassa ?? '').trim() === '' ? Math.max(0, $_sugg - $_xfer) : ` + jsCents("$_toKassa") + `) : 0`
+	exprDelta = `$_card + $_pre + $_kassa + $_xfer - ($_total - $_self)`
+	// Cash fills itself in as Total − card − certificate until it is typed;
+	// «Оставьте в кассе» follows the suggestion until it is typed.
+	effectCash = `if (!$_cashEdited && $_m.cashId) { $_pay[$_m.cashId] = ` + jsText(`$_total - $_card - $_pre`, "") + ` }`
+	// An empty «Наличными в кассу» shows the suggestion as its placeholder.
+	attrKassaHint = `$_cash > 0 ? ` + jsText(`Math.max(0, $_sugg - $_xfer)`, "0") + ` : '0'`
+	textEffect    = `Number.isNaN($_delta) ? '' : (($_cash - $_kassa - $_xfer > 0 ? 'Остальные ' + ` + jsEUR(`$_cash - $_kassa - $_xfer`) + ` + ' наличными — ваши. ' : '') + ($_delta > 0 ? 'Салон должен вам ' + ` + jsEUR(`$_delta`) + ` : $_delta < 0 ? 'Вы должны салону ' + ` + jsEUR(`-$_delta`) + ` : 'Расчёт за день: 0'))`
+	textDiff      = `$_total - $_card - $_pre - $_cash > 0 ? 'Сумма оплат меньше выручки на ' + ` + jsEUR(`$_total - $_card - $_pre - $_cash`) + ` + ' — проверьте наличные' : 'Сумма оплат больше выручки на ' + ` + jsEUR(`$_card + $_pre + $_cash - $_total`) + ` + ' — проверьте суммы'`
+	showOverCash  = `!($_kassa + $_xfer > $_cash)`
+	showOverSelf  = `!($_manual && $_self > $_total)`
+	showDiff      = `!Number.isNaN($_total + $_card + $_pre + $_cash) && $_total !== $_card + $_pre + $_cash`
+	textTotal     = jsEUR(`$_total`)
+	textSugg      = jsEUR(`$_sugg`)
+	textSelf      = jsEUR(`$_self`)
+	textSalon     = jsEUR(`$_total - $_self`)
+)
+
+// nextField moves the keyboard's «Далее» to the next field instead of
+// submitting a half-filled form.
+const nextField = `if (evt.key === 'Enter' && evt.target.enterKeyHint === 'next') { evt.preventDefault(); const fs = [...el.querySelectorAll('input[type=text]:not(:disabled)')].filter(f => !f.closest('details:not([open])') && f.getClientRects().length > 0); fs[fs.indexOf(evt.target) + 1]?.focus() }`
+
+// onFetch says so when a save does not reach the server; the values stay.
+const onFetch = `if (evt.detail.el === el) { if (evt.detail.type === 'started') { $_offline = false } else if (evt.detail.type === 'error' || evt.detail.type === 'retrying' || evt.detail.type === 'retries-failed') { $_offline = true } }`
+
+func reportAction(f ReportForm) string {
+	if f.Action != "" {
+		return f.Action
+	}
+	return "/reports/" + f.Date
+}
+
+func pickerAction(f ReportForm) string {
+	if f.PickerAction != "" {
+		return f.PickerAction
+	}
+	return "/"
+}
+
+// DailyPage is the daily form with its date switcher.
+templ DailyPage(nav Nav, f ReportForm) {
+	@Layout("Отчёт", nav) {
+		if f.PersonName != "" {
+			@PageHeader("Отчёт · "+f.PersonName, "/admin/day?date="+f.Date)
+		}
+		@DateSwitcher(f)
+		@ReportFormView(f)
+		<script type="module" src="/static/draft.js"></script>
+	}
+}
+
+// DateSwitcher is «‹ 20.11.2026 ›»; tapping the date opens the phone's picker.
+templ DateSwitcher(f ReportForm) {
+	<nav class="flex items-center justify-between gap-2 py-3" aria-label="Выбор дня">
+		@dayLink(f.Prev, "chevron-left", "Предыдущий день")
+		<form method="get" action={ templ.SafeURL(pickerAction(f)) } class="relative inline-flex items-center">
+			<button
+				type="button"
+				class="btn btn-ghost h-auto min-h-12 flex-col gap-0 px-4 py-1"
+				aria-label="Выбрать день"
+				data-on:click="try { el.nextElementSibling.showPicker?.() } catch (_) {}"
+			>
+				<span class="text-lg font-semibold">{ f.DayLabel }</span>
+				<span class="text-xs font-normal text-base-content/60">{ f.Weekday }</span>
+			</button>
+			<input
+				type="date"
+				name="date"
+				value={ f.Date }
+				min={ f.Min }
+				max={ f.Max }
+				class="pointer-events-none absolute inset-0 -z-10 h-full w-full opacity-0"
+				tabindex="-1"
+				aria-label="Выбрать день"
+				data-on:input="el.value && (el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit())"
+				data-on:change="el.value && (el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit())"
+			/>
+			<noscript><button type="submit" class="btn btn-sm">Открыть</button></noscript>
+		</form>
+		@dayLink(f.Next, "chevron-right", "Следующий день")
+	</nav>
+}
+
+templ dayLink(href, icon, label string) {
+	if href != "" {
+		<a href={ templ.SafeURL(href) } class="btn btn-ghost btn-square btn-lg" aria-label={ label }>
+			@Icon(icon, "size-6")
+		</a>
+	} else {
+		<span class="btn btn-ghost btn-square btn-lg btn-disabled" aria-hidden="true">
+			@Icon(icon, "size-6")
+		</span>
+	}
+}
+
+// ReportFormView is the form alone, for Datastar patches.
+templ ReportFormView(f ReportForm) {
+	<form
+		id="report-form"
+		method="post"
+		action={ templ.SafeURL(reportAction(f)) }
+		class="flex flex-col gap-4"
+		autocomplete="off"
+		data-draft={ f.Date }
+		data-draft-user={ f.User }
+		data-version={ strconv.FormatInt(f.Version, 10) }
+		data-signals={ reportSignals(f) }
+		data-computed:_r={ exprR }
+		data-computed:_p={ exprP }
+		data-computed:_total={ exprTotal }
+		data-computed:_base={ exprBase }
+		data-computed:_self={ exprSelf }
+		data-computed:_card={ exprCard }
+		data-computed:_pre={ exprPre }
+		data-computed:_cash={ exprCash }
+		data-computed:_sugg={ exprSugg }
+		data-computed:_xfer={ exprXfer }
+		data-computed:_kassa={ exprKassa }
+		data-computed:_delta={ exprDelta }
+		data-effect={ effectCash }
+		data-indicator="_busy"
+		data-on:submit={ sendFinancialForm(reportAction(f)) }
+		data-on:datastar-fetch={ onFetch }
+		data-on:keydown={ nextField }
+	>
+		<input type="hidden" name="version" value={ strconv.FormatInt(f.Version, 10) }/>
+		if f.Locked != "" {
+			<div role="alert" class="alert alert-warning alert-soft">
+				@Icon("lock", "size-5")
+				<span>{ f.Locked }</span>
+			</div>
+		}
+		<fieldset class="contents" disabled?={ f.Locked != "" }>
+			<section class="card bg-base-100 shadow-sm">
+				<div class="card-body gap-1 p-4">
+					<h2 class="card-title text-base">Выручка</h2>
+					for i, r := range f.Revenue {
+						@amountRow("r_", "_rev", r, i == 0 && !f.Editing && f.Locked == "", "")
+					}
+				</div>
+			</section>
+			<section class="card bg-base-100 shadow-sm">
+				<div class="card-body gap-1 p-4">
+					<h2 class="card-title text-base">Оплата</h2>
+					for _, p := range f.Payments {
+						@amountRow("p_", "_pay", p, false, cashMark(p))
+					}
+					<p class="text-sm text-error hidden" data-class:hidden={ "!(" + showDiff + ")" } data-text={ textDiff } aria-live="polite"></p>
+				</div>
+			</section>
+			<section class={ "card bg-base-100 shadow-sm", templ.KV("hidden", !f.HasCash) } data-class:hidden="!($_cash > 0)">
+				<div class="card-body gap-2 p-4">
+					<h2 class="card-title flex-wrap items-baseline text-base">
+						Оставьте в кассе
+						<span class="text-sm font-normal text-base-content/60">подсказка <span data-text={ textSugg }>{ f.Suggested }</span></span>
+					</h2>
+					@kassaRow("cashToKassa", "Наличными в кассу", "_toKassa", f.CashToKassa, f.KassaHint, f.KassaBad, attrKassaHint)
+					@kassaRow("transferToCard", "Переводом на карту салона", "_toCard", f.TransferToCard, "0", f.TransferBad, "")
+					<p class="hidden text-sm text-error" data-class:hidden={ showOverCash } aria-live="polite">В кассу и на карту вместе — не больше суммы наличных</p>
+					<p class="text-sm text-base-content/70" data-text={ textEffect } aria-live="polite">{ f.Effect }</p>
+				</div>
+			</section>
+			<section class="card bg-base-100 shadow-sm">
+				<div class="card-body gap-2 p-4">
+					<div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+						<p class="text-base">
+							«Себе» <strong class="font-semibold" data-text={ textSelf }>{ f.Self }</strong>
+							<span class="text-base-content/60">({ f.SelfPctText })</span>
+						</p>
+						<p class="text-base">«Салону» <strong class="font-semibold" data-text={ textSalon }>{ f.Salon }</strong></p>
+					</div>
+					<label class="label min-h-11 cursor-pointer gap-3 text-sm text-base-content">
+						<input type="checkbox" name="selfManual" value="1" class="toggle toggle-sm" checked?={ f.SelfManual } data-bind="_manual"/>
+						Изменить «Себе» вручную
+					</label>
+					<label class={ "flex items-center justify-between gap-3", templ.KV("hidden", !f.SelfManual) } data-class:hidden="!$_manual">
+						<span class="text-base">«Себе» за день</span>
+						<span class={ "input input-lg w-40 shrink-0 text-base", templ.KV("input-error", f.SelfBad) }>
+							<span class="text-base-content/50">€</span>
+							<input type="text" name="selfOverride" value={ f.SelfValue } inputmode="decimal" enterkeyhint="done" autocomplete="off" class="text-right" data-bind="_selfOv" data-attr:disabled="!$_manual" disabled?={ !f.SelfManual }/>
+						</span>
+					</label>
+					<p class="hidden text-sm text-error" data-class:hidden={ showOverSelf } aria-live="polite">«Себе» — не больше выручки за день</p>
+				</div>
+			</section>
+		</fieldset>
+		<div class="sticky bottom-dock z-10 -mx-1 flex flex-col gap-2 lg:bottom-4">
+			@Alert(f.Error, "")
+			<div role="alert" class="alert alert-error hidden" data-class:hidden="!$_offline">
+				@Icon("wifi-off", "size-5")
+				<span>Нет сети — данные сохранены на телефоне, нажмите ещё раз</span>
+			</div>
+			<div class="flex items-center gap-3 rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
+				<div class="min-w-0 flex-1">
+					<p class="text-xs text-base-content/60">
+						Итого
+						if f.Done != "" {
+							<span role="status" class="font-medium text-success">· { f.Done }</span>
+						}
+					</p>
+					<p class="text-xl font-semibold break-words" data-text={ textTotal }>{ f.Total }</p>
+				</div>
+				if f.Locked == "" {
+					<button type="submit" class="btn btn-primary btn-lg" data-attr:disabled="$_busy">
+						<span class="loading loading-spinner loading-sm" data-show="$_busy"></span>
+						Сохранить
+					</button>
+				}
+			</div>
+		</div>
+	</form>
+}
+
+// kassaRow is one way of handing the salon its share: cash left in the till
+// or a transfer to the salon's card. Empty till means the suggestion, shown as
+// its placeholder; nothing ever writes into a field the person may type in.
+templ kassaRow(name, label, signal, value, placeholder string, bad bool, placeholderExpr string) {
+	<label class="flex min-h-14 items-center justify-between gap-3">
+		<span class="min-w-0 text-base">{ label }</span>
+		<span class={ "input input-lg w-40 shrink-0 text-base", templ.KV("input-error", bad) }>
+			<span class="text-base-content/50">€</span>
+			<input
+				type="text"
+				name={ name }
+				value={ value }
+				inputmode="decimal"
+				enterkeyhint="next"
+				autocomplete="off"
+				placeholder={ placeholder }
+				class="text-right"
+				aria-invalid={ boolText(bad) }
+				data-bind={ signal }
+				data-attr:disabled="!($_cash > 0)"
+				if placeholderExpr != "" {
+					data-attr:placeholder={ placeholderExpr }
+				}
+			/>
+		</span>
+	</label>
+}
+
+// cashMark lets the cash field stop filling itself in once it is typed.
+func cashMark(p AmountRow) string {
+	if p.Destination == "cash" {
+		return "$_cashEdited = true"
+	}
+	return ""
+}
+
+templ amountRow(prefix, group string, r AmountRow, focus bool, onInput string) {
+	<label class="flex min-h-14 items-center justify-between gap-3">
+		<span class="min-w-0 text-base">{ r.Name }</span>
+		<span class={ "input input-lg w-40 shrink-0 text-base", templ.KV("input-error", r.Bad) }>
+			<span class="text-base-content/50">€</span>
+			<input
+				type="text"
+				name={ prefix + r.ID }
+				value={ r.Value }
+				inputmode="decimal"
+				enterkeyhint="next"
+				autocomplete="off"
+				placeholder="0"
+				class="text-right"
+				aria-invalid={ boolText(r.Bad) }
+				autofocus?={ focus }
+				if b := bindPath(group, r.ID); b != "" {
+					data-bind={ b }
+				}
+				if onInput != "" {
+					data-on:input={ onInput }
+				}
+			/>
+		</span>
+	</label>
+}
+
+func boolText(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}

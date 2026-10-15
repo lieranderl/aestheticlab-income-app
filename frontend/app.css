@@ -1,0 +1,122 @@
+/* source(none): no automatic scanning, so words in Go code, comments and
+   docs never become CSS. Classes live only in templates. */
+@import "tailwindcss" source(none);
+
+@source "../internal/**/*.templ";
+
+@plugin "daisyui" {
+  themes: false;
+  logs: false;
+}
+
+/* Brand palette from aestheticlab.be (qwik-aestheticlab/src/global.css).
+   Literal colours live only here; templates use daisyUI semantic tokens. */
+@plugin "daisyui/theme" {
+  name: "aesthetic";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: #fffaf3;
+  --color-base-200: #f7f5ef;
+  --color-base-300: #e8e4da;
+  --color-base-content: #1c211b;
+  --color-primary: #5f6b5b;
+  --color-primary-content: #fffaf3;
+  --color-secondary: #8b9687;
+  --color-secondary-content: #1c211b;
+  --color-accent: #d9b3a6;
+  --color-accent-content: #1c211b;
+  --color-neutral: #2e352c;
+  --color-neutral-content: #f7f5ef;
+  --color-info: #3f6e8c;
+  --color-info-content: #ffffff;
+  --color-success: #2f7a46;
+  --color-success-content: #ffffff;
+  --color-warning: #8a5c00;
+  --color-warning-content: #ffffff;
+  --color-error: #b3261e;
+  --color-error-content: #ffffff;
+  --radius-selector: 1rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "aesthetic-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: #161a15;
+  --color-base-200: #1e231d;
+  --color-base-300: #2b3129;
+  --color-base-content: #ece8df;
+  --color-primary: #a9b4a4;
+  --color-primary-content: #161a15;
+  --color-secondary: #8b9687;
+  --color-secondary-content: #161a15;
+  --color-accent: #d9b3a6;
+  --color-accent-content: #161a15;
+  --color-neutral: #2b3129;
+  --color-neutral-content: #ece8df;
+  --color-info: #8cc1e0;
+  --color-info-content: #0d1f2a;
+  --color-success: #6fcf8e;
+  --color-success-content: #0b2414;
+  --color-warning: #e6bf6b;
+  --color-warning-content: #2a1d00;
+  --color-error: #f2938c;
+  --color-error-content: #2c0907;
+  --radius-selector: 1rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* Onest variable font (SIL OFL 1.1, static/fonts/OFL-Onest.txt), served by the app. */
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/static/fonts/onest-cyrillic-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/static/fonts/onest-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  --font-sans: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Bottom padding that clears the iPhone home indicator (viewport-fit=cover). */
+@utility pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+/* Clear the bottom bar (daisyUI dock-lg: 4.5rem + the home-indicator inset). */
+@utility bottom-dock {
+  bottom: calc(4.5rem + env(safe-area-inset-bottom) + 0.5rem);
+}
+@utility pb-dock {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom) + 1.5rem);
+}
+/* The app opened from the Home Screen. */
+@custom-variant standalone (@media (display-mode: standalone));
+

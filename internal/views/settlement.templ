@@ -1,0 +1,137 @@
+package views
+
+import "strconv"
+
+type SettlementWarning struct{ Text, Href string }
+type SettlementPerson struct {
+	Name, Balance, Current, Earned, Action, ActionURL, CarryURL string
+	Sign, CurrentSign                                           int
+	Breakdown                                                   []MoneyRow
+}
+type SettlementData struct {
+	Key, Month, Prev, Next, Notice, AsOf string
+	Closed                         bool
+	Figures, Expenses              []MoneyRow
+	People                         []SettlementPerson
+	Blockers                       []string
+	Warnings, Missing              []SettlementWarning
+	Action                         MonthActionData
+	MovementForm                   MovementFormData
+}
+
+templ MonthTabs(key string, settlement bool) {
+	<nav class="tabs tabs-box" aria-label="Раздел месяца">
+		<a
+			class={ "tab min-h-11",templ.KV("tab-active",!settlement) }
+			href={ templ.SafeURL("/admin/month?m=" + key) }
+			if !settlement {
+				aria-current="page"
+			}
+		>Выручка</a>
+		<a
+			class={ "tab min-h-11",templ.KV("tab-active",settlement) }
+			href={ templ.SafeURL("/admin/month?m=" + key + "&tab=settlement") }
+			if settlement {
+				aria-current="page"
+			}
+		>Итоги и расчёт</a>
+	</nav>
+}
+
+templ SettlementPage(nav Nav, p SettlementData) {
+	@Layout("Итоги и расчёт", nav) {
+		@PageHeader("Месяц", "")
+		<div class="flex flex-col gap-4">
+			@MonthSwitcher(p.Month, p.Prev, p.Next)
+			@MonthTabs(p.Key, true)
+			@Alert("", p.Notice)
+			if p.Closed {
+				<p class="alert alert-soft" role="status">Месяц закрыт. Итоги и условия зафиксированы.</p>
+			} else {
+				<p class="alert alert-info alert-soft" role="status">Предварительный расчёт. Зарплаты, доплата «Себе» и дивиденды ещё не начислены.</p>
+			}
+			@adminFigures(p.Figures)
+			@breakdown("Расходы по категориям", p.Expenses)
+			for _,b:=range p.Blockers {
+				<p class="alert alert-error alert-soft" role="alert">
+					{ b }
+				</p>
+			}
+			if len(p.Blockers)>0 {
+				<a class="btn min-h-11" href="/admin/kassa">Открыть кассу</a>
+			}
+			if len(p.Missing)>0 {
+				<details class="collapse collapse-arrow bg-base-100">
+					<summary class="collapse-title min-h-14">
+						Не сдали отчёт: { strconv.Itoa(len(p.Missing)) } · предупреждение
+					</summary>
+					<div class="collapse-content flex flex-col gap-2">
+						for _,warning:=range p.Missing {
+							<a
+								class="btn btn-ghost min-h-11 h-auto min-w-0 max-w-full justify-start py-3 text-left whitespace-normal [overflow-wrap:anywhere]"
+								href={ templ.SafeURL(warning.Href) }
+							>{ warning.Text }</a>
+						}
+					</div>
+				</details>
+			}
+			for _,warning:=range p.Warnings {
+				<a
+					class="alert alert-warning alert-soft min-h-11"
+					href={ templ.SafeURL(warning.Href) }
+				>{ warning.Text } · Пересчитать</a>
+			}
+			for _,c:=range p.People {
+				<article class="card bg-base-100 shadow-sm">
+					<div class="card-body p-4 gap-3">
+						<h2 class="font-semibold break-words">{ c.Name }</h2>
+						<h3 class="font-semibold">Текущий остаток</h3>
+						<p class={ "text-xl font-semibold break-words", templ.KV("text-success", c.CurrentSign > 0), templ.KV("text-error", c.CurrentSign < 0) }>{ c.Current }</p>
+						<p class="text-sm text-base-content/60">На { p.AsOf }</p>
+						if c.ActionURL!="" {
+							<a
+								class="btn btn-primary min-h-11"
+								href={ templ.SafeURL(c.ActionURL) }
+								data-url={ c.ActionURL }
+								data-on:click__prevent={ loadMovementForm(true) }
+								data-on:datastar-fetch__window={ onMovementLoad }
+								data-attr:aria-disabled="$_movementloading"
+								data-attr:tabindex="$_movementloading ? -1 : 0"
+							>{ c.Action }</a>
+						}
+						<a
+							class="btn btn-ghost min-h-11"
+							href={ templ.SafeURL(c.CarryURL) }
+						>Перенести</a>
+						<section class="rounded-box bg-base-200 p-4">
+							<h3 class="font-semibold">
+								if p.Closed {
+									Зафиксированный итог месяца
+								} else {
+									Предварительный итог месяца
+								}
+							</h3>
+							<p class="mt-2 break-words">{ c.Balance }</p>
+							<p class="mt-2 text-sm">Всего заработано: { c.Earned }</p>
+							<p class="mt-2 text-sm text-base-content/70">
+								if p.Closed {
+									На конец выбранного месяца. Последующие выплаты и внесения отражены в текущем остатке.
+								} else {
+									С учётом ожидаемых начислений при закрытии месяца.
+								}
+							</p>
+							<details class="collapse collapse-arrow">
+								<summary class="collapse-title min-h-14">Из чего складывается итог месяца</summary>
+								<div class="collapse-content">@moneyRows(c.Breakdown)</div>
+							</details>
+						</section>
+					</div>
+				</article>
+			}
+			@MovementSheet(p.MovementForm)
+			if p.Action.Action!="" {
+				@MonthActionSheet(p.Action)
+			}
+		</div>
+	}
+}

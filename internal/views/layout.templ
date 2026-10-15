@@ -1,0 +1,150 @@
+package views
+
+// NavItem is one entry of the bottom tab bar (phones) and the sidebar (lg+).
+type NavItem struct {
+	Href   string
+	Label  string
+	Icon   string
+	Active bool
+}
+
+// UserBadge represents the signed-in person for header and sidebar navigation.
+type UserBadge struct {
+	Name      string
+	Username  string
+	RoleLabel string
+}
+
+// Nav holds the navigation items and the current user badge.
+type Nav struct {
+	Items                 []NavItem
+	User                  UserBadge
+	FinancialWritesPaused bool
+}
+
+// redirectEffect performs server-requested navigations (CSP forbids inline scripts).
+const redirectEffect = `if ($redirectUrl) { window.location.assign($redirectUrl) }`
+
+// swInit registers the service worker without inline script tags (CSP).
+const swInit = `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }`
+
+// Layout is the document shell: phone first, bottom tab bar below lg and a
+// sidebar from lg. The theme follows the phone's light/dark setting.
+templ Layout(title string, nav Nav) {
+	<!DOCTYPE html>
+	<html lang="ru">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+			<meta name="color-scheme" content="light dark"/>
+			<meta name="theme-color" content="#8b9687"/>
+			<title>{ title } · Касса</title>
+			<link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg"/>
+			<!-- Installable app (system-design §7): manifest for Android, meta tags for iPhone -->
+			<link rel="manifest" href="/manifest.webmanifest"/>
+			<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png"/>
+			<meta name="apple-mobile-web-app-capable" content="yes"/>
+			<meta name="mobile-web-app-capable" content="yes"/>
+			<meta name="apple-mobile-web-app-title" content="Касса"/>
+			<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+			<link rel="preload" href="/static/fonts/onest-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin/>
+			<link href="/static/app.css?v=2" rel="stylesheet"/>
+			<!-- Datastar client (v1.0.4); modules are deferred and never block rendering -->
+			<script type="module" src="/static/datastar.js"></script>
+		</head>
+		<body
+			class="bg-base-200 text-base-content min-h-dvh font-sans antialiased lg:flex"
+			data-signals="{ redirectUrl: '', toast: '', toastError: '' }"
+		>
+			<div class="hidden" data-effect={ redirectEffect }></div>
+			<div class="hidden" data-init={ swInit }></div>
+			if len(nav.Items) > 0 {
+				@sidebar(nav)
+			}
+			<main class={ "mx-auto w-full max-w-3xl px-4 pt-safe lg:py-8", templ.KV("pb-dock lg:pb-8", len(nav.Items) > 0) }>
+				if nav.User.Name != "" {
+					@topbar(nav.User)
+				}
+				if nav.FinancialWritesPaused {
+					<div class="alert alert-warning text-xs sm:text-sm font-medium my-3 py-2 px-3 shadow-xs rounded-box flex items-center gap-2" role="status">
+						@Icon("triangle-alert", "size-4 shrink-0")
+						<span>Запись финансовых операций временно приостановлена</span>
+					</div>
+				}
+				{ children... }
+			</main>
+			if len(nav.Items) > 0 {
+				@dock(nav)
+			}
+		</body>
+	</html>
+}
+
+templ topbar(u UserBadge) {
+	<header class="flex items-center justify-between gap-3 border-b border-base-300/60 pb-3 pt-1 lg:hidden">
+		<a href="/" class="flex items-center gap-2 min-h-11">
+			<img src="/static/icons/favicon.svg" width="28" height="28" alt="" class="size-7 rounded-box"/>
+			<span class="font-semibold text-base">Касса</span>
+		</a>
+		<a href="/profile" class="flex items-center gap-2 rounded-full bg-base-100 py-1 pl-1.5 pr-3 border border-base-300 shadow-xs min-h-11 max-w-[200px]" aria-label={ "Профиль: " + u.Name }>
+			<div class="avatar avatar-placeholder shrink-0">
+				<div class="size-7 rounded-full bg-primary text-primary-content text-xs font-bold flex items-center justify-center">
+					<span>{ initial(u.Name) }</span>
+				</div>
+			</div>
+			<span class="truncate text-sm font-semibold">{ u.Name }</span>
+		</a>
+	</header>
+}
+
+templ sidebar(nav Nav) {
+	<aside class="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-64 lg:shrink-0 lg:self-start lg:flex-col lg:gap-2 lg:overflow-y-auto lg:border-r lg:border-base-300 lg:bg-base-100 lg:p-4">
+		<a href="/" class="flex items-center gap-3 px-2 py-3">
+			<img src="/static/icons/favicon.svg" width="36" height="36" alt="" class="size-9 rounded-box"/>
+			<span class="text-lg font-semibold">Касса</span>
+		</a>
+		<ul class="menu w-full gap-1">
+			for _, item := range nav.Items {
+				<li>
+					<a href={ templ.SafeURL(item.Href) } class={ templ.KV("menu-active", item.Active) } aria-current={ ariaCurrent(item.Active) }>
+						@Icon(item.Icon, "size-5")
+						{ item.Label }
+					</a>
+				</li>
+			}
+		</ul>
+		if nav.User.Name != "" {
+			<div class="mt-auto border-t border-base-300 pt-3">
+				<a href="/profile" class="flex items-center gap-3 rounded-box p-2 hover:bg-base-200 transition-colors" aria-label={ "Профиль: " + nav.User.Name }>
+					<div class="avatar avatar-placeholder shrink-0">
+						<div class="size-9 rounded-full bg-primary text-primary-content text-sm font-bold flex items-center justify-center">
+							<span>{ initial(nav.User.Name) }</span>
+						</div>
+					</div>
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm font-semibold">{ nav.User.Name }</p>
+						<p class="truncate text-xs text-base-content/60">{ nav.User.RoleLabel }</p>
+					</div>
+				</a>
+			</div>
+		}
+	</aside>
+}
+
+templ dock(nav Nav) {
+	<nav class="dock dock-lg bg-base-100 border-t border-base-300 lg:hidden" aria-label="Навигация">
+		for _, item := range nav.Items {
+			<a href={ templ.SafeURL(item.Href) } class={ templ.KV("dock-active text-primary", item.Active) } aria-current={ ariaCurrent(item.Active) }>
+				@Icon(item.Icon, "size-6")
+				<span class="dock-label">{ item.Label }</span>
+			</a>
+		}
+	</nav>
+}
+
+func ariaCurrent(active bool) string {
+	if active {
+		return "page"
+	}
+	return "false"
+}

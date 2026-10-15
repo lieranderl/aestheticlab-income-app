@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Aesthetic Lab — Касса",
+  "short_name": "Касса",
+  "description": "Ежедневные отчёты, касса и расчёты салона Aesthetic Lab",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#8b9687",
+  "background_color": "#fffaf3",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

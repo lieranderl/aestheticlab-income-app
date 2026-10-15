@@ -1,0 +1,11 @@
+# Secret scanning (CI runs gitleaks over the whole history on every push).
+# Only made-up test values may be allowed here; a real key must never be
+# added: remove it and rotate it.
+title = "Aesthetic Lab Kassa"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "The what-not-to-do examples of the vendored Go security skill"
+paths = ['''^\.agents/skills/golang-security/references/secrets\.md$''']

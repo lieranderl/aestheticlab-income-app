@@ -1,0 +1,138 @@
+package views
+
+type FilterOption struct{ Value, Label string }
+type FilterChip struct{ Label, Href string }
+type HistoryFilters struct {
+	Action, From, To, Person, Category, Entity string
+ Type,Status string
+ Types,Statuses []FilterOption
+ Movements bool
+	People, Categories, Entities               []FilterOption
+	Chips                                      []FilterChip
+	Audit                                      bool
+}
+type Paging struct{ Label, Prev, Next string }
+type ReportHistory struct {
+	Filters HistoryFilters
+	Paging  Paging
+	Reports []AdminReport
+}
+
+templ ReportHistoryPage(nav Nav, p ReportHistory) {
+	@Layout("История", nav) {
+		@PageHeader("История", "/more")
+		<div class="flex flex-col gap-4">
+			@historyTabs(false)
+			@historyFilters(p.Filters)
+			if len(p.Reports) == 0 {
+				<p class="rounded-box bg-base-100 p-4 text-base-content/60">По этим фильтрам записей нет.</p>
+			}
+			@adminReports(p.Reports)
+			@paging(p.Paging)
+		</div>
+	}
+}
+
+templ historyFilters(f HistoryFilters) {
+	<section class="flex flex-col gap-3" data-signals="{ _filtersOpen: false }">
+		<div class="flex items-center justify-between gap-3">
+			<button type="button" class="btn min-h-11" data-on:click="$_filtersOpen = true">
+				@Icon("filter", "size-5")
+				Фильтры
+			</button>
+			<a href={ templ.SafeURL(f.Action) } class="btn btn-ghost min-h-11">Сбросить</a>
+		</div>
+		<div class="flex flex-wrap gap-2" aria-label="Активные фильтры">
+			for _, chip := range f.Chips {
+				<a class="badge badge-soft h-auto min-h-11 max-w-full [overflow-wrap:anywhere] px-3" href={ templ.SafeURL(chip.Href) } aria-label={ "Убрать фильтр: " + chip.Label }>{ chip.Label } ×</a>
+			}
+		</div>
+		<dialog class="modal modal-bottom sm:modal-middle" aria-labelledby="filter-title" data-effect="$_filtersOpen ? el.showModal() : el.close()" data-on:close="$_filtersOpen = false">
+			<div class="modal-box pb-safe">
+				<div class="mb-4 flex items-center justify-between gap-3">
+					<h2 id="filter-title" class="text-lg font-semibold">Фильтры</h2>
+					<button type="button" class="btn btn-ghost btn-square min-h-11" aria-label="Закрыть фильтры" data-on:click="$_filtersOpen = false">
+						@Icon("x", "size-5")
+					</button>
+				</div>
+				@filterFields(f)
+			</div>
+			<form method="dialog" class="modal-backdrop"><button>Закрыть</button></form>
+		</dialog>
+		<noscript>
+			<details class="collapse collapse-arrow bg-base-100">
+				<summary class="collapse-title font-semibold">Фильтры</summary>
+				<div class="collapse-content">
+					@filterFields(f)
+				</div>
+			</details>
+		</noscript>
+	</section>
+}
+
+templ filterFields(f HistoryFilters) {
+	<form method="get" action={ templ.SafeURL(f.Action) } class="flex flex-col gap-4">
+		<label class="flex min-w-0 flex-col gap-1">С даты<input type="date" name="from" value={ f.From } class="input input-lg w-full min-w-0 text-base" required/></label>
+		<label class="flex min-w-0 flex-col gap-1">По дату<input type="date" name="to" value={ f.To } class="input input-lg w-full min-w-0 text-base" required/></label>
+		<label class="flex flex-col gap-1">
+			if f.Audit {
+				Кто изменил
+			} else {
+				Сотрудник
+			}
+			<select name="person" class="select select-lg w-full text-base">
+				<option value="">Все</option>
+				for _, option := range f.People {
+					<option value={ option.Value } selected?={ f.Person == option.Value }>{ option.Label }</option>
+				}
+			</select>
+		</label>
+		if f.Movements {
+   <label class="flex flex-col gap-1">Вид движения<select name="type" class="select select-lg w-full text-base"><option value="">Все</option>
+    for _, o:= range f.Types {
+     <option value={ o.Value } selected?={ f.Type==o.Value }>{ o.Label }</option>
+    }
+   </select></label>
+   <label class="flex flex-col gap-1">Статус<select name="status" class="select select-lg w-full text-base"><option value="">Все</option>
+    for _, o:= range f.Statuses {
+     <option value={ o.Value } selected?={ f.Status==o.Value }>{ o.Label }</option>
+    }
+   </select></label>
+  } else if !f.Audit {
+   <label class="flex flex-col gap-1">
+				Категория
+				<select name="category" class="select select-lg w-full text-base">
+					<option value="">Все</option>
+					for _, option := range f.Categories {
+						<option value={ option.Value } selected?={ f.Category == option.Value }>{ option.Label }</option>
+					}
+				</select>
+			</label>
+		} else {
+			<label class="flex flex-col gap-1">
+				Что изменилось
+				<select name="entity" class="select select-lg w-full text-base">
+					<option value="">Всё</option>
+					for _, option := range f.Entities {
+						<option value={ option.Value } selected?={ f.Entity == option.Value }>{ option.Label }</option>
+					}
+				</select>
+			</label>
+		}
+		<div class="sticky bottom-0 bg-base-100 pt-2 pb-safe"><button type="submit" class="btn btn-primary btn-lg w-full">Применить</button></div>
+	</form>
+}
+
+templ paging(p Paging) {
+	<nav class="flex flex-col gap-3" aria-label="Страницы записей">
+		if p.Label != "" {
+			<p class="text-center text-sm text-base-content/60">{ p.Label }</p>
+		}
+		if p.Prev != "" {
+			<a class="btn min-h-11" href={ templ.SafeURL(p.Prev) }>Предыдущие записи</a>
+		}
+		if p.Next != "" {
+			<a class="btn btn-lg" href={ templ.SafeURL(p.Next) }>Показать ещё</a>
+		}
+	</nav>
+}

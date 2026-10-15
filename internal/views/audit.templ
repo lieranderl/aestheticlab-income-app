@@ -1,0 +1,45 @@
+package views
+
+type AuditCard struct {
+	Entity, Subject, Actor, Action, At, Href string
+	Changes                                  []MoneyRow
+}
+type AuditHistory struct {
+	Filters HistoryFilters
+	Paging  Paging
+	Rows    []AuditCard
+}
+
+templ AuditPage(nav Nav, p AuditHistory) {
+	@Layout("Журнал изменений", nav) {
+		@PageHeader("Журнал изменений", "/more")
+		<div class="flex flex-col gap-4">
+			@historyFilters(p.Filters)
+			if len(p.Rows) == 0 {
+				<p class="rounded-box bg-base-100 p-4 text-base-content/60">По этим фильтрам изменений нет.</p>
+			}
+			for _, row := range p.Rows {
+				<article class="card bg-base-100 shadow-sm">
+					<div class="card-body gap-3 p-4">
+						<h2 class="font-semibold break-words">{ row.Entity } · { row.Action }</h2>
+						if row.Subject != "" {
+							<p class="break-words">{ row.Subject }</p>
+						}
+						<p class="text-sm text-base-content/70 break-words">{ row.Actor } · { row.At }</p>
+						if len(row.Changes) > 0 {
+							<dl class="flex flex-col gap-2">
+								for _, change := range row.Changes {
+									<div><dt class="text-sm text-base-content/60">{ change.Name }</dt><dd class="break-words font-medium">{ change.Value }</dd></div>
+								}
+							</dl>
+						}
+						if row.Href != "" {
+							<a class="btn min-h-11" href={ templ.SafeURL(row.Href) }>Открыть отчёт</a>
+						}
+					</div>
+				</article>
+			}
+			@paging(p.Paging)
+		</div>
+	}
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(make:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(go run ./cmd/web:*)",
+      "Bash(go tool templ:*)",
+      "Bash(go mod tidy)",
+      "Bash(go list:*)",
+      "Bash(gofmt:*)",
+      "Bash(staticcheck:*)",
+      "Bash(golangci-lint run:*)",
+      "Bash(govulncheck:*)",
+      "Bash(bun run:*)",
+      "Bash(bun test:*)",
+      "Bash(bunx @tailwindcss/cli:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git switch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gcloud run services describe:*)",
+      "Bash(gcloud run revisions list:*)",
+      "Bash(gcloud logging read:*)",
+      "Bash(gcloud firestore databases describe:*)",
+      "Bash(gcloud firestore backups list:*)",
+      "Bash(gcloud dns record-sets list:*)",
+      "Bash(curl -fsS https://kassa.aestheticlab.be/readyz)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Bash(gcloud firestore databases delete:*)",
+      "Bash(gcloud run services delete:*)",
+      "Bash(gcloud projects delete:*)",
+      "Bash(gcloud projects remove-iam-policy-binding:*)",
+      "Bash(gcloud secrets delete:*)",
+      "Bash(gcloud dns managed-zones delete:*)",
+      "Read(./.env.web)",
+      "Read(./.env)",
+      "Read(./**/*.pem)"
+    ],
+    "ask": [
+      "Bash(gcloud run deploy:*)",
+      "Bash(gcloud run services update-traffic:*)",
+      "Bash(gcloud dns record-sets create:*)",
+      "Bash(gcloud dns record-sets update:*)",
+      "Bash(gcloud dns record-sets delete:*)",
+      "Bash(gcloud firestore databases restore:*)",
+      "Bash(gh repo create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(git push:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+# Dependencies and build output
+node_modules/
+bin/
+tmp/
+coverage.out
+*.test
+build-errors.log
+__pycache__/
+
+# Local settings, secrets and data: never commit these
+.env
+.env.*
+!.env.web.example
+*.pem
+# Exports from the Google Sheet for cmd/import hold financial data
+*.csv
+!internal/**/testdata/*.csv
+
+# Editors, OS and per-developer agent tooling
+.DS_Store
+.idea/
+.vscode/
+.worktrees/
+.superpowers/
+.claude/settings.local.json
+
+# Playwright output
+.playwright-mcp/

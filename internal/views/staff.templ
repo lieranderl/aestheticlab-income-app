@@ -1,0 +1,423 @@
+package views
+
+import (
+	"encoding/json"
+	"strconv"
+	"strings"
+)
+
+// StaffRow is one person on «Сотрудники».
+type StaffRow struct {
+	ID       string
+	Name     string
+	Username string
+	Role     string
+	Reporter bool
+	Active   bool
+	Terms    string // «Себе» 50% · зарплата €1 000 · доля 1, or «Условия не заданы»
+}
+
+// StaffPage lists everyone with an account (admin).
+templ StaffPage(nav Nav, rows []StaffRow, notice string) {
+	@Layout("Сотрудники", nav) {
+		@PageHeader("Сотрудники", "/more")
+		<div class="flex flex-col gap-3">
+			@Alert("", notice)
+			<a href="/admin/users/new" class="btn btn-primary btn-lg btn-block">
+				@Icon("user-plus", "size-5")
+				Добавить сотрудника
+			</a>
+			<ul class="flex flex-col gap-3">
+				for _, r := range rows {
+					<li>
+						<a href={ templ.SafeURL("/admin/users/" + r.ID) } class="card bg-base-100 shadow-sm transition-colors hover:bg-base-300/40">
+							<div class="card-body gap-2 p-4">
+								<div class="flex items-center gap-2">
+									<span class="truncate text-lg font-semibold">{ r.Name }</span>
+									<span class="badge badge-soft badge-sm">{ r.Role }</span>
+									if !r.Active {
+										<span class="badge badge-soft badge-error badge-sm">Нет доступа</span>
+									}
+									@Icon("chevron-right", "ml-auto size-5 text-base-content/40")
+								</div>
+								<p class="text-sm text-base-content/60">
+									{ r.Username }
+									if r.Reporter {
+										· сдаёт отчёты
+									}
+								</p>
+								<p class="text-sm">{ r.Terms }</p>
+							</div>
+						</a>
+					</li>
+				}
+			</ul>
+		</div>
+	}
+}
+
+// NewStaffForm is the add-a-person form's state.
+type NewStaffForm struct {
+	Username string
+	Name     string
+	Admin    bool
+	Reporter bool
+	Error    string
+}
+
+// NewStaffPage adds an account with a temporary password (admin).
+templ NewStaffPage(nav Nav, f NewStaffForm) {
+	@Layout("Новый сотрудник", nav) {
+		@PageHeader("Новый сотрудник", "/admin/users")
+		@NewStaffFormView(f)
+	}
+}
+
+// NewStaffFormView is the form alone, for Datastar patches.
+templ NewStaffFormView(f NewStaffForm) {
+	<form
+		id="new-staff-form"
+		method="post"
+		action="/admin/users"
+		class="card bg-base-100 shadow-sm"
+		data-signals="{ _busy: false }"
+		data-indicator="_busy"
+		data-on:submit={ sendForm("/admin/users") }
+	>
+		<div class="card-body gap-2">
+			@Alert(f.Error, "")
+			@Field("Имя", "Как показывать в приложении.") {
+				<input type="text" name="name" value={ f.Name } class="input input-lg w-full text-base" autocomplete="off" enterkeyhint="next" required autofocus/>
+			}
+			@Field("Имя пользователя", "Для входа: латиница и цифры, например olga.") {
+				<input type="text" name="username" value={ f.Username } class="input input-lg w-full text-base" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required/>
+			}
+			@Field("Временный пароль", "Не короче 8 символов. При первом входе его нужно сменить.") {
+				<input type="text" name="password" minlength="8" class="input input-lg w-full text-base" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" required/>
+			}
+			@roleFields(f.Admin, f.Reporter, true, false)
+			<div class="pt-4">
+				@SubmitButton("Добавить")
+			</div>
+		</div>
+	</form>
+}
+
+templ roleFields(admin, reporter, active, self bool) {
+	<label class="label min-h-12 cursor-pointer justify-between gap-4 text-base text-base-content">
+		<span>Администратор</span>
+		<input type="checkbox" name="admin" value="1" class="toggle toggle-primary toggle-lg" checked?={ admin } disabled?={ self }/>
+	</label>
+	<label class="label min-h-12 cursor-pointer justify-between gap-4 text-base text-base-content">
+		<span>Сдаёт ежедневные отчёты</span>
+		<input type="checkbox" name="reporter" value="1" class="toggle toggle-primary toggle-lg" checked?={ reporter }/>
+	</label>
+	if self {
+		<input type="hidden" name="admin" value="1"/>
+		<p class="label whitespace-normal">Свои права администратора снять нельзя.</p>
+	}
+}
+
+// StaffEdit is everything «Сотрудник» shows and edits (admin).
+type StaffEdit struct {
+	ID       string
+	Name     string
+	Username string
+	Self     bool // the admin editing their own account
+	Notice   string
+	Account  AccountForm
+	Password ResetForm
+	Terms    []TermsRow
+	NewTerms TermsForm
+}
+
+// AccountForm edits name, role, reports and access.
+type AccountForm struct {
+	Name     string
+	Admin    bool
+	Reporter bool
+	Active   bool
+	Error    string
+}
+
+// ResetForm sets a new temporary password.
+type ResetForm struct {
+	Error string
+}
+
+// TermsRow is one entry of a person's terms history.
+type TermsRow struct {
+	From    string // «с ноября 2026»
+	SelfPct string
+	Salary  string
+	Share   string
+	High    string // «80% при базе больше €5 000», or ""
+	Note    string
+	Current bool
+}
+
+// TermsForm starts new terms from an open month.
+type TermsForm struct {
+	Months    []MonthOption
+	Month     string
+	SelfPct   string
+	Salary    string
+	Share     string
+	ShareNote string // what the share means against everyone else's
+	ShareBad  bool
+	HighFrom  string // the month's «Себе» base threshold, €
+	HighPct   string // the whole month's «Себе» above it, %
+	Note      string
+	Error     string
+}
+
+// MonthOption is a month new terms may start in.
+type MonthOption struct {
+	Value       string // 2026-11
+	Label       string // Ноябрь 2026
+	OthersShare int64  // everyone else's profit shares in force that month
+	Others      string // «Анна 1 · Ольга 1»
+}
+
+// termsSignals start the terms form's signals: the share and month as typed,
+// and everyone else's shares per month (keyed m202611), all as data.
+func termsSignals(f TermsForm) string {
+	others := map[string]any{}
+	for _, m := range f.Months {
+		others["m"+strings.ReplaceAll(m.Value, "-", "")] = map[string]any{"sum": m.OthersShare, "names": m.Others}
+	}
+	b, _ := json.Marshal(map[string]any{"_busy": false, "_share": f.Share, "_month": f.Month, "_others": others}) // strings and numbers always marshal
+	return string(b)
+}
+
+func othersFor(f TermsForm) string {
+	for _, m := range f.Months {
+		if m.Value == f.Month {
+			return m.Others
+		}
+	}
+	return ""
+}
+
+// The share preview in the browser; web.shareNote says the same on the server.
+const (
+	shareTrimmed  = `String($_share).trim()`
+	shareValue    = `$_st === '' ? -2 : (/^[0-9]{1,4}/.exec($_st)?.[0] === $_st && +$_st <= 1000 ? +$_st : -1)`
+	shareOthers   = `$_others['m' + $_month.replace('-', '')] ?? {sum: 0, names: ''}`
+	sharePercent  = `$_sh > 0 && $_oth.sum > 0 ? Math.round($_sh * 1000 / ($_sh + $_oth.sum)) : 0`
+	shareNoteExpr = `$_sh === -2 ? 'Целое число от 0 до 1000; 0 — без дивидендов.'` +
+		` : $_sh === -1 ? 'Введите целое число от 0 до 1000.'` +
+		` : $_sh === 0 ? ($_oth.sum > 0 ? 'Без дивидендов: прибыль делится между остальными.' : 'Ни у кого нет доли: прибыль останется в салоне.')` +
+		` : $_oth.sum === 0 ? 'Получит всю прибыль месяца.'` +
+		` : 'Получит ' + ($_pct / 10).toLocaleString('ru-RU') + '% прибыли месяца, остальные — ' + ((1000 - $_pct) / 10).toLocaleString('ru-RU') + '%.'`
+)
+
+// StaffEditPage is one person's account, password and money terms (admin).
+templ StaffEditPage(nav Nav, s StaffEdit) {
+	@Layout(s.Name, nav) {
+		@PageHeader(s.Name, "/admin/users")
+		<div class="flex flex-col gap-4">
+			@Alert("", s.Notice)
+			@TermsSection(s.ID, s.Terms, s.NewTerms)
+			@AccountFormView(s.ID, s.Self, s.Account)
+			if s.Self {
+				@OwnPasswordCard()
+			} else {
+				@ResetFormView(s.ID, s.Username, s.Password)
+			}
+		</div>
+	}
+}
+
+// TermsSection is the terms history and the form for new terms.
+templ TermsSection(id string, rows []TermsRow, f TermsForm) {
+	<section id="terms-section" class="card bg-base-100 shadow-sm">
+		<div class="card-body gap-3">
+			<h2 class="card-title">Условия</h2>
+			<p class="text-sm text-base-content/60">«Себе» — доля выручки (можно задать повышенный процент для месяцев с базой «Себе» выше порога), зарплата — в месяц, доля — как делится прибыль месяца (0 — без дивидендов). Новые условия действуют с выбранного месяца; прошлые месяцы не меняются.</p>
+			if len(rows) == 0 {
+				<div role="alert" class="alert alert-warning alert-soft">
+					@Icon("triangle-alert", "size-5")
+					<span>Условия не заданы — отчёты и расчёт месяца без них не сохранятся.</span>
+				</div>
+			}
+			<ul class="flex flex-col gap-2">
+				for _, r := range rows {
+					<li class={ "rounded-box border p-3", templ.KV("border-primary", r.Current), templ.KV("border-base-300", !r.Current) }>
+						<div class="flex items-center gap-2">
+							<span class="inline-block font-semibold first-letter:uppercase">{ r.From }</span>
+							if r.Current {
+								<span class="badge badge-primary badge-soft badge-sm">Сейчас</span>
+							}
+						</div>
+						<p class="text-sm">
+							«Себе» { r.SelfPct }
+							if r.High != "" {
+								({ r.High })
+							}
+							· зарплата { r.Salary } · доля { r.Share }
+						</p>
+						if r.Note != "" {
+							<p class="text-sm text-base-content/60">{ r.Note }</p>
+						}
+					</li>
+				}
+			</ul>
+			@TermsFormView(id, f)
+		</div>
+	</section>
+}
+
+// TermsFormView is the new-terms form alone, for Datastar patches.
+templ TermsFormView(id string, f TermsForm) {
+	<form
+		id="terms-form"
+		method="post"
+		action={ templ.SafeURL("/admin/users/" + id + "/terms") }
+		class="flex flex-col gap-2 border-t border-base-300 pt-3"
+		data-signals={ termsSignals(f) }
+		data-computed:_st={ shareTrimmed }
+		data-computed:_sh={ shareValue }
+		data-computed:_oth={ shareOthers }
+		data-computed:_pct={ sharePercent }
+		data-indicator="_busy"
+		data-on:submit={ sendForm("/admin/users/" + id + "/terms") }
+	>
+		<h3 class="font-semibold">Новые условия</h3>
+		@Alert(f.Error, "")
+		@Field("Действуют с", "Открытый месяц. Если у сотрудника уже есть отчёты в этом месяце или позже, выберите более поздний.") {
+			<select name="month" class="select select-lg w-full text-base" data-bind:_month>
+				for _, m := range f.Months {
+					<option value={ m.Value } selected?={ m.Value == f.Month }>{ m.Label }</option>
+				}
+			</select>
+		}
+		<div class="grid grid-cols-2 gap-3">
+			@Field("«Себе», %", "") {
+				<input type="text" name="selfPct" value={ f.SelfPct } inputmode="decimal" class="input input-lg w-full text-base" autocomplete="off" enterkeyhint="next" required/>
+			}
+			@Field("Зарплата в месяц, €", "") {
+				<input type="text" name="salary" value={ f.Salary } inputmode="decimal" class="input input-lg w-full text-base" autocomplete="off" enterkeyhint="next"/>
+			}
+		</div>
+		<fieldset class="fieldset rounded-box border border-base-300 p-3">
+			<legend class="fieldset-legend px-1 text-sm">Повышенный «Себе» (необязательно)</legend>
+			<div class="grid grid-cols-2 gap-3">
+				<label class="flex flex-col gap-1">
+					<span class="text-sm">Если база за месяц больше, €</span>
+					<input type="text" name="highFrom" value={ f.HighFrom } inputmode="decimal" class="input input-lg w-full text-base" autocomplete="off" enterkeyhint="next"/>
+				</label>
+				<label class="flex flex-col gap-1">
+					<span class="text-sm">то «Себе» за весь месяц, %</span>
+					<input type="text" name="highPct" value={ f.HighPct } inputmode="decimal" class="input input-lg w-full text-base" autocomplete="off" enterkeyhint="next"/>
+				</label>
+			</div>
+			<p class="label whitespace-normal">База — выручка, с которой считается «Себе» (без продажи сертификатов). Если за месяц она больше порога, весь месяц считается по повышенному проценту: в отчётах — обычный, разница начисляется при закрытии месяца.</p>
+		</fieldset>
+		@Field("Доля в прибыли", "Прибыль месяца делится пропорционально долям: у всех 1 — поровну, 2 против 1 — вдвое больше. 0 — без дивидендов.") {
+			<input
+				type="text"
+				name="share"
+				value={ f.Share }
+				inputmode="numeric"
+				maxlength="4"
+				class={ "input input-lg w-full text-base", templ.KV("input-error", f.ShareBad) }
+				aria-invalid={ strconv.FormatBool(f.ShareBad) }
+				aria-describedby="share-note"
+				autocomplete="off"
+				enterkeyhint="next"
+				required
+				data-bind:_share
+				data-class:input-error="$_sh === -1"
+				data-attr:aria-invalid="String($_sh === -1)"
+			/>
+		}
+		<div id="share-note" class="-mt-1 flex min-w-0 flex-col gap-1 rounded-box bg-base-200 p-3 text-sm break-words" aria-live="polite">
+			<p class={ "font-medium", templ.KV("text-error", f.ShareBad) } data-class:text-error="$_sh === -1" data-text={ shareNoteExpr }>{ f.ShareNote }</p>
+			<p class="text-base-content/60">У остальных: <span data-text="$_oth.names">{ othersFor(f) }</span></p>
+		</div>
+		@Field("Комментарий", "") {
+			<input type="text" name="note" value={ f.Note } class="input input-lg w-full text-base" autocomplete="off" enterkeyhint="done"/>
+		}
+		<div class="pt-2">
+			@SubmitButton("Сохранить условия")
+		</div>
+	</form>
+}
+
+// AccountFormView edits name, role, reports and access.
+templ AccountFormView(id string, self bool, f AccountForm) {
+	<form
+		id="account-form"
+		method="post"
+		action={ templ.SafeURL("/admin/users/" + id) }
+		class="card bg-base-100 shadow-sm"
+		data-signals="{ _busy: false }"
+		data-indicator="_busy"
+		data-on:submit={ sendForm("/admin/users/" + id) }
+	>
+		<div class="card-body gap-2">
+			<h2 class="card-title">Учётная запись</h2>
+			@Alert(f.Error, "")
+			@Field("Имя", "") {
+				<input type="text" name="name" value={ f.Name } class="input input-lg w-full text-base" autocomplete="off" required/>
+			}
+			@roleFields(f.Admin, f.Reporter, f.Active, self)
+			if self {
+				<input type="hidden" name="active" value="1"/>
+			} else {
+				<label class="label min-h-12 cursor-pointer justify-between gap-4 text-base text-base-content">
+					<span>Может входить в приложение</span>
+					<input type="checkbox" name="active" value="1" class="toggle toggle-primary toggle-lg" checked?={ f.Active }/>
+				</label>
+				<p class="label whitespace-normal">Если выключить, сотрудник сразу выйдет на всех устройствах. Записи и расчёты сохранятся.</p>
+			}
+			<div class="pt-4">
+				@SubmitButton("Сохранить")
+			</div>
+		</div>
+	</form>
+}
+
+// OwnPasswordCard sends the admin to the profile for their own password,
+// which asks for the current one.
+templ OwnPasswordCard() {
+	<section id="reset-form-own" class="card bg-base-100 shadow-sm">
+		<div class="card-body gap-2">
+			<h2 class="card-title">Пароль</h2>
+			<p class="text-sm text-base-content/60">Свой пароль меняйте в профиле: там нужен текущий пароль.</p>
+			<div class="pt-4">
+				<a href="/profile" class="btn btn-outline btn-lg btn-block">Изменить в профиле</a>
+			</div>
+		</div>
+	</section>
+}
+
+// ResetFormView sets a new temporary password for the person.
+templ ResetFormView(id, username string, f ResetForm) {
+	<form
+		id="reset-form"
+		method="post"
+		action={ templ.SafeURL("/admin/users/" + id + "/password") }
+		class="card bg-base-100 shadow-sm"
+		data-signals="{ _busy: false }"
+		data-indicator="_busy"
+		data-on:submit={ sendForm("/admin/users/" + id + "/password") }
+	>
+		<div class="card-body gap-2">
+			<h2 class="card-title">Сбросить пароль</h2>
+			<p class="text-sm text-base-content/60">Сотрудник выйдет на всех устройствах и при входе задаст свой пароль.</p>
+			@Alert(f.Error, "")
+			<input type="text" name="username" value={ username } autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true"/>
+			@Field("Временный пароль", "Не короче 8 символов.") {
+				<input type="text" name="password" minlength="8" class="input input-lg w-full text-base" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" required/>
+			}
+			<div class="pt-4">
+				<button type="submit" class="btn btn-outline btn-error btn-lg btn-block" data-attr:disabled="$_busy">
+					<span class="loading loading-spinner loading-sm" data-show="$_busy"></span>
+					Сбросить пароль
+				</button>
+			</div>
+		</div>
+	</form>
+}

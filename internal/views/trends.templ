@@ -1,0 +1,311 @@
+package views
+
+import (
+	"strconv"
+)
+
+type TrendMetric struct {
+	ID, Label string
+}
+
+type TrendPerson struct {
+	ID, Name string
+}
+
+// TrendSeries is one kind of bar: «Обзор» draws three, every other metric one.
+type TrendSeries struct {
+	ID, Label string
+}
+
+// TrendRow is one month: its figure per series ("" when it has none) and its
+// place on the chart.
+type TrendRow struct {
+	MonthLabel string
+	ShortMonth string
+	Imported   bool
+	HasData    bool
+	Values     []string
+	Column     TrendColumn
+}
+
+// TrendColumn is a month's slot on the chart, in viewBox units.
+type TrendColumn struct {
+	X, W, LabelX int
+	Bars         []TrendBar
+}
+
+type TrendBar struct {
+	Series     int
+	X, Y, W, H int
+}
+
+// TrendTick is a horizontal gridline with its value on the axis.
+type TrendTick struct {
+	Y     int
+	Label string
+}
+
+type TrendData struct {
+	Period      int // 3, 6, 12
+	Metric      string
+	MetricLabel string
+	PersonID    string
+	People      []TrendPerson
+	Metrics     []TrendMetric
+	Series      []TrendSeries
+	Rows        []TrendRow
+	Ticks       []TrendTick
+	ZeroY       int
+	Selected    int // the month whose figures show above the chart: the latest with data
+	HasData     bool
+	HasImported bool
+}
+
+templ TrendsPage(nav Nav, d TrendData) {
+	@Layout("Динамика", nav) {
+		@PageHeader("Динамика", "/more")
+		<div class="flex flex-col gap-4">
+			<!-- Period Switcher -->
+			<nav class="join w-full" aria-label="Период">
+				for _, p := range []int{3, 6, 12} {
+					<a
+						href={ templ.SafeURL("/admin/trends?period=" + strconv.Itoa(p) + "&metric=" + d.Metric + trendPersonParam(d.PersonID)) }
+						class={ "join-item btn min-h-11 flex-1", templ.KV("btn-primary", d.Period == p) }
+						aria-current={ ariaCurrent(d.Period == p) }
+					>{ strconv.Itoa(p) } мес</a>
+				}
+			</nav>
+
+			<!-- Metric Selector -->
+			<div class="flex flex-col gap-2">
+				<p class="text-sm font-semibold text-base-content/80">Показатель</p>
+				<div class="flex flex-wrap gap-2">
+					for _, m := range d.Metrics {
+						<a
+							href={ templ.SafeURL("/admin/trends?period=" + strconv.Itoa(d.Period) + "&metric=" + m.ID + trendPersonParam(d.PersonID)) }
+							class={ "btn btn-sm min-h-11", templ.KV("btn-primary", d.Metric == m.ID), templ.KV("btn-outline", d.Metric != m.ID) }
+							aria-current={ ariaCurrent(d.Metric == m.ID) }
+						>{ m.Label }</a>
+					}
+				</div>
+			</div>
+
+			<!-- Person Selector (when person_revenue is active) -->
+			if d.Metric == "person_revenue" && len(d.People) > 0 {
+				<div class="flex flex-col gap-2">
+					<p class="text-sm font-semibold text-base-content/80">Сотрудник</p>
+					<div class="flex flex-wrap gap-2">
+						for _, p := range d.People {
+							<a
+								href={ templ.SafeURL("/admin/trends?period=" + strconv.Itoa(d.Period) + "&metric=person_revenue&person=" + p.ID) }
+								class={ "btn btn-sm min-h-11", templ.KV("btn-primary", d.PersonID == p.ID), templ.KV("btn-outline", d.PersonID != p.ID) }
+								aria-current={ ariaCurrent(d.PersonID == p.ID) }
+							>{ p.Name }</a>
+						}
+					</div>
+				</div>
+			}
+
+			<section class="card bg-base-100 shadow-sm" aria-label={ "График: " + d.MetricLabel } data-selected={ strconv.Itoa(d.Selected) } data-signals:_month="+el.dataset.selected">
+				<div class="card-body gap-3 p-4">
+					<h2 class="font-semibold text-base">{ d.MetricLabel }</h2>
+					if d.HasData {
+						@trendReadout(d)
+					}
+					@trendChart(d)
+					if d.HasData && len(d.Series) > 1 {
+						<ul class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/70" aria-label="Обозначения">
+							for j, s := range d.Series {
+								<li class="flex items-center gap-1.5">
+									<span class={ "size-2.5 shrink-0 rounded-sm", seriesSwatch(j) } aria-hidden="true"></span>
+									{ s.Label }
+								</li>
+							}
+						</ul>
+					}
+					if d.HasImported {
+						<p class="text-xs text-base-content/60">Светлые столбцы — месяцы из Google-таблицы («импорт»).</p>
+					}
+				</div>
+			</section>
+
+			<section class="flex flex-col gap-2" aria-label="Таблица значений">
+				<h2 class="font-semibold text-base">Данные по месяцам</h2>
+				<div class="flex flex-col gap-2 lg:hidden">
+					for _, r := range d.Rows {
+						<div class="card bg-base-100 shadow-sm">
+							<div class="card-body gap-1 p-3">
+								<div class="flex items-center justify-between gap-2">
+									<div class="flex items-center gap-2">
+										<span class="font-medium text-sm">{ r.MonthLabel }</span>
+										if r.Imported {
+											<span class="badge badge-xs badge-soft badge-info">импорт</span>
+										}
+									</div>
+									if len(d.Series) == 1 {
+										@trendValue(r.Values[0], "font-semibold text-base text-right")
+									}
+								</div>
+								if len(d.Series) > 1 {
+									<dl class="flex flex-col gap-1 text-sm">
+										for j, s := range d.Series {
+											<div class="flex items-center justify-between gap-2">
+												<dt class="text-base-content/70">{ s.Label }</dt>
+												<dd>
+													@trendValue(r.Values[j], "font-semibold")
+												</dd>
+											</div>
+										}
+									</dl>
+								}
+							</div>
+						</div>
+					}
+				</div>
+				<div class="hidden lg:block overflow-x-auto rounded-box bg-base-100 shadow-sm">
+					<table class="table">
+						<thead>
+							<tr>
+								<th>Месяц</th>
+								<th>Источник</th>
+								for _, s := range d.Series {
+									<th class="text-right">{ s.Label }</th>
+								}
+							</tr>
+						</thead>
+						<tbody>
+							for _, r := range d.Rows {
+								<tr>
+									<td class="font-medium">{ r.MonthLabel }</td>
+									<td>
+										if r.Imported {
+											<span class="badge badge-sm badge-soft badge-info">импорт</span>
+										} else if r.HasData {
+											<span class="badge badge-sm badge-soft badge-success">учёт</span>
+										} else {
+											<span class="text-base-content/40">нет данных</span>
+										}
+									</td>
+									for _, v := range r.Values {
+										<td class="text-right">
+											@trendValue(v, "font-semibold")
+										</td>
+									}
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</section>
+		</div>
+	}
+}
+
+func trendPersonParam(id string) string {
+	if id != "" {
+		return "&person=" + id
+	}
+	return ""
+}
+
+templ trendValue(v, class string) {
+	if v != "" {
+		<span class={ class }>{ v }</span>
+	} else {
+		<span class="text-base-content/40">—</span>
+	}
+}
+
+// trendReadout shows the selected month's exact figures; ‹ › and tapping a
+// month on the chart change it. Without JS it shows the latest month with data.
+templ trendReadout(d TrendData) {
+	<div class="flex items-center gap-2 rounded-box bg-base-200 p-1">
+		<button type="button" class="btn btn-ghost btn-square min-h-11 min-w-11 shrink-0" aria-label="Предыдущий месяц" disabled data-attr:disabled="$_month <= 0" data-on:click="$_month = Math.max(0, $_month - 1)">
+			@Icon("chevron-left", "size-6")
+		</button>
+		<div class="min-w-0 flex-1 py-1" aria-live="polite" aria-atomic="true">
+			for i, r := range d.Rows {
+				<div class={ "flex flex-col gap-1", templ.KV("hidden", i != d.Selected) } data-month={ strconv.Itoa(i) } data-class:hidden="$_month !== +el.dataset.month">
+					<div class="flex items-center gap-2">
+						<span class="font-medium text-sm">{ r.MonthLabel }</span>
+						if r.Imported {
+							<span class="badge badge-xs badge-soft badge-info">импорт</span>
+						}
+					</div>
+					if !r.HasData {
+						<span class="text-sm text-base-content/60">Нет данных</span>
+					} else {
+						<dl class="flex flex-col gap-0.5 text-sm">
+							for j, s := range d.Series {
+								<div class="flex items-center justify-between gap-2">
+									<dt class="flex items-center gap-2 text-base-content/70">
+										<span class={ "size-2.5 shrink-0 rounded-sm", seriesSwatch(j) } aria-hidden="true"></span>
+										{ s.Label }
+									</dt>
+									<dd>
+										@trendValue(r.Values[j], "font-semibold text-base")
+									</dd>
+								</div>
+							}
+						</dl>
+					}
+				</div>
+			}
+		</div>
+		<button type="button" class="btn btn-ghost btn-square min-h-11 min-w-11 shrink-0" aria-label="Следующий месяц" disabled data-last={ strconv.Itoa(len(d.Rows)-1) } data-attr:disabled="$_month >= +el.dataset.last" data-on:click="$_month = Math.min(+el.dataset.last, $_month + 1)">
+			@Icon("chevron-right", "size-6")
+		</button>
+	</div>
+}
+
+func seriesSwatch(j int) string {
+	return [...]string{"bg-primary", "bg-warning", "bg-success"}[j%3]
+}
+
+func seriesFill(j int) string {
+	return [...]string{"fill-primary", "fill-warning", "fill-success"}[j%3]
+}
+
+func chartLabel(d TrendData) string {
+	if !d.HasData {
+		return d.MetricLabel + ": нет данных за выбранный период"
+	}
+	return d.MetricLabel
+}
+
+func barOpacity(imported bool) string {
+	if imported {
+		return "0.6"
+	}
+	return "1"
+}
+
+// trendChart draws bars per month on a euro (or count) axis. The table below
+// carries the same figures for screen readers.
+templ trendChart(d TrendData) {
+	<svg viewBox="0 0 340 190" class="h-auto w-full select-none overflow-visible lg:max-h-72" role="img" aria-label={ chartLabel(d) }>
+		if !d.HasData {
+			<text x="170" y="95" text-anchor="middle" class="fill-base-content/50 font-sans text-sm">Нет данных за выбранный период</text>
+		} else {
+			for _, t := range d.Ticks {
+				<line x1="52" y1={ strconv.Itoa(t.Y) } x2="334" y2={ strconv.Itoa(t.Y) } stroke="currentColor" stroke-opacity="0.12" stroke-dasharray="2,3"/>
+				<text x="46" y={ strconv.Itoa(t.Y + 4) } text-anchor="end" class="fill-base-content/60 font-sans text-[11px]">{ t.Label }</text>
+			}
+			for i, r := range d.Rows {
+				<rect x={ strconv.Itoa(r.Column.X) } y="8" width={ strconv.Itoa(r.Column.W) } height="156" rx="4" fill-opacity="0.08" class={ "fill-base-content", templ.KV("hidden", i != d.Selected) } data-month={ strconv.Itoa(i) } data-class:hidden="$_month !== +el.dataset.month"/>
+				for _, b := range r.Column.Bars {
+					<rect x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) } width={ strconv.Itoa(b.W) } height={ strconv.Itoa(b.H) } rx="1.5" fill-opacity={ barOpacity(r.Imported) } class={ seriesFill(b.Series) }/>
+				}
+				<text x={ strconv.Itoa(r.Column.LabelX) } y="180" text-anchor="middle" class={ "font-sans text-[11px]", templ.KV("fill-base-content/60", r.HasData), templ.KV("fill-base-content/30", !r.HasData) }>{ r.ShortMonth }</text>
+			}
+			<line x1="52" y1={ strconv.Itoa(d.ZeroY) } x2="334" y2={ strconv.Itoa(d.ZeroY) } stroke="currentColor" stroke-opacity="0.4"/>
+			// Month hit areas are under 44 pt wide at 12 months; the ‹ › buttons
+			// (44 pt) and the table below are the full-size equivalents.
+			for i, r := range d.Rows {
+				<rect x={ strconv.Itoa(r.Column.X) } y="0" width={ strconv.Itoa(r.Column.W) } height="190" fill="transparent" class="cursor-pointer" data-month={ strconv.Itoa(i) } data-on:click="$_month = +el.dataset.month">
+					<title>{ r.MonthLabel }</title>
+				</rect>
+			}
+		}
+	</svg>
+}

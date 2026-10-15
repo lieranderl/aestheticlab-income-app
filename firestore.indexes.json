@@ -1,0 +1,13 @@
+{
+  "database": "aestheticlab-income",
+  "indexes": [
+    {"collectionGroup": "reports", "fields": [{"fieldPath": "userId", "order": "ascending"}, {"fieldPath": "date", "order": "ascending"}]},
+    {"collectionGroup": "reports", "fields": [{"fieldPath": "userId", "order": "ascending"}, {"fieldPath": "month", "order": "ascending"}]},
+    {"collectionGroup": "ledger", "fields": [{"fieldPath": "month", "order": "ascending"}, {"fieldPath": "date", "order": "ascending"}]},
+    {"collectionGroup": "ledger", "fields": [{"fieldPath": "personId", "order": "ascending"}, {"fieldPath": "month", "order": "ascending"}]},
+    {"collectionGroup": "ledger", "fields": [{"fieldPath": "status", "order": "ascending"}, {"fieldPath": "createdAt", "order": "ascending"}]},
+    {"collectionGroup": "audit", "fields": [{"fieldPath": "entityId", "order": "ascending"}, {"fieldPath": "at", "order": "descending"}]},
+    {"collectionGroup": "audit", "fields": [{"fieldPath": "entity", "order": "ascending"}, {"fieldPath": "at", "order": "ascending"}]},
+    {"collectionGroup": "ledger", "fields": [{"fieldPath": "personId", "order": "ascending"}, {"fieldPath": "date", "order": "ascending"}]}
+  ]
+}
