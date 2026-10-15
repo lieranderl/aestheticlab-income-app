@@ -18,6 +18,7 @@ const (
 	ProblemAlreadyVoided domain.Problem = "already_voided" // a voided row stays voided
 	ProblemNoteRequired  domain.Problem = "note_required"  // expenses, adjustments and voids need a note
 	ProblemUnknownParty  domain.Problem = "unknown_party"  // the account, person or expense category doesn't exist
+	ProblemOpeningExists domain.Problem = "opening_exists" // a party has one opening; void the wrong one first
 )
 
 // ReasonMonthReopened is the void reason of accruals when a month reopens.
@@ -195,6 +196,11 @@ func (s *Store) recordMovement(ctx context.Context, actor Actor, n NewMovement, 
 				return err
 			}
 		}
+		if e.Type == domain.Opening {
+			if err := s.requireNoOpening(t, []Entry{e}); err != nil {
+				return err
+			}
+		}
 		category, err := checkParties(t, e.Movement)
 		if err != nil {
 			return err
@@ -272,6 +278,9 @@ func (s *Store) RecordOpenings(ctx context.Context, actor Actor, ns []NewMovemen
 		if err := requireOpen(t, s.start); err != nil {
 			return err
 		}
+		if err := s.requireNoOpening(t, entries); err != nil {
+			return err
+		}
 		for _, e := range entries { // every read before any write
 			if _, err := checkParties(t, e.Movement); err != nil {
 				return err
@@ -288,6 +297,29 @@ func (s *Store) RecordOpenings(ctx context.Context, actor Actor, ns []NewMovemen
 		return nil, err
 	}
 	return entries, nil
+}
+
+// requireNoOpening refuses an opening for a party that already has one that
+// isn't voided, or that appears twice among the new rows. It reads inside the
+// transaction, so two imports of the same file can't both load.
+func (s *Store) requireNoOpening(t tx, entries []Entry) error {
+	existing, err := readLedger(t, where("month", "==", s.start.String()), where("type", "==", string(domain.Opening)))
+	if err != nil {
+		return err
+	}
+	has := map[domain.Party]bool{}
+	for _, e := range existing {
+		if e.Status != domain.Voided {
+			has[e.To] = true
+		}
+	}
+	for _, e := range entries {
+		if has[e.To] {
+			return &domain.ValidationError{Field: "to", Problem: ProblemOpeningExists}
+		}
+		has[e.To] = true
+	}
+	return nil
 }
 
 // checkParties makes sure the accounts, person and expense category exist;

@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -397,6 +398,58 @@ func TestOpeningBalancesLoadWholeOrNotAtAll(t *testing.T) {
 		}
 		if got := s.actions(t, entries[0].ID); !reflect.DeepEqual(got, []string{store.ActionCreate}) {
 			t.Errorf("audit = %v", got)
+		}
+	})
+}
+
+func TestEachPartyHasOneOpeningBalance(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		nov1 := date(t, "2026-11-01")
+		opening := func(to domain.Party, amount domain.Cents) store.NewMovement {
+			return store.NewMovement{Type: domain.Opening, Amount: amount, From: domain.Salon, To: to, Date: nov1, Note: "Начальный остаток"}
+		}
+		cash := opening(domain.Account(domain.KassaCash), 30000)
+
+		_, err := s.RecordOpenings(ctx, s.admin, []store.NewMovement{cash, cash})
+		wantProblem(t, "the same party twice in one file", err, store.ProblemOpeningExists)
+
+		// Two imports of the same file at once: one loads, the other is refused.
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		for i := range errs {
+			wg.Go(func() { _, errs[i] = s.RecordOpenings(ctx, s.admin, []store.NewMovement{cash}) })
+		}
+		wg.Wait()
+		if (errs[0] == nil) == (errs[1] == nil) {
+			t.Fatalf("concurrent imports: errs = %v, want exactly one refused", errs)
+		}
+		for _, err := range errs {
+			if err != nil {
+				wantProblem(t, "the concurrent second import", err, store.ProblemOpeningExists)
+			}
+		}
+
+		_, err = s.RecordOpenings(ctx, s.admin, []store.NewMovement{cash})
+		wantProblem(t, "a second import", err, store.ProblemOpeningExists)
+		_, err = s.RecordMovement(ctx, s.admin, cash)
+		wantProblem(t, "a second opening by hand", err, store.ProblemOpeningExists)
+		b, err := s.Balances(ctx)
+		must(t, err)
+		if got := b.Accounts[domain.KassaCash]; got != 30000 {
+			t.Fatalf("kassa cash = %d, want 30000 (one opening)", got)
+		}
+
+		// A wrong opening is voided, then the right one goes in.
+		rows, err := s.Ledger(ctx, month(t, "2026-11"))
+		must(t, err)
+		_, err = s.VoidMovement(ctx, s.admin, rows[0].ID, rows[0].Version, "не та сумма")
+		must(t, err)
+		_, err = s.RecordOpenings(ctx, s.admin, []store.NewMovement{opening(domain.Account(domain.KassaCash), 31000)})
+		must(t, err)
+		b, err = s.Balances(ctx)
+		must(t, err)
+		if got := b.Accounts[domain.KassaCash]; got != 31000 {
+			t.Fatalf("kassa cash after the correction = %d, want 31000", got)
 		}
 	})
 }
