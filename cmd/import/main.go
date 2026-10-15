@@ -57,7 +57,7 @@ func importCmd(args []string) int {
 	project := fs.String("project", os.Getenv("INCOME_FIRESTORE_PROJECT"), "Google Cloud project")
 	database := fs.String("database", cmp.Or(os.Getenv("INCOME_FIRESTORE_DATABASE"), "aestheticlab-income"), "Firestore database")
 	startMonth := fs.String("start-month", cmp.Or(os.Getenv("INCOME_START_MONTH"), store.DefaultStartMonth.String()), "the first month the app keeps")
-	admin := fs.String("admin", "anna", "the admin the rows are recorded as")
+	admin := fs.String("admin", "", "username of the admin the rows are recorded as (default: the only active admin)")
 	dryRun := fs.Bool("dry-run", false, "check and print the figures, write nothing")
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
@@ -93,6 +93,38 @@ func importCmd(args []string) int {
 	return 0
 }
 
+// recordingAdmin is the admin the opening rows are recorded as: the named
+// one, or the only active admin. A failed lookup (a timeout, say) is
+// reported as it is, not as a missing user.
+func recordingAdmin(ctx context.Context, st *store.Store, username string) (store.User, error) {
+	if username == "" {
+		users, err := st.Users(ctx)
+		if err != nil {
+			return store.User{}, fmt.Errorf("list the admins: %w", err)
+		}
+		var admins []store.User
+		for _, u := range users {
+			if u.Active && u.Role == store.RoleAdmin {
+				admins = append(admins, u)
+			}
+		}
+		if len(admins) != 1 {
+			return store.User{}, fmt.Errorf("%d active admins: name one with -admin", len(admins))
+		}
+		return admins[0], nil
+	}
+	u, err := st.UserByUsername(ctx, username)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return store.User{}, fmt.Errorf("no user %q", username)
+	case err != nil:
+		return store.User{}, fmt.Errorf("look up %q: %w", username, err)
+	case u.Role != store.RoleAdmin || !u.Active:
+		return store.User{}, fmt.Errorf("%q is not an admin", username)
+	}
+	return u, nil
+}
+
 type options struct {
 	admin  string // username of the admin the rows are recorded as
 	dryRun bool
@@ -112,9 +144,9 @@ type openingRow struct {
 // unless it is a dry run, records one opening row per figure not yet loaded.
 // A file with any mistake writes nothing.
 func runOpening(ctx context.Context, st *store.Store, opt options, in io.Reader, out io.Writer) error {
-	admin, err := st.UserByUsername(ctx, opt.admin)
-	if err != nil || admin.Role != store.RoleAdmin {
-		return fmt.Errorf("admin %q not found", opt.admin)
+	admin, err := recordingAdmin(ctx, st, opt.admin)
+	if err != nil {
+		return err
 	}
 	rows, err := readOpening(ctx, st, in)
 	if err != nil {
