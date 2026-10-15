@@ -380,10 +380,10 @@ Dockerfile, Makefile, .air.toml, .env.web.example, firestore.indexes.json
 5. **Backups bucket:** `<project>-income-backups` (3-year lifecycle), plus a monthly Cloud Scheduler export job (OAuth token, dedicated `aestheticlab-income-backup@` account).
    - **Image repository:** a separate Artifact Registry repo `aestheticlab-income`, so the deployer can only push this app's images.
 6. **Cloud Run `aestheticlab-income`:** 1 vCPU, 512 MiB, 0–2 instances, concurrency 80, gen2, CPU throttling on.
-7. **Domain `kassa.aestheticlab.be`:** a Cloud Run domain mapping, plus a CNAME `kassa → ghs.googlehosted.com.` at DNS. Google manages the TLS certificate.
+7. **Domain `<app-host>`:** a Cloud Run domain mapping, plus a CNAME `kassa → ghs.googlehosted.com.` at DNS. Google manages the TLS certificate.
 8. **Monitoring:** alerts on 5xx errors and failed `/readyz` checks, and a €5/month budget alert.
 9. **October testing — production only (decision 2026-10-12):**
-   - Use `kassa.aestheticlab.be`, Cloud Run `aestheticlab-income` and the main database `aestheticlab-income`, with start month `2026-10` during testing. Preserve existing accounts/settings and November/December terms; add October-only terms as needed.
+   - Use `<app-host>`, Cloud Run `aestheticlab-income` and the main database `aestheticlab-income`, with start month `2026-10` during testing. Preserve existing accounts/settings and November/December terms; add October-only terms as needed.
    - Trial service/database/account/secret and temporary IAM grants were removed after verified exports. Never recreate or deploy a trial environment.
    - **Decision 2026-10-14:** October 2026 is the first real month, run in parallel with the sheet, with openings dated 2026-10-01 and the start month kept at `2026-10`. The October practice entries were already voided and stay as history; no cleanup or cut-off change (docs/MAINTAINING.md → Real October).
 

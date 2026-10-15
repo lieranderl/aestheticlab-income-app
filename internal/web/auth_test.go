@@ -53,7 +53,7 @@ func newSiteOptions(t *testing.T, opts ...store.Option) *site {
 	s.olga = s.person("olga", "Ольга", olgaPass)
 	s.maria = s.person("maria", "Мария", mariaPass)
 	s.h = handler(t, web.Config{
-		BaseURL: "https://kassa.aestheticlab.be", Store: st, Now: now, PasswordCost: bcrypt.MinCost,
+		BaseURL: "https://kassa.example.com", Store: st, Now: now, PasswordCost: bcrypt.MinCost,
 		SessionKey: []byte("test-session-key-test-session-key-0123456789"),
 	})
 	return s

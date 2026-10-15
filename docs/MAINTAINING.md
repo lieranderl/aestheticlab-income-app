@@ -9,7 +9,7 @@ Operations runbook. Project **`<project>`** (number `<project-number>`), region 
 | Firestore database | `aestheticlab-income` (Native, europe-west1) | Delete protection on. Point-in-time recovery 7 days. Daily backups kept 7 days, weekly (Sunday) kept 14 weeks. No Firebase on this project, so the only access is through IAM. |
 | Composite indexes | `firestore.indexes.json` | Applied with `scripts/infra/firestore-indexes.sh`, which is safe to re-run. |
 | Cloud Run service | `aestheticlab-income` | Public (allUsers invoker), 1 vCPU, 512 MiB, 0–2 instances, concurrency 80, gen2, CPU throttling plus startup boost, 300 s timeout, label `app=kassa`. |
-| Domain | `kassa.aestheticlab.be` | Cloud Run domain mapping plus a CNAME `kassa → ghs.googlehosted.com.` (TTL 300) in Cloud DNS zone `aestheticlab`. Google manages the certificate. |
+| Domain | `<app-host>` | Cloud Run domain mapping plus a CNAME `kassa → ghs.googlehosted.com.` (TTL 300) in Cloud DNS zone `aestheticlab`. Google manages the certificate. |
 | Image repository | Artifact Registry `aestheticlab-income` (docker) | Separate from the website's `aestheticlab` repository. Cleanup keeps the latest 10 images and deletes anything older than 30 days. |
 | Runtime service account | `aestheticlab-income-runtime@` | `roles/datastore.user` conditioned on `databases/aestheticlab-income` only. `secretAccessor` on `INCOME_SESSION_KEY` only. |
 | Deployer service account | `aestheticlab-income-deployer@` | `run.developer` on the service only; `artifactregistry.writer` on `aestheticlab-income` only; `serviceAccountUser` on the runtime account. Workload Identity user for GitHub. |
@@ -19,20 +19,20 @@ Operations runbook. Project **`<project>`** (number `<project-number>`), region 
 | Backups bucket | `gs://<project>-income-backups` | Uniform access, public access prevention, objects deleted after 1,095 days, label `app=kassa`. **90-day retention policy (unlocked)**: no one can delete or overwrite an export younger than 90 days; 7-day soft delete on top. The Firestore service agent can write to it. Locking the retention policy would make it permanent and can't be undone; it's left unlocked on purpose. |
 | Monthly export | Cloud Scheduler job `income-firestore-export` | `0 3 1 * *` Europe/Brussels. POSTs to `…/databases/aestheticlab-income:exportDocuments` with an **OAuth** token (scope `datastore`) as the backup account. The output goes to a timestamped folder in the bucket. |
 | Alert | «Kassa production 5xx responses» | Any 5xx in 5 minutes → the existing channel «Aesthetic Lab production alerts» (<owner-email>). |
-| Uptime check and alert | «Kassa production readyz» / «Kassa production readyz failing» | `https://kassa.aestheticlab.be/readyz` every 5 minutes from Europe, the USA and Asia-Pacific; it must answer 200 with `ready`. Alert when 2+ regions fail. Policy template in `scripts/infra/monitoring/kassa-uptime.json` (`${CHECK_ID}` is filled in by `create-uptime-alert.sh`, because Monitoring assigns the ID on creation). |
+| Uptime check and alert | «Kassa production readyz» / «Kassa production readyz failing» | `https://<app-host>/readyz` every 5 minutes from Europe, the USA and Asia-Pacific; it must answer 200 with `ready`. Alert when 2+ regions fail. Policy template in `scripts/infra/monitoring/kassa-uptime.json` (`${CHECK_ID}` is filled in by `create-uptime-alert.sh`, because Monitoring assigns the ID on creation). |
 | Budget | «Kassa (app=kassa)» | €5/month on the billing account, filtered by label `app=kassa`. Alerts at 50, 90 and 100 %, plus a forecast alert. Firestore can't carry labels, so its few cents aren't counted. |
 
 ### Cloud Run service settings
 These live on the service. The deploy workflow only changes the image.
 ```
-INCOME_BASE_URL=https://kassa.aestheticlab.be
+INCOME_BASE_URL=https://<app-host>
 INCOME_FIRESTORE_PROJECT=<project>
 INCOME_FIRESTORE_DATABASE=aestheticlab-income
 INCOME_START_MONTH=2026-10
 INCOME_TZ=Europe/Brussels
 INCOME_SESSION_KEY=secret:INCOME_SESSION_KEY:latest
 ```
-**Production only, from 2026-10-12:** use **https://kassa.aestheticlab.be**, Cloud Run `aestheticlab-income`, and the main database `aestheticlab-income`, with `INCOME_START_MONTH=2026-10`.
+**Production only, from 2026-10-12:** use **https://<app-host>**, Cloud Run `aestheticlab-income`, and the main database `aestheticlab-income`, with `INCOME_START_MONTH=2026-10`.
 
 **October 2026 is the first real month (decision 2026-10-14).** It runs in parallel with the sheet, which stays the record until October reconciles (M12). The practice entries made on 12–14 October (7 client entries, 2 movements) were all voided in the app. They count nowhere and stay as history: they appear in «Журнал изменений», and they moved the per-day client numbers on 1, 2 and 14 October for the two people who tested. No cleanup or cut-off change is needed. From now on every October record is real: never delete one, void it with a reason.
 
@@ -161,14 +161,14 @@ gcloud run deploy aestheticlab-income --project $P --region europe-west1 \
   --image us-docker.pkg.dev/cloudrun/container/hello --service-account $RUNTIME --allow-unauthenticated --ingress all \
   --cpu 1 --memory 512Mi --min-instances 0 --max-instances 2 --concurrency 80 \
   --execution-environment gen2 --cpu-throttling --cpu-boost --port 8080 --timeout 300 \
-  --set-env-vars "INCOME_BASE_URL=https://kassa.aestheticlab.be,INCOME_FIRESTORE_PROJECT=$P,INCOME_FIRESTORE_DATABASE=aestheticlab-income,INCOME_TZ=Europe/Brussels" \
+  --set-env-vars "INCOME_BASE_URL=https://<app-host>,INCOME_FIRESTORE_PROJECT=$P,INCOME_FIRESTORE_DATABASE=aestheticlab-income,INCOME_TZ=Europe/Brussels" \
   --set-secrets "INCOME_SESSION_KEY=INCOME_SESSION_KEY:latest" --labels app=kassa
 gcloud run services add-iam-policy-binding aestheticlab-income --project $P --region europe-west1 \
   --role=roles/run.developer --member="serviceAccount:$DEPLOYER"
 
 # 6. Domain
-gcloud beta run domain-mappings create --service aestheticlab-income --domain kassa.aestheticlab.be --project $P --region europe-west1
-gcloud dns record-sets create kassa.aestheticlab.be. --zone=aestheticlab --project $P --type=CNAME --ttl=300 --rrdatas="ghs.googlehosted.com."
+gcloud beta run domain-mappings create --service aestheticlab-income --domain <app-host> --project $P --region europe-west1
+gcloud dns record-sets create <app-host>. --zone=aestheticlab --project $P --type=CNAME --ttl=300 --rrdatas="ghs.googlehosted.com."
 
 # 7. Backups bucket and monthly export
 gcloud storage buckets create gs://<project>-income-backups --project $P --location=europe-west1 \
@@ -191,13 +191,16 @@ gcloud scheduler jobs create http income-firestore-export --project $P --locatio
   --message-body='{"outputUriPrefix":"gs://<project>-income-backups"}' \
   --oauth-service-account-email="$BACKUP" --oauth-token-scope="https://www.googleapis.com/auth/datastore"
 
-# 8. Monitoring (policy files in scripts/infra/monitoring/)
-gcloud alpha monitoring policies create --project $P --policy-from-file=scripts/infra/monitoring/kassa-5xx.json
+# 8. Monitoring (policy templates in scripts/infra/monitoring/; they hold
+#    ${PROJECT}, ${CHANNEL_ID} and ${APP_HOST}, filled in here)
+export PROJECT=$P CHANNEL_ID=<channel-id> APP_HOST=<app-host>
+envsubst '${PROJECT} ${CHANNEL_ID}' < scripts/infra/monitoring/kassa-5xx.json > /tmp/kassa-5xx.json
+gcloud alpha monitoring policies create --project $P --policy-from-file=/tmp/kassa-5xx.json
 gcloud monitoring uptime create "Kassa production readyz" --project $P --resource-type=uptime-url \
-  --resource-labels=host=kassa.aestheticlab.be,project_id=$P --protocol=https --port=443 --path=/readyz \
+  --resource-labels=host=$APP_HOST,project_id=$P --protocol=https --port=443 --path=/readyz \
   --validate-ssl=true --status-codes=200 --matcher-content=ready --matcher-type=contains-string \
   --period=5 --timeout=10 --regions=europe,usa-oregon,asia-pacific --user-labels=app=kassa
-scripts/infra/monitoring/create-uptime-alert.sh   # looks up the new check ID and fills it into kassa-uptime.json
+scripts/infra/monitoring/create-uptime-alert.sh   # uses PROJECT, CHANNEL_ID and APP_HOST; looks up the new check ID and fills kassa-uptime.json
 
 # 9. Budget
 gcloud services enable billingbudgets.googleapis.com --project $P

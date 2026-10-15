@@ -10,7 +10,7 @@
     }
   }],
   "alertStrategy": {"autoClose": "604800s"},
-  "documentation": {"content": "The Kassa app (kassa.aestheticlab.be) returned server errors. Check logs: gcloud logging read 'resource.labels.service_name=\"aestheticlab-income\" AND severity>=ERROR' --project <project> --freshness 1h", "mimeType": "text/markdown"},
+  "documentation": {"content": "The Kassa app returned server errors. Check logs: gcloud logging read 'resource.labels.service_name=\"aestheticlab-income\" AND severity>=ERROR' --project <project> --freshness 1h", "mimeType": "text/markdown"},
   "userLabels": {"app": "kassa"},
   "notificationChannels": ["projects/${PROJECT}/notificationChannels/${CHANNEL_ID}"]
 }

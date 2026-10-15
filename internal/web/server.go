@@ -23,7 +23,7 @@ const MinSessionKey = 32
 
 // Config holds what the web app needs to serve requests.
 type Config struct {
-	// BaseURL is where people reach the app (https://kassa.aestheticlab.be,
+	// BaseURL is where people reach the app (https://kassa.example.com,
 	// or http://localhost:8080 locally). An https URL turns on HSTS and
 	// Secure cookies.
 	BaseURL string

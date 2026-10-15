@@ -1,7 +1,7 @@
 name: Deploy
 
 # Deploys the app to the Cloud Run service aestheticlab-income
-# (https://kassa.aestheticlab.be). Only the CI workflow calls this, as its
+# (the production URL is configured on the service, not here). Only the CI workflow calls this, as its
 # last job on main after «CI passed», so it deploys exactly the commit CI
 # tested; a red CI run never deploys. CI runs on main queue in push order,
 # and a run whose commit is no longer the head of main skips the deploy,
@@ -67,7 +67,6 @@ jobs:
     timeout-minutes: 20
     environment:
       name: production
-      url: https://kassa.aestheticlab.be
     permissions:
       contents: read
       id-token: write # sign in to Google Cloud

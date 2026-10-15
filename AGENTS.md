@@ -1,6 +1,6 @@
 # AGENTS.md
 
-**Aesthetic Lab Kassa** (`kassa.aestheticlab.be`) is an internal, phone-first PWA for the Aesthetic Lab salon in Brussels. Four people use it (Anna = admin, Maria, Olga, Vera). It covers:
+**Aesthetic Lab Kassa** (`<app-host>`) is an internal, phone-first PWA for the Aesthetic Lab salon in Brussels. Four people use it (Anna = admin, Maria, Olga, Vera). It covers:
 - per-client revenue entries and daily totals;
 - the salon kassa (cash till + the salon's card) and each person's balance with the salon;
 - the monthly settlement (salary, dividends, who pays whom).
@@ -9,7 +9,7 @@ It replaces the «Aesthetic Lab Finance» Google Sheet.
 
 **Stack:** Go 1.27 · templ · Datastar v1 (SSE, no client framework) · Tailwind 4 + daisyUI 5 · Firestore (named DB `aestheticlab-income`) · Cloud Run (GCP project `<project>`, europe-west1). The UI is **Russian only**. Money is **int64 euro cents**.
 
-**Production only:** service/database `aestheticlab-income` at `kassa.aestheticlab.be`, start month `INCOME_START_MONTH=2026-10`.
+**Production only:** service/database `aestheticlab-income` at `<app-host>`, start month `INCOME_START_MONTH=2026-10`.
 - **October 2026 is the first real month (decision 2026-10-14).** It runs in parallel with the sheet, which stays the record until October reconciles. Openings are dated 2026-10-01, and 1–14 October is backfilled from the sheet.
 - Treat all October production data as real: no test entries, and never delete October records. The earlier practice entries were voided in the app and stay.
 - Trial resources were retired; do not recreate them. See `docs/MAINTAINING.md`.

@@ -33,8 +33,7 @@
       "Bash(gcloud logging read:*)",
       "Bash(gcloud firestore databases describe:*)",
       "Bash(gcloud firestore backups list:*)",
-      "Bash(gcloud dns record-sets list:*)",
-      "Bash(curl -fsS https://kassa.aestheticlab.be/readyz)"
+      "Bash(gcloud dns record-sets list:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
