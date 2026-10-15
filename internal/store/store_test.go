@@ -964,3 +964,36 @@ func TestFailedLoginsLockTheAccountForAWhile(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// The admin can rename a kassa account (only its display name); the change
+// is audited and staff can't do it.
+func TestTheAdminRenamesAKassaAccount(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		_, err := s.RenameAccount(ctx, s.actor(s.olga), domain.KassaCard, "Касса — карта салона")
+		wantErr(t, "staff rename", err, store.ErrForbidden)
+		_, err = s.RenameAccount(ctx, s.admin, domain.KassaCard, "  ")
+		wantErr(t, "blank name", err, store.ErrInvalid)
+		_, err = s.RenameAccount(ctx, s.admin, "nope", "Касса")
+		wantErr(t, "unknown account", err, store.ErrNotFound)
+
+		a, err := s.RenameAccount(ctx, s.admin, domain.KassaCard, "  Касса — карта салона ")
+		must(t, err)
+		if a.Name != "Касса — карта салона" || a.Kind != store.AccountCard || !a.Active {
+			t.Fatalf("renamed account = %+v", a)
+		}
+		accounts, err := s.Accounts(ctx)
+		must(t, err)
+		if accounts[1].ID != domain.KassaCard || accounts[1].Name != "Касса — карта салона" {
+			t.Fatalf("accounts = %+v", accounts)
+		}
+		entries, err := s.Audit(ctx, domain.KassaCard)
+		must(t, err)
+		renamed := false
+		for _, e := range entries {
+			renamed = renamed || (e.Action == store.ActionUpdate && e.Entity == store.EntityAccount && strings.Contains(e.After, "Касса — карта салона"))
+		}
+		if !renamed {
+			t.Fatalf("no audited rename in %+v", entries)
+		}
+	})
+}
