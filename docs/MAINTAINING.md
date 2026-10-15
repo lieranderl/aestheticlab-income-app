@@ -191,13 +191,16 @@ gcloud scheduler jobs create http income-firestore-export --project $P --locatio
   --message-body='{"outputUriPrefix":"gs://<project>-income-backups"}' \
   --oauth-service-account-email="$BACKUP" --oauth-token-scope="https://www.googleapis.com/auth/datastore"
 
-# 8. Monitoring (policy files in scripts/infra/monitoring/)
-gcloud alpha monitoring policies create --project $P --policy-from-file=scripts/infra/monitoring/kassa-5xx.json
+# 8. Monitoring (policy templates in scripts/infra/monitoring/; they hold
+#    ${PROJECT}, ${CHANNEL_ID} and ${APP_HOST}, filled in here)
+export PROJECT=$P CHANNEL_ID=<channel-id> APP_HOST=<app-host>
+envsubst '${PROJECT} ${CHANNEL_ID}' < scripts/infra/monitoring/kassa-5xx.json > /tmp/kassa-5xx.json
+gcloud alpha monitoring policies create --project $P --policy-from-file=/tmp/kassa-5xx.json
 gcloud monitoring uptime create "Kassa production readyz" --project $P --resource-type=uptime-url \
-  --resource-labels=host=<app-host>,project_id=$P --protocol=https --port=443 --path=/readyz \
+  --resource-labels=host=$APP_HOST,project_id=$P --protocol=https --port=443 --path=/readyz \
   --validate-ssl=true --status-codes=200 --matcher-content=ready --matcher-type=contains-string \
   --period=5 --timeout=10 --regions=europe,usa-oregon,asia-pacific --user-labels=app=kassa
-scripts/infra/monitoring/create-uptime-alert.sh   # looks up the new check ID and fills it into kassa-uptime.json
+scripts/infra/monitoring/create-uptime-alert.sh   # uses PROJECT, CHANNEL_ID and APP_HOST; looks up the new check ID and fills kassa-uptime.json
 
 # 9. Budget
 gcloud services enable billingbudgets.googleapis.com --project $P

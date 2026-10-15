@@ -15,6 +15,6 @@ if gcloud alpha monitoring policies list --project "$PROJECT" --filter='displayN
 fi
 policy=$(mktemp); trap 'rm -f "$policy"' EXIT
 : "${CHANNEL_ID:?set CHANNEL_ID to the notification channel ID}"
-: "${APP_HOST:?set APP_HOST to the app's host name}"
+: "${APP_HOST:?set APP_HOST to the host name of the app}"
 CHECK_ID="$CHECK_ID" PROJECT="$PROJECT" CHANNEL_ID="$CHANNEL_ID" APP_HOST="$APP_HOST" envsubst '${CHECK_ID} ${PROJECT} ${CHANNEL_ID} ${APP_HOST}' < "$DIR/kassa-uptime.json" > "$policy"
 gcloud alpha monitoring policies create --project "$PROJECT" --policy-from-file="$policy" --format='value(name)'
