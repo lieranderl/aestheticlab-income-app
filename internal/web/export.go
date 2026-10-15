@@ -117,6 +117,7 @@ func (a *app) handleExportDownload(w http.ResponseWriter, r *http.Request, _ sto
 	}
 
 	monthResults := make(map[domain.Month]domain.MonthResult)
+	closing := make(map[domain.Month]domain.Balances)
 	for _, m := range months {
 		if m.Before(a.store.StartMonth()) || a.store.Today().Month().Before(m) {
 			continue
@@ -124,6 +125,9 @@ func (a *app) handleExportDownload(w http.ResponseWriter, r *http.Request, _ sto
 		settlement, err := a.store.Settlement(r.Context(), m)
 		if err == nil && settlement.PreviewError == nil {
 			monthResults[m] = settlement.Result
+			if settlement.Closing != nil {
+				closing[m] = *settlement.Closing
+			}
 		}
 	}
 
@@ -144,6 +148,7 @@ func (a *app) handleExportDownload(w http.ResponseWriter, r *http.Request, _ sto
 		Reports:      reports,
 		Movements:    movements,
 		MonthResults: monthResults,
+		Closing:      closing,
 		TrendPoints:  trendPoints,
 	}
 

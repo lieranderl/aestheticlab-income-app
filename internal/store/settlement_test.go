@@ -345,3 +345,41 @@ func TestSettlementAmountCannotCreateReverseDebtButAllowsPartialAndFullPayment(t
 		}
 	})
 }
+
+func TestSettlementGivesTheBalancesAtMonthEnd(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		nov := month(t, "2026-11")
+		kassaCash := func(what string, want domain.Cents) {
+			t.Helper()
+			got, err := s.Settlement(ctx, nov)
+			must(t, err)
+			if got.Closing == nil || got.Closing.Accounts[domain.KassaCash] != want {
+				t.Fatalf("%s: closing %+v, want kassa cash %d", what, got.Closing, want)
+			}
+		}
+		_, err := s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Opening, Amount: 100000, From: domain.Salon, To: domain.Account(domain.KassaCash), Date: nov.FirstDay()})
+		must(t, err)
+		_, err = s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Deposit, Amount: 10000, From: domain.Person(s.olga), To: domain.Account(domain.KassaCash), Date: date(t, "2026-11-12")})
+		must(t, err)
+		_, err = s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Expense, Amount: 5000, From: domain.Account(domain.KassaCash), To: domain.Outside, ExpenseCategory: "rent", Date: date(t, "2026-11-13"), Note: "аренда"})
+		must(t, err)
+		_, err = s.RecordMovement(ctx, s.actor(s.olga), store.NewMovement{Type: domain.Deposit, Amount: 7000, From: domain.Person(s.olga), To: domain.Account(domain.KassaCash), Date: date(t, "2026-11-14")})
+		must(t, err) // pending: not in the kassa yet
+		kassaCash("open month", 105000)
+
+		s.at("2026-12-20")
+		_, err = s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Deposit, Amount: 90000, From: domain.Person(s.olga), To: domain.Account(domain.KassaCash), Date: date(t, "2026-12-02")})
+		must(t, err)
+		kassaCash("with a later month's rows", 105000)
+
+		pending, err := s.PendingMovements(ctx)
+		must(t, err)
+		_, err = s.VoidMovement(ctx, s.admin, pending[0].ID, pending[0].Version, "не было")
+		must(t, err)
+		fresh, err := s.Settlement(ctx, nov)
+		must(t, err)
+		_, err = s.CloseMonthGuarded(ctx, s.admin, nov, fresh.Revision)
+		must(t, err)
+		kassaCash("closed month", 105000)
+	})
+}

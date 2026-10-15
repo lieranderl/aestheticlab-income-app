@@ -14,6 +14,7 @@ import (
 type SettlementMonth struct {
 	State                        MonthState
 	Result                       domain.MonthResult
+	Closing                      *domain.Balances // at the month's end (now, for an open month); nil if unknown
 	Breakdowns                   map[string]domain.SettlementBreakdown
 	Revision                     string
 	Pending                      int
@@ -111,8 +112,13 @@ func (s *Store) settlement(t tx, m domain.Month) (SettlementMonth, error) {
 	in := domain.MonthInput{Month: m, Opening: opening, Reports: personReports(reports), Movements: moves, Terms: terms}
 	if out.State.Snapshot != nil {
 		out.Result = out.State.Snapshot.Result
+		closing := out.State.Snapshot.Balances
+		out.Closing = &closing
 	} else {
 		out.Result, out.PreviewError = domain.PreviewMonth(in)
+		if closing, err := domain.Fold(opening, in.Reports, moves); err == nil {
+			out.Closing = &closing
+		}
 	}
 	for id, p := range out.Result.People {
 		out.Breakdowns[id] = domain.BreakdownFor(id, opening.Persons[id], in.Reports, moves, p)

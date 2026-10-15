@@ -40,8 +40,12 @@ type Data struct {
 	Reports      []store.SavedReport
 	Movements    []store.Entry
 	MonthResults map[domain.Month]domain.MonthResult
+	Closing      map[domain.Month]domain.Balances // the balances at each month's end (now, for the open month)
 	TrendPoints  []domain.TrendPoint
 }
+
+// unknown fills a cell whose figure the app doesn't have, as the web view does.
+const unknown = "—"
 
 // XLSX generates a multi-sheet Excel workbook:
 // «Записи», «Движения», «По сотрудникам», «Итоги месяца», «По месяцам».
@@ -166,6 +170,7 @@ type empSummary struct {
 	ID           string
 	Name         string
 	Clients      int
+	LegacyDays   bool // a legacy day report has no client count
 	WorkingDays  int
 	Revenue      domain.Cents
 	Services     domain.Cents
@@ -199,6 +204,8 @@ func writeEmployeesSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 		}
 		if r.Client {
 			s.Clients++
+		} else {
+			s.LegacyDays = true
 		}
 		personDays[r.Person][r.Date] = true
 		s.Revenue += r.Report.Total
@@ -242,7 +249,7 @@ func writeEmployeesSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 		totalEarned := s.Self + s.SelfBonus + s.Salary + s.Dividend
 
 		_ = f.SetCellValue(sheet, cell(1, row), s.Name)
-		_ = f.SetCellValue(sheet, cell(2, row), s.Clients)
+		setCount(f, sheet, 2, row, s.Clients, !s.LegacyDays)
 		_ = f.SetCellValue(sheet, cell(3, row), s.WorkingDays)
 		setCur(f, sheet, 4, row, s.Revenue, cStyle)
 		setCur(f, sheet, 5, row, s.Services, cStyle)
@@ -266,8 +273,8 @@ func writeMonthResultsSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 	headers := []string{
 		"Месяц", "Выручка", "Себе мастера",
 		"Доход салона", "Расходы салона", "Зарплаты",
-		"Прибыль", "Дивиденды", "Касса наличные (конец)",
-		"Касса карта (конец)", "Клиентов всего",
+		"Прибыль", "Дивиденды", "Касса наличные, остаток на конец",
+		"Касса карта, остаток на конец", "Клиентов всего",
 	}
 	writeHeaderRow(f, sheet, headers, hStyle)
 
@@ -292,9 +299,14 @@ func writeMonthResultsSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 		setCur(f, sheet, 6, row, res.Salaries, cStyle)
 		setCur(f, sheet, 7, row, res.Profit, cStyle)
 		setCur(f, sheet, 8, row, res.DividendPool, cStyle)
-		setCur(f, sheet, 9, row, res.KassaCash, cStyle)
-		setCur(f, sheet, 10, row, res.KassaCard, cStyle)
-		_ = f.SetCellValue(sheet, cell(11, row), res.Clients)
+		if b, ok := d.Closing[m]; ok {
+			setCur(f, sheet, 9, row, b.Accounts[domain.KassaCash], cStyle)
+			setCur(f, sheet, 10, row, b.Accounts[domain.KassaCard], cStyle)
+		} else {
+			_ = f.SetCellValue(sheet, cell(9, row), unknown)
+			_ = f.SetCellValue(sheet, cell(10, row), unknown)
+		}
+		setCount(f, sheet, 11, row, res.Clients, res.StatsVersion > 0)
 	}
 }
 
@@ -319,13 +331,16 @@ func writeTrendsSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 
 		_ = f.SetCellValue(sheet, cell(1, row), monthStr)
 		_ = f.SetCellValue(sheet, cell(2, row), sourceStr)
-		setCur(f, sheet, 3, row, pt.Revenue, cStyle)
-		setCur(f, sheet, 4, row, pt.Self, cStyle)
-		setCur(f, sheet, 5, row, pt.SalonIncome, cStyle)
-		setCur(f, sheet, 6, row, pt.Expenses, cStyle)
-		setCur(f, sheet, 7, row, pt.Profit, cStyle)
-		setCur(f, sheet, 8, row, pt.Dividends, cStyle)
-		_ = f.SetCellValue(sheet, cell(9, row), pt.Clients)
+		// The same availability as the «Динамика» screen: imported months
+		// have no «Себе» or clients, legacy snapshots no clients.
+		has := pt.HasData
+		setCurIf(f, sheet, 3, row, pt.Revenue, cStyle, has)
+		setCurIf(f, sheet, 4, row, pt.Self, cStyle, has && !pt.Imported)
+		setCurIf(f, sheet, 5, row, pt.SalonIncome, cStyle, has)
+		setCurIf(f, sheet, 6, row, pt.Expenses, cStyle, has)
+		setCurIf(f, sheet, 7, row, pt.Profit, cStyle, has)
+		setCurIf(f, sheet, 8, row, pt.Dividends, cStyle, has)
+		setCount(f, sheet, 9, row, pt.Clients, has && !pt.Imported && pt.StatsVersion > 0)
 	}
 }
 
@@ -341,6 +356,24 @@ func setCur(f *excelize.File, sheet string, col, row int, c domain.Cents, style 
 	target := cell(col, row)
 	_ = f.SetCellValue(sheet, target, float64(c)/100.0)
 	_ = f.SetCellStyle(sheet, target, target, style)
+}
+
+// setCurIf writes the amount, or «—» when the figure isn't known.
+func setCurIf(f *excelize.File, sheet string, col, row int, c domain.Cents, style int, known bool) {
+	if !known {
+		_ = f.SetCellValue(sheet, cell(col, row), unknown)
+		return
+	}
+	setCur(f, sheet, col, row, c, style)
+}
+
+// setCount writes a count, or «—» when the figure isn't known.
+func setCount(f *excelize.File, sheet string, col, row, n int, known bool) {
+	if !known {
+		_ = f.SetCellValue(sheet, cell(col, row), unknown)
+		return
+	}
+	_ = f.SetCellValue(sheet, cell(col, row), n)
 }
 
 func cell(col, row int) string {
@@ -383,8 +416,8 @@ func CSV(w io.Writer, kind string, d Data) error {
 				timeStr,
 				movementKindTitle(m.Type),
 				centsBelgian(m.Amount),
-				partyName(m.From, d.Users, d.Accounts),
-				partyName(m.To, d.Users, d.Accounts),
+				sanitizeCSV(partyName(m.From, d.Users, d.Accounts)),
+				sanitizeCSV(partyName(m.To, d.Users, d.Accounts)),
 				sanitizeCSV(catStr),
 				movementStatusTitle(m.Status),
 				sanitizeCSV(m.Note),
@@ -414,7 +447,7 @@ func CSV(w io.Writer, kind string, d Data) error {
 			row := []string{
 				fmt.Sprintf("%02d.%02d.%04d", r.Date.Day, int(r.Date.Mon), r.Date.Year),
 				timeStr,
-				userName(r.Person, d.Users),
+				sanitizeCSV(userName(r.Person, d.Users)),
 				numStr,
 				centsBelgian(r.Revenue["services"]),
 				centsBelgian(r.Revenue["creams"]),
