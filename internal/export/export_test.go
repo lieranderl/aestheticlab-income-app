@@ -298,3 +298,148 @@ func TestExportCSVMovementsAndInjectionEscaping(t *testing.T) {
 		t.Error("formula injection '=HYPERLINK' was not escaped with leading single quote")
 	}
 }
+
+func openXLSX(t *testing.T, data export.Data) *excelize.File {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := export.XLSX(&buf, data); err != nil {
+		t.Fatalf("export.XLSX failed: %v", err)
+	}
+	f, err := excelize.OpenReader(&buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+	return f
+}
+
+func rawCell(t *testing.T, f *excelize.File, sheet, ref string) string {
+	t.Helper()
+	v, err := f.GetCellValue(sheet, ref, excelize.Options{RawCellValue: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestExportMonthResultsShowTheKassaBalanceAtMonthEnd(t *testing.T) {
+	data := sampleExportData()
+	nov := domain.Month{Year: 2026, Mon: 11}
+	// Opening 1 000 + contribution 100 − expense 50: the month's contribution
+	// alone (150 here) is not what the kassa holds.
+	data.Closing = map[domain.Month]domain.Balances{nov: {Accounts: map[string]domain.Cents{
+		domain.KassaCash: 105000, domain.KassaCard: 230000,
+	}}}
+	f := openXLSX(t, data)
+
+	if got := rawCell(t, f, "Итоги месяца", "I1"); got != "Касса наличные, остаток на конец" {
+		t.Errorf("I1 = %q", got)
+	}
+	if got := rawCell(t, f, "Итоги месяца", "I2"); got != "1050" {
+		t.Errorf("kassa cash at month end = %q, want 1050", got)
+	}
+	if got := rawCell(t, f, "Итоги месяца", "J2"); got != "2300" {
+		t.Errorf("kassa card at month end = %q, want 2300", got)
+	}
+
+	// Without a known balance the cell says so instead of showing a figure.
+	data.Closing = nil
+	f = openXLSX(t, data)
+	if got := rawCell(t, f, "Итоги месяца", "I2"); got != "—" {
+		t.Errorf("unknown kassa balance = %q, want —", got)
+	}
+}
+
+func TestExportLeavesUnavailableStatisticsBlank(t *testing.T) {
+	data := sampleExportData()
+	nov := domain.Month{Year: 2026, Mon: 11}
+	legacy := data.MonthResults[nov]
+	legacy.StatsVersion = 0 // a legacy snapshot without client statistics
+	data.MonthResults[nov] = legacy
+	data.TrendPoints = []domain.TrendPoint{
+		{Month: domain.Month{Year: 2026, Mon: 9}}, // no data at all
+		{Month: domain.Month{Year: 2026, Mon: 10}, HasData: true, Imported: true, Revenue: 500000, Self: 0, Clients: 0},
+		{Month: nov, HasData: true, StatsVersion: 0, Revenue: 150000, Self: 60000, Clients: 0},
+		{Month: domain.Month{Year: 2026, Mon: 12}, HasData: true, StatsVersion: 1, Revenue: 1000, Self: 500, Clients: 3},
+	}
+	f := openXLSX(t, data)
+
+	if got := rawCell(t, f, "Итоги месяца", "K2"); got != "—" {
+		t.Errorf("legacy month clients = %q, want —", got)
+	}
+	want := map[string]string{
+		// no data: every figure is unknown
+		"C2": "—", "D2": "—", "G2": "—", "I2": "—",
+		// imported from the sheet: revenue known, «Себе» and clients not
+		"C3": "5000", "D3": "—", "I3": "—",
+		// legacy app month: «Себе» known, clients not
+		"D4": "600", "I4": "—",
+		// a month with statistics
+		"D5": "5", "I5": "3",
+	}
+	for ref, w := range want {
+		if got := rawCell(t, f, "По месяцам", ref); got != w {
+			t.Errorf("По месяцам %s = %q, want %q", ref, got, w)
+		}
+	}
+}
+
+func TestExportCSVEscapesFormulasInNames(t *testing.T) {
+	data := sampleExportData()
+	data.Users["olga"] = store.User{ID: "olga", DisplayName: "=1+1"}
+	data.Accounts["cash"] = store.Account{ID: "cash", Name: "@SUM(A1)"}
+	for _, kind := range []string{"records", "movements"} {
+		var buf bytes.Buffer
+		if err := export.CSV(&buf, kind, data); err != nil {
+			t.Fatal(err)
+		}
+		out := buf.String()
+		for _, bad := range []string{";=1+1", ";@SUM(A1)"} {
+			if strings.Contains(out, bad) {
+				t.Errorf("%s CSV has an unescaped formula %q", kind, bad)
+			}
+		}
+		if !strings.Contains(out, "'=1+1") {
+			t.Errorf("%s CSV lost the escaped name", kind)
+		}
+	}
+}
+
+func TestExportEmployeeClientsAreUnknownWithLegacyDayReports(t *testing.T) {
+	data := sampleExportData()
+	day := data.Reports[0]
+	day.Client = false // a legacy day report
+	data.Reports = append(data.Reports, day)
+	f := openXLSX(t, data)
+	if got := rawCell(t, f, "По сотрудникам", "B2"); got != "—" {
+		t.Errorf("clients with a legacy day report = %q, want —", got)
+	}
+
+	f = openXLSX(t, sampleExportData())
+	if got := rawCell(t, f, "По сотрудникам", "B2"); got != "1" {
+		t.Errorf("clients from client entries = %q, want 1", got)
+	}
+}
+
+func TestExportMarksOpenMonthsAsPreliminary(t *testing.T) {
+	nov := domain.Month{Year: 2026, Mon: 11}
+	for _, c := range []struct {
+		name   string
+		closed bool
+		today  domain.Date
+		want   string
+	}{
+		{"closed", true, domain.Date{Year: 2026, Mon: 12, Day: 5}, "Ноябрь 2026"},
+		{"open and over", false, domain.Date{Year: 2026, Mon: 12, Day: 5}, "Ноябрь 2026 — предварительно"},
+		{"open, last day", false, nov.LastDay(), "Ноябрь 2026 — предварительно, на сегодня"},
+		{"open, mid-month", false, domain.Date{Year: 2026, Mon: 11, Day: 15}, "Ноябрь 2026 — предварительно, на сегодня"},
+	} {
+		data := sampleExportData()
+		data.Closed = map[domain.Month]bool{nov: c.closed}
+		data.Today = c.today
+		f := openXLSX(t, data)
+		if got := rawCell(t, f, "Итоги месяца", "A2"); got != c.want {
+			t.Errorf("%s: A2 = %q, want %q", c.name, got, c.want)
+		}
+	}
+}

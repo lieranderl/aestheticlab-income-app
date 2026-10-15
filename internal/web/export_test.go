@@ -182,3 +182,57 @@ func TestExportDownloadCSVRecordsAndMovements(t *testing.T) {
 		t.Error("missing UTF-8 BOM in CSV movements")
 	}
 }
+
+func TestExportMonthResultsCarryTheKassaBalance(t *testing.T) {
+	s := newSite(t)
+	actor := s.anna.Actor()
+	nov := s.st.StartMonth()
+	if err := s.st.SetTerms(ctx, actor, s.olga.ID, nov, domain.Terms{SelfPct: 5000}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.st.RecordOpenings(ctx, actor, []store.NewMovement{
+		{Type: domain.Opening, Amount: 100000, From: domain.Salon, To: domain.Account(domain.KassaCash), Date: nov.FirstDay()},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	day := domain.Date{Year: 2026, Mon: 11, Day: 10}
+	// A €200 service paid in cash: the cash goes to the kassa.
+	clientEntry := store.ClientEntry{
+		Token:  "test-client-token-kassa",
+		Person: s.olga.ID,
+		Date:   day,
+		Input:  domain.ClientInput{Services: 20000, ServiceCash: 20000},
+	}
+	if _, err := s.st.SaveClientReport(ctx, actor, clientEntry); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.st.RecordMovement(ctx, actor, store.NewMovement{
+		Type: domain.Expense, Amount: 5000, From: domain.Account(domain.KassaCash), To: domain.Outside,
+		ExpenseCategory: "materials", Date: day, Note: "Материалы",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.st.Balances(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	admin := s.login("anna", annaPass)
+	r := s.get("/admin/export/download?from=2026-11-01&to=2026-11-30&format=xlsx", admin)
+	if r.Code != http.StatusOK {
+		t.Fatalf("download: %d %s", r.Code, r.Body.String())
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(r.Body.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = f.Close() }()
+	got, err := f.GetCellValue("Итоги месяца", "I2", excelize.Options{RawCellValue: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Opening 1 000 + 200 − 50: the balance, not the month's 200 contribution.
+	if b.Accounts[domain.KassaCash] != 115000 || got != "1150" {
+		t.Fatalf("kassa cash: balance %d, export %q, want 115000 and 1150", b.Accounts[domain.KassaCash], got)
+	}
+}
