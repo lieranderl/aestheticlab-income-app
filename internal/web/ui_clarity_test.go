@@ -134,7 +134,7 @@ func TestCategoryPageShowsGuidanceForFixedCategories(t *testing.T) {
 	admin := s.login("anna", annaPass)
 	page := s.get("/admin/categories/services", admin)
 	wantPage(t, "fixed category notice", page, http.StatusOK,
-		"Это базовая категория салона. Название можно изменить.")
+		"Базовую категорию нельзя архивировать или удалить. Новое название видно в категориях и отчётах за день, но не в форме записи клиента.")
 }
 
 func TestDateSwitcherProvidesAccessibleCalendarPicker(t *testing.T) {

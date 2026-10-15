@@ -120,13 +120,21 @@ func TestEachCategoryOpensItsOwnEditor(t *testing.T) {
 func TestCategoryFlagsSayTheyOnlyApplyToLegacyDayReports(t *testing.T) {
 	s := newSite(t)
 	cookies := s.login("anna", annaPass)
-	for _, path := range []string{"/admin/categories/services", "/admin/categories?kind=revenue", "/admin/categories?kind=payment"} {
+	for path, want := range map[string]string{
+		"/admin/categories?kind=revenue": "Записи клиентов считаются по постоянным правилам",
+		"/admin/categories?kind=payment": "В записях клиентов кассу",
+		"/admin/categories/services":     "Эти настройки действуют только при исправлении старых отчётов за день",
+		"/admin/categories/card":         "Эти настройки действуют только при исправлении старых отчётов за день",
+	} {
 		body := s.get(path, cookies).Body.String()
 		if strings.Contains(body, "влияют на поклиентский учёт") {
 			t.Errorf("%s claims the flags change client entries", path)
 		}
-		if !strings.Contains(body, "Поклиентские записи считаются по постоянным правилам") {
-			t.Errorf("%s doesn't say client entries use fixed rules", path)
+		if !strings.Contains(body, want) {
+			t.Errorf("%s lacks %q", path, want)
 		}
+	}
+	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !strings.Contains(body, "В отчётах за день: входит в «Себе»") {
+		t.Error("the list doesn't name the services setting as a day-report one")
 	}
 }
