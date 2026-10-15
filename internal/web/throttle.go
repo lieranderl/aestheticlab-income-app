@@ -31,10 +31,11 @@ type loginThrottle struct {
 	mu      sync.Mutex
 	sources map[string]*sourceCount
 	hashing chan struct{}
+	reauth  map[string]bool // people whose current password is being checked
 }
 
 func newLoginThrottle(now func() time.Time) *loginThrottle {
-	return &loginThrottle{now: now, sources: map[string]*sourceCount{}, hashing: make(chan struct{}, maxHashing)}
+	return &loginThrottle{now: now, sources: map[string]*sourceCount{}, hashing: make(chan struct{}, maxHashing), reauth: map[string]bool{}}
 }
 
 // admit lets a login from source go ahead unless the source has used up
@@ -101,6 +102,25 @@ func (t *loginThrottle) prune(now time.Time) {
 			delete(t.sources, k)
 		}
 	}
+}
+
+// beginReauth claims the one current-password check a person may have
+// running, so parallel requests cannot each guess before any of them
+// records a failure; false means one is already running. endReauth frees it.
+func (t *loginThrottle) beginReauth(uid string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.reauth[uid] {
+		return false
+	}
+	t.reauth[uid] = true
+	return true
+}
+
+func (t *loginThrottle) endReauth(uid string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.reauth, uid)
 }
 
 // hash runs a bcrypt compare once one of maxHashing slots is free, so a

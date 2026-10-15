@@ -12,7 +12,10 @@ import (
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 )
 
-const msgReauthLocked = "Слишком много неверных попыток ввода пароля. Подождите 15 минут или попросите администратора сбросить пароль."
+const (
+	msgReauthLocked = "Слишком много неверных попыток ввода пароля. Подождите 15 минут или попросите администратора сбросить пароль."
+	msgReauthBusy   = "Пароль уже проверяется. Подождите немного и попробуйте снова."
+)
 
 func roleLabel(r store.Role) string {
 	if r == store.RoleAdmin {
@@ -48,8 +51,19 @@ func (a *app) handleChangePassword(w http.ResponseWriter, r *http.Request, u sto
 	fail := func(msg string) { show(http.StatusUnprocessableEntity, msg) }
 	// The current password is checked like a login: wrong guesses count
 	// towards the same account lock, and the compare waits for a free slot,
-	// so a stolen session cannot guess it or flood the CPU.
-	if a.now().Before(u.LockedUntil) {
+	// so a stolen session cannot guess it or flood the CPU. One check per
+	// person runs at a time, against the lock as stored now.
+	if !a.throttle.beginReauth(u.ID) {
+		show(http.StatusTooManyRequests, msgReauthBusy)
+		return
+	}
+	defer a.throttle.endReauth(u.ID)
+	stored, err := a.store.User(r.Context(), u.ID)
+	if err != nil {
+		fail(problemText(r, err))
+		return
+	}
+	if a.now().Before(stored.LockedUntil) {
 		show(http.StatusTooManyRequests, msgReauthLocked)
 		return
 	}
