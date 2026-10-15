@@ -73,7 +73,7 @@ reports/anna_2026-10-08
 Every write path is one Firestore transaction that also appends an `audit` doc.
 
 ### 3.1 Save a daily report
-1. Read `months/{month}`. If the month is closed, reject for **everyone, the admin included** (`ErrMonthClosed`, «Месяц закрыт — сначала откройте его заново»). Dates before the start month `S` (`INCOME_START_MONTH`; `2026-11` for real use, `2026-10` for October practice on the main URL) are rejected too.
+1. Read `months/{month}`. If the month is closed, reject for **everyone, the admin included** (`ErrMonthClosed`, «Месяц закрыт — сначала откройте его заново»). Dates before the start month `S` (`INCOME_START_MONTH`; production uses `2026-10`, October 2026 being the first real month; the code default `2026-11` applies only when it is unset) are rejected too.
 2. Read the existing report. If its `version` differs from the version the form was loaded with, reject with «Запись изменена другим пользователем — обновите страницу».
 3. Read the current categories and the person's `selfPct` **from the terms in force for the report's month** (`users/{uid}/terms`, greatest ID ≤ month).
 4. Validate:
@@ -383,7 +383,7 @@ Dockerfile, Makefile, .air.toml, .env.web.example, firestore.indexes.json
 7. **Domain `<app-host>`:** a Cloud Run domain mapping, plus a CNAME `kassa → ghs.googlehosted.com.` at DNS. Google manages the TLS certificate.
 8. **Monitoring:** alerts on 5xx errors and failed `/readyz` checks, and a €5/month budget alert.
 9. **October testing — production only (decision 2026-10-12):**
-   - Use `<app-host>`, Cloud Run `aestheticlab-income` and the main database `aestheticlab-income`, with start month `2026-10` during testing. Preserve existing accounts/settings and November/December terms; add October-only terms as needed.
+   - Use `<app-host>`, Cloud Run `aestheticlab-income` and the main database `aestheticlab-income`, with start month `2026-10`. Preserve existing accounts/settings and November/December terms; add October-only terms as needed.
    - Trial service/database/account/secret and temporary IAM grants were removed after verified exports. Never recreate or deploy a trial environment.
    - **Decision 2026-10-14:** October 2026 is the first real month, run in parallel with the sheet, with openings dated 2026-10-01 and the start month kept at `2026-10`. The October practice entries were already voided and stay as history; no cleanup or cut-off change (docs/MAINTAINING.md → Real October).
 
