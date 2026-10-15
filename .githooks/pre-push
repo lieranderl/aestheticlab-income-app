@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Refuse direct pushes to main: GitHub branch rulesets need GitHub Pro for a
-# private repository, so this hook stands in for them. Changes reach main
-# through a pull request whose CI passed (squash merge).
+# Refuse direct pushes to main before they reach GitHub, where the main
+# ruleset rejects them too. Changes reach main through a pull request whose
+# CI passed (squash merge).
 # Enabled per clone with: git config core.hooksPath .githooks  (make hooks)
 # Emergency override: ALLOW_MAIN_PUSH=1 git push ...
 set -euo pipefail
