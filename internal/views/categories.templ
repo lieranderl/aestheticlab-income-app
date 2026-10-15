@@ -2,6 +2,8 @@ package views
 
 import (
 	"strconv"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
@@ -61,10 +63,13 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 					>{ categoryKindLabel(k) }</a>
 				}
 			</nav>
+			if kind == store.KindRevenue || kind == store.KindPayment {
+				@categoryFlagsScope(kind)
+			}
 			<a href={ templ.SafeURL("/admin/categories/new?kind=" + string(kind)) } class="btn btn-primary btn-lg w-full">Добавить категорию</a>
 			<ul class="flex flex-col gap-3">
 				for i, c := range rows {
-					<li class="card min-w-0 bg-base-100 shadow-sm" data-signals="{ _editOpen: false }">
+					<li class="card min-w-0 bg-base-100 shadow-sm">
 						<div class="card-body min-w-0 gap-3 p-4">
 							<a href={ templ.SafeURL("/admin/categories/" + c.ID) } class="min-h-11 [overflow-wrap:anywhere] text-lg font-semibold underline-offset-2 hover:underline">{ c.Name }</a>
 							if store.IsFixedCategory(c.ID) {
@@ -73,14 +78,14 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 								<span class="badge badge-soft badge-warning">В архиве</span>
 							}
 							if categoryFlag(c) != "" {
-								<p class="text-sm text-base-content/70 [overflow-wrap:anywhere]">{ categoryFlag(c) }</p>
+								<p class="text-sm text-base-content/70 [overflow-wrap:anywhere]">{ categoryFlagLine(c) }</p>
 							}
-							<button type="button" class="btn min-h-11 w-full" data-on:click="$_editOpen = true">Изменить</button>
-							<dialog class="modal modal-bottom sm:modal-middle" aria-label={ "Изменить: " + c.Name } data-effect="$_editOpen ? el.showModal() : el.close()" data-on:close="$_editOpen = false">
+							<button type="button" class="btn min-h-11 w-full" data-category={ c.ID } data-on:click="$_editcat = el.dataset.category">Изменить</button>
+							<dialog data-signals:_editcat__ifmissing="''" class="modal modal-bottom sm:modal-middle" aria-label={ "Изменить: " + c.Name } data-category={ c.ID } data-effect="$_editcat === el.dataset.category ? el.showModal() : el.close()" data-on:close="$_editcat = ''">
 								<div class="modal-box min-w-0 pb-safe">
 									<div class="mb-3 flex items-center justify-between gap-3">
 										<h2 class="min-w-0 text-lg font-semibold [overflow-wrap:anywhere]">{ c.Name }</h2>
-										<button type="button" class="btn btn-ghost btn-square min-h-11" aria-label="Закрыть" data-on:click="$_editOpen = false">×</button>
+										<button type="button" class="btn btn-ghost btn-square min-h-11 min-w-11" aria-label="Закрыть" data-on:click="$_editcat = ''">×</button>
 									</div>
 									@CategoryForm(CategoryFormData{Category: c, Action: "/admin/categories/" + c.ID})
 									if !store.IsFixedCategory(c.ID) {
@@ -112,6 +117,29 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 	}
 }
 
+// categoryFlagsScope says where the revenue and payment settings still apply:
+// client entries have fixed rules (system-design, client entries 2026-10-13),
+// and a corrected day report keeps the flags saved on its existing lines.
+templ categoryFlagsScope(kind store.CategoryKind) {
+	<div class="rounded-box bg-base-200 p-3 text-sm text-base-content/70">
+		if kind == store.KindRevenue {
+			Записи клиентов считаются по постоянным правилам: в «Себе» входят только услуги, а кремы, масло и сертификаты целиком идут в кассу, выбранную в записи («Касса — наличные» или «Касса — карта салона»). Категории и настройки ниже нужны только для исправления старых отчётов за день; строки, уже сохранённые в отчёте, не меняются. Новые категории в записях клиентов не появятся.
+		} else {
+			В записях клиентов кассу («Касса — наличные» или «Касса — карта салона») выбирают в каждой записи. Способы оплаты ниже нужны только для исправления старых отчётов за день; строки, уже сохранённые в отчёте, не меняются.
+		}
+	</div>
+}
+
+// categoryFlagLine is a list row's setting, named as the day-report setting it is.
+func categoryFlagLine(c store.Category) string {
+	if c.Kind == store.KindPayment {
+		return "В отчётах за день деньги идут: " + categoryFlag(c)
+	}
+	flag := categoryFlag(c)
+	first, size := utf8.DecodeRuneInString(flag)
+	return "В отчётах за день: " + string(unicode.ToLower(first)) + flag[size:]
+}
+
 templ categoryOrderButton(c, neighbor store.Category, label string) {
 	<form method="post" action={ templ.SafeURL("/admin/categories/" + c.ID + "/reorder") } class="flex-1" data-on:submit={ sendForm("/admin/categories/" + c.ID + "/reorder") }>
 		<input type="hidden" name="version" value={ strconv.FormatInt(c.Version, 10) }/>
@@ -125,7 +153,7 @@ templ CategoryPage(nav Nav, f CategoryFormData) {
 	@Layout("Категория", nav) {
 		@PageHeader("Категория", "/admin/categories?kind=" + string(f.Category.Kind))
 		@CategoryForm(f)
-		if !f.New {
+		if !f.New && !store.IsFixedCategory(f.Category.ID) {
 			@categoryActions(f.Category)
 		}
 	}
@@ -145,13 +173,16 @@ templ CategoryForm(f CategoryFormData) {
 			}
 			if store.IsFixedCategory(f.Category.ID) {
 				<div class="rounded-box bg-base-200 p-3 text-sm text-base-content/70">
-					Это базовая категория салона. Изменение названия разрешено; системные флаги влияют на поклиентский учёт.
+					Базовую категорию нельзя архивировать или удалить. Новое название видно в категориях и отчётах за день, но не в форме записи клиента.
 				</div>
+			}
+			if f.Category.Kind == store.KindRevenue || f.Category.Kind == store.KindPayment {
+				<p class="text-sm text-base-content/70">Эти настройки действуют только при исправлении старых отчётов за день; уже сохранённые суммы не пересчитываются.</p>
 			}
 			if f.Category.Kind == store.KindRevenue {
 				<label class="label min-h-12 cursor-pointer justify-between gap-3">Входит в «Себе» <input type="checkbox" name="countsTowardSelf" value="1" class="checkbox checkbox-primary" checked?={ f.Category.CountsTowardSelf }/></label>
 				<label class="label min-h-12 cursor-pointer justify-between gap-3">Продажа сертификата <input type="checkbox" name="isCertificateSale" value="1" class="checkbox checkbox-primary" checked?={ f.Category.IsCertificateSale }/></label>
-				<p class="text-sm text-base-content/70">Продажа сертификата не может входить в «Себе». Для поклиентских записей используются услуги и сопутствующие продажи. Изменения действуют только для будущих отчётов.</p>
+				<p class="text-sm text-base-content/70">Продажа сертификата не может входить в «Себе».</p>
 			}
 			if f.Category.Kind == store.KindPayment {
 				@Field("Куда поступают деньги", "") {
@@ -161,7 +192,6 @@ templ CategoryForm(f CategoryFormData) {
 						<option value={ string(domain.Prepaid) } selected?={ f.Category.Destination == domain.Prepaid }>Оплата сертификатом</option>
 					</select>
 				}
-				<p class="text-sm text-base-content/70">Изменение действует только для будущих отчётов.</p>
 			}
 			@SubmitButton("Сохранить")
 		</div>
@@ -170,11 +200,7 @@ templ CategoryForm(f CategoryFormData) {
 
 templ categoryActions(c store.Category) {
 	<section class="mt-4 flex flex-col gap-3" aria-label="Действия с категорией">
-		if store.IsFixedCategory(c.ID) {
-			<div class="rounded-box bg-base-100 p-4 text-sm text-base-content/70">
-				Это базовая категория салона. Её нельзя архивировать или удалить.
-			</div>
-		} else {
+		if !store.IsFixedCategory(c.ID) {
 			<details class="rounded-box bg-base-100 p-4">
 				<summary class="min-h-11 cursor-pointer font-semibold">
 					if c.Active {

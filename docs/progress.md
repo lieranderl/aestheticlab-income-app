@@ -1,5 +1,16 @@
 # Progress
 
+## Review fixes before reconciliation (2026-10-15)
+
+Fixes for the 2026-10-15 review of `efbcfe5`, in three PRs:
+- **Opening imports** (`fix/opening-import-dedupe`): the store refuses a second live opening for the same party, and the same party twice in one batch, inside the write transaction (`ProblemOpeningExists`). Two overlapping imports can no longer double a balance. To correct an opening, void it and record it again.
+- **Export** (`fix/export-figures`): the «Итоги месяца» kassa columns show the cash/card balance at the month's end (`SettlementMonth.Closing`), not the month's contributions. An open month is labelled «предварительно». Figures the app doesn't have are «—», matching «Динамика». CSV escapes formula prefixes in staff and account names.
+- **Categories** (`fix/category-settings`): each «Изменить» opens only its own category's editor, which before shared one signal. The revenue/payment settings now say they only matter when an old day report is corrected; client entries use fixed rules.
+
+Verification: tests at the store (memory and emulator, including concurrent imports), export, HTTP and Playwright seams; `make ci` passes on each branch. The money-auditor reviews found no calculation defects, and their labelling notes are fixed. Mobile/copy review notes are fixed.
+
+Still open before October reconciles: openings and the 1–14 October backfill, real-phone acceptance, the April–September history import, and Anna's sign-off. The implementation plan still calls M9 paused and keeps superseded November instructions; that needs reconciling.
+
 ## Remove a client entered by mistake (2026-10-14)
 
 Staff can remove their own client record and the admin can remove anyone's, in an open month, from «Удалить клиента» on the client page. A confirmation page shows the client's figures and needs a reason. The record is voided, not deleted: version+1, `voided`/`voidReason`, and an audit row («Удаление» in «Журнал изменений») in the same transaction. Every report read skips voided records, so day/month totals, kassa, balances, settlement revision, close snapshots, history and exports drop it. Client numbers are never reused, replaying the original create token cannot restore it, a repeated removal after a lost response returns to the list without claiming success, the new-client form previews the next number from the day counter, and a voided record no longer blocks new terms. Removal follows the edit date rules (nothing before the start month) and the reason is at most 200 characters on the server. Legacy daily reports cannot be removed.
