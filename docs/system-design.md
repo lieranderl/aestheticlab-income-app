@@ -306,9 +306,9 @@ Dates switch with «‹ 08.10.2026 ›» (tap the date for the native picker). M
 **Exports on iPhone:** files are served with `Content-Disposition: attachment` and an ASCII file name. Safari's preview offers Share → «Сохранить в Файлы».
 
 ### 6.6 Weak or missing connection
-- **Daily form drafts:** `static/draft.js` keeps the unsaved form in `localStorage` per user and date, and clears it after a successful save.
+- **Daily form drafts:** `static/draft.js` keeps the unsaved form in `localStorage` per user and date, and clears it after a successful save. Drafts older than 7 days are dropped, and the login page shown right after a logout clears every draft on the phone.
 - **Failed save:** the values stay on screen with a «Нет сети — данные сохранены на телефоне, нажмите ещё раз» message.
-- **Money figures are never cached**, so nobody sees stale amounts.
+- **Money figures are never cached**, so nobody sees stale amounts: every response except the public assets is sent with `Cache-Control: private, no-store`.
 
 ### 6.7 Speed
 - **Target:** under 1.5 s from opening the app to a usable form, on 4G.

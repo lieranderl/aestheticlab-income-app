@@ -180,7 +180,7 @@ func TestServiceWorkerAndOfflinePageAreServed(t *testing.T) {
 	if allowed := sw.Header().Get("Service-Worker-Allowed"); allowed != "/" {
 		t.Errorf("sw.js Service-Worker-Allowed = %q, want /", allowed)
 	}
-	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v2") {
+	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v3") {
 		t.Errorf("sw.js body missing expected contents: %s", sw.Body.String())
 	}
 

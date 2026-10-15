@@ -35,7 +35,12 @@ func (a *app) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	a.render(w, r, views.LoginPage(views.LoginForm{}))
+	f := views.LoginForm{}
+	if _, err := r.Cookie(signedOutCookie); err == nil {
+		http.SetCookie(w, a.signedOutMarker(-1))
+		f.ClearDrafts = true
+	}
+	a.render(w, r, views.LoginPage(f))
 }
 
 // handleLogin checks a username and password. Unknown names still run a
@@ -133,7 +138,8 @@ func (a *app) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleLogout ends the person's sessions on every device, so a copy of
-// this cookie stops working too.
+// this cookie stops working too, and has the next login page clear this
+// phone's drafts.
 func (a *app) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if u, _, err := a.currentUser(r); err == nil {
 		if _, err := a.store.UpdateUser(r.Context(), u.Actor(), u.ID, func(x *store.User) error {
@@ -144,6 +150,7 @@ func (a *app) handleLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.endSession(w)
+	http.SetCookie(w, a.signedOutMarker(60))
 	a.navigate(w, r, "/login")
 }
 

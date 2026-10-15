@@ -31,6 +31,63 @@ func securityHeaders(secure bool, next http.Handler) http.Handler {
 	})
 }
 
+// noStore keeps every response except the public assets out of browser and
+// proxy caches: signed-in pages, Datastar answers and exports carry names
+// and money. It is applied when the header is written, because Datastar's
+// SSE writer sets its own Cache-Control.
+func noStore(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if publicPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(&noStoreWriter{ResponseWriter: w}, r)
+	})
+}
+
+// publicPath is what anyone may cache: assets, the service worker, the
+// manifest, the offline page and the readiness check.
+func publicPath(p string) bool {
+	switch p {
+	case "/sw.js", "/manifest.webmanifest", "/offline", "/readyz":
+		return true
+	}
+	return strings.HasPrefix(p, "/static/")
+}
+
+type noStoreWriter struct {
+	http.ResponseWriter
+	wroteHeader bool
+}
+
+func (w *noStoreWriter) WriteHeader(code int) {
+	if !w.wroteHeader {
+		w.wroteHeader = true
+		w.Header().Set("Cache-Control", "private, no-store")
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *noStoreWriter) Write(p []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(p)
+}
+
+// Unwrap gives http.ResponseController the underlying writer (SSE flushes).
+func (w *noStoreWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// Flush keeps Datastar's SSE responses streaming.
+func (w *noStoreWriter) Flush() {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // logging writes one structured log line per request; successful readiness
 // checks are left out.
 func logging(next http.Handler) http.Handler {
