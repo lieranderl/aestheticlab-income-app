@@ -41,6 +41,8 @@ type Data struct {
 	Movements    []store.Entry
 	MonthResults map[domain.Month]domain.MonthResult
 	Closing      map[domain.Month]domain.Balances // the balances at each month's end (now, for the open month)
+	Closed       map[domain.Month]bool            // months whose figures are final
+	Today        domain.Date
 	TrendPoints  []domain.TrendPoint
 }
 
@@ -290,6 +292,13 @@ func writeMonthResultsSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 		row := i + 2
 		res := d.MonthResults[m]
 		monthStr := ru.MonthYear(m.Year, m.Mon)
+		switch {
+		case d.Closed[m]:
+		case d.Today.Before(m.LastDay()) || d.Today == m.LastDay():
+			monthStr += " — предварительно, на сегодня"
+		default:
+			monthStr += " — предварительно"
+		}
 
 		_ = f.SetCellValue(sheet, cell(1, row), monthStr)
 		setCur(f, sheet, 2, row, res.Revenue, cStyle)

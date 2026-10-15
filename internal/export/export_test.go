@@ -420,3 +420,26 @@ func TestExportEmployeeClientsAreUnknownWithLegacyDayReports(t *testing.T) {
 		t.Errorf("clients from client entries = %q, want 1", got)
 	}
 }
+
+func TestExportMarksOpenMonthsAsPreliminary(t *testing.T) {
+	nov := domain.Month{Year: 2026, Mon: 11}
+	for _, c := range []struct {
+		name   string
+		closed bool
+		today  domain.Date
+		want   string
+	}{
+		{"closed", true, domain.Date{Year: 2026, Mon: 12, Day: 5}, "Ноябрь 2026"},
+		{"open and over", false, domain.Date{Year: 2026, Mon: 12, Day: 5}, "Ноябрь 2026 — предварительно"},
+		{"open, last day", false, nov.LastDay(), "Ноябрь 2026 — предварительно, на сегодня"},
+		{"open, mid-month", false, domain.Date{Year: 2026, Mon: 11, Day: 15}, "Ноябрь 2026 — предварительно, на сегодня"},
+	} {
+		data := sampleExportData()
+		data.Closed = map[domain.Month]bool{nov: c.closed}
+		data.Today = c.today
+		f := openXLSX(t, data)
+		if got := rawCell(t, f, "Итоги месяца", "A2"); got != c.want {
+			t.Errorf("%s: A2 = %q, want %q", c.name, got, c.want)
+		}
+	}
+}

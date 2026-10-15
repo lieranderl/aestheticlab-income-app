@@ -383,3 +383,29 @@ func TestSettlementGivesTheBalancesAtMonthEnd(t *testing.T) {
 		kassaCash("closed month", 105000)
 	})
 }
+
+func TestOpenMonthBalancesStartFromTheClosedMonth(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		nov, dec := month(t, "2026-11"), month(t, "2026-12")
+		_, err := s.RecordOpenings(ctx, s.admin, []store.NewMovement{
+			{Type: domain.Opening, Amount: 100000, From: domain.Salon, To: domain.Account(domain.KassaCash), Date: nov.FirstDay()},
+			{Type: domain.Opening, Amount: 20000, From: domain.Salon, To: domain.Account(domain.KassaCard), Date: nov.FirstDay()},
+		})
+		must(t, err)
+		s.at("2026-12-10")
+		fresh, err := s.Settlement(ctx, nov)
+		must(t, err)
+		_, err = s.CloseMonthGuarded(ctx, s.admin, nov, fresh.Revision)
+		must(t, err)
+		_, err = s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Transfer, Amount: 30000, From: domain.Account(domain.KassaCash), To: domain.Account(domain.KassaCard), Date: date(t, "2026-12-03")})
+		must(t, err)
+		_, err = s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Expense, Amount: 4000, From: domain.Account(domain.KassaCard), To: domain.Outside, ExpenseCategory: "rent", Date: date(t, "2026-12-04"), Note: "аренда"})
+		must(t, err)
+
+		got, err := s.Settlement(ctx, dec)
+		must(t, err)
+		if got.Closing == nil || got.Closing.Accounts[domain.KassaCash] != 70000 || got.Closing.Accounts[domain.KassaCard] != 46000 {
+			t.Fatalf("December closing %+v, want cash 70000 and card 46000", got.Closing)
+		}
+	})
+}
