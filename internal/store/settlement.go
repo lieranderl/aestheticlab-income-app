@@ -12,8 +12,13 @@ import (
 
 // SettlementMonth contains selected-month figures, never later movements.
 type SettlementMonth struct {
-	State                        MonthState
-	Result                       domain.MonthResult
+	State  MonthState
+	Result domain.MonthResult
+	// Closing is the balances at the month's end: the snapshot of a closed
+	// month; for an open one, its rows so far, without the salary, «Себе» bonus
+	// and dividend accruals that closing adds to people (the kassa accounts
+	// are the same either way). Nil if unknown.
+	Closing                      *domain.Balances
 	Breakdowns                   map[string]domain.SettlementBreakdown
 	Revision                     string
 	Pending                      int
@@ -111,8 +116,13 @@ func (s *Store) settlement(t tx, m domain.Month) (SettlementMonth, error) {
 	in := domain.MonthInput{Month: m, Opening: opening, Reports: personReports(reports), Movements: moves, Terms: terms}
 	if out.State.Snapshot != nil {
 		out.Result = out.State.Snapshot.Result
+		closing := out.State.Snapshot.Balances
+		out.Closing = &closing
 	} else {
 		out.Result, out.PreviewError = domain.PreviewMonth(in)
+		if closing, err := domain.Fold(opening, in.Reports, moves); err == nil {
+			out.Closing = &closing
+		}
 	}
 	for id, p := range out.Result.People {
 		out.Breakdowns[id] = domain.BreakdownFor(id, opening.Persons[id], in.Reports, moves, p)
