@@ -50,3 +50,17 @@ test("admin records a settlement payout or deposit", async ({ page }) => {
   await tapSave(sheet.getByRole("button", { name: "Сохранить" }));
   await expect(page.getByText("Сохранено ✓")).toBeVisible();
 });
+
+test("admin edits one category at a time", async ({ page }) => {
+  await signIn(page, "anna");
+  await page.goto("/admin/categories?kind=revenue");
+  const services = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Услуги", exact: true }) });
+  await services.getByRole("button", { name: "Изменить" }).click();
+  const open = page.locator("dialog[open]");
+  await expect(open).toHaveCount(1);
+  await expect(open).toHaveAttribute("aria-label", "Изменить: Услуги");
+  await expect(open.locator('input[name="name"]')).toHaveValue("Услуги");
+  expect(await phoneRules(page)).toEqual([]);
+  await open.getByRole("button", { name: "Закрыть" }).first().click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+});
