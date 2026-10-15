@@ -60,3 +60,21 @@ func TestGzippedManifestKeepsItsContentType(t *testing.T) {
 		t.Fatalf("Content-Type = %q, want application/manifest+json", got)
 	}
 }
+
+// Only the production assets are embedded: the frontend tests next to them
+// in static/ are never served.
+func TestStaticServesNoTestFiles(t *testing.T) {
+	h := handler(t, web.Config{})
+	for _, name := range []string{"draft.test.js", "sw.test.js", "assets.go"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/"+name, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("/static/%s: status %d, want 404", name, rec.Code)
+		}
+	}
+	for _, name := range []string{"draft.js", "datastar.js", "sw.js", "app.css", "manifest.webmanifest"} {
+		if _, err := static.Files.Open(name); err != nil {
+			t.Errorf("%s not embedded: %v", name, err)
+		}
+	}
+}

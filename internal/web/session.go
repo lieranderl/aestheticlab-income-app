@@ -108,6 +108,18 @@ func (a *app) cookie(value string, maxAge time.Duration) *http.Cookie {
 	}
 }
 
+// signedOutCookie marks the login page right after a logout, which tells
+// draft.js to forget this phone's unsaved drafts. It lives a minute and is
+// read once.
+const signedOutCookie = "kassa_signed_out"
+
+func (a *app) signedOutMarker(maxAge int) *http.Cookie {
+	return &http.Cookie{ // #nosec G124 -- Secure is set whenever the app is served over HTTPS (always in production)
+		Name: signedOutCookie, Value: "1", Path: "/login", MaxAge: maxAge,
+		HttpOnly: true, Secure: a.secure(), SameSite: http.SameSiteLaxMode,
+	}
+}
+
 func (a *app) secure() bool { return strings.HasPrefix(a.cfg.BaseURL, "https://") }
 
 // errNoSession means the visitor must sign in (again).

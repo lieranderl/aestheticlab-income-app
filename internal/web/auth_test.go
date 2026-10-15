@@ -14,6 +14,7 @@ import (
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
+	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 	"github.com/lieranderl/aestheticlab-income-app/internal/web"
 )
 
@@ -608,6 +609,33 @@ func TestUserIndicationShowsNameAndAvatarAcrossScreens(t *testing.T) {
 	}
 	if !strings.Contains(body, "<span>О</span>") {
 		t.Fatalf("GET / missing Olga's avatar initial: %s", body)
+	}
+}
+
+// Drafts on the phone hold names and money: the login page right after a
+// logout tells draft.js to forget them, once; an ordinary visit does not.
+func TestLogoutClearsDraftsOnThePhone(t *testing.T) {
+	s := newSite(t)
+	if body := s.get("/login", nil).Body.String(); strings.Contains(body, "data-drafts-clear") {
+		t.Fatal("plain login page clears drafts")
+	}
+	res := s.post("/logout", url.Values{}, s.login("olga", olgaPass))
+	wantRedirect(t, "logout", res, "/login")
+	var marker []*http.Cookie
+	for _, c := range res.Result().Cookies() {
+		if c.Name == "kassa_signed_out" {
+			marker = append(marker, c)
+		}
+	}
+	if len(marker) != 1 || !marker[0].HttpOnly || !marker[0].Secure || marker[0].MaxAge <= 0 {
+		t.Fatalf("logout marker cookie: %+v", marker)
+	}
+	page := s.get("/login", marker)
+	wantPage(t, "login after logout", page, http.StatusOK, `<script type="module" src="`+views.DraftScript+`" data-drafts-clear></script>`)
+	for _, c := range page.Result().Cookies() {
+		if c.Name == "kassa_signed_out" && c.MaxAge >= 0 {
+			t.Errorf("login page must delete the marker: %+v", c)
+		}
 	}
 }
 

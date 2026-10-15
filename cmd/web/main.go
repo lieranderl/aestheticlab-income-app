@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,6 +26,10 @@ import (
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
+	if err := checkCloudRun(os.Getenv); err != nil {
+		slog.Error("refusing to start on Cloud Run", "error", err)
+		os.Exit(1)
+	}
 	st, err := openStore()
 	if err != nil {
 		slog.Error("store failed", "error", err)
@@ -94,6 +99,38 @@ func main() {
 		slog.Error("store close failed", "error", err)
 	}
 	slog.Info("stopped cleanly")
+}
+
+// checkCloudRun refuses a Cloud Run start (K_SERVICE set) without the
+// production settings, so a missing variable never falls back to the memory
+// store (and its logged password), a random session key or plain HTTP
+// (no Secure cookies, no HSTS), or to the default start month, which would
+// put the real October before go-live.
+func checkCloudRun(getenv func(string) string) error {
+	if getenv("K_SERVICE") == "" {
+		return nil
+	}
+	var missing []string
+	for _, name := range []string{"INCOME_FIRESTORE_PROJECT", "INCOME_FIRESTORE_DATABASE", "INCOME_SESSION_KEY", "INCOME_START_MONTH"} {
+		if getenv(name) == "" {
+			missing = append(missing, name)
+		}
+	}
+	if !strings.HasPrefix(getenv("INCOME_BASE_URL"), "https://") {
+		missing = append(missing, "INCOME_BASE_URL (https://…)")
+	}
+	if getenv("FIRESTORE_EMULATOR_HOST") != "" {
+		return errors.New("FIRESTORE_EMULATOR_HOST is set")
+	}
+	if v := getenv("INCOME_START_MONTH"); v != "" {
+		if _, err := domain.ParseMonth(v); err != nil {
+			return fmt.Errorf("INCOME_START_MONTH: %w", err)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 // openStore is Firestore when INCOME_FIRESTORE_PROJECT is set, otherwise

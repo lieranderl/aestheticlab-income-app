@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 	"github.com/lieranderl/aestheticlab-income-app/internal/web"
 )
 
@@ -180,8 +181,13 @@ func TestServiceWorkerAndOfflinePageAreServed(t *testing.T) {
 	if allowed := sw.Header().Get("Service-Worker-Allowed"); allowed != "/" {
 		t.Errorf("sw.js Service-Worker-Allowed = %q, want /", allowed)
 	}
-	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v2") {
+	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v3") {
 		t.Errorf("sw.js body missing expected contents: %s", sw.Body.String())
+	}
+	// Pages load draft.js by a versioned URL the worker precaches, so a worker
+	// from an older release (cache-first) can never answer it with a stale copy.
+	if !strings.HasPrefix(views.DraftScript, "/static/draft.js?v=") || !strings.Contains(sw.Body.String(), "'"+views.DraftScript+"'") {
+		t.Errorf("sw.js does not precache %s", views.DraftScript)
 	}
 
 	// 2. Offline fallback page is publicly served.

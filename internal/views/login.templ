@@ -4,6 +4,9 @@ package views
 type LoginForm struct {
 	Username string
 	Error    string
+	// ClearDrafts is set right after a logout: draft.js forgets the
+	// unsaved drafts on this phone.
+	ClearDrafts bool
 }
 
 // LoginPage is the phone-first sign-in screen; it works without JS.
@@ -19,6 +22,9 @@ templ LoginPage(f LoginForm) {
 			</div>
 			@LoginFormView(f)
 		</div>
+		if f.ClearDrafts {
+			<script type="module" src={ DraftScript } data-drafts-clear></script>
+		}
 	}
 }
 

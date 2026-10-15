@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm";
 
 function harness() {
  const values = new Map();
- const localStorage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ const localStorage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k),get length(){return values.size},key:i=>[...values.keys()][i]??null};
  const scope={window:{localStorage,addEventListener(){}},document:{addEventListener(){},documentElement:{}},MutationObserver:class {observe(){}},Event:class {},HTMLFormElement:class {}};
  runInNewContext(readFileSync(new URL("./draft.js",import.meta.url),"utf8"),scope);
  const form=(owner,date,entry,token,version="0")=>{
@@ -58,4 +58,33 @@ test("keyboard Next follows visible fields and skips collapsed extras",()=>{
   const fields=["services","creams","oil","certificates","certificatePaid","serviceCash","serviceCard"].map(name=>({name,enterKeyHint:"next",closest(){return !open&&["creams","oil","certificates","certificatePaid"].includes(name)?{}:null},getClientRects(){return hiddenCream&&name==="creams"?[]:[{}]},focus(){focused=name}}));
   const evt={key:"Enter",target:fields[0],preventDefault(){prevented=true}};const el={querySelectorAll(){return fields}};runInNewContext(action,{evt,el});expect(prevented).toBe(true);expect(focused).toBe(wanted);
  }
+});
+
+const DAY=24*60*60*1000;
+test("drafts older than the retention limit are dropped, recent ones and other keys kept",()=>{
+ const h=harness();const now=Date.UTC(2026,10,20);
+ h.values.set("kassa-draft:olga:2026-11-01",JSON.stringify({version:"0",savedAt:now-8*DAY,fields:{services:"100"}}));
+ h.values.set("kassa-draft:olga:2026-11-19",JSON.stringify({version:"0",savedAt:now-DAY,fields:{services:"200"}}));
+ h.values.set("kassa-draft:olga:2026-11-18",JSON.stringify({version:"0",fields:{services:"300"}}));
+ h.values.set("kassa-draft:olga:broken","{");
+ h.values.set("theme","dark");
+ h.scope.prune(h.scope.window.localStorage,now);
+ expect([...h.values.keys()].sort()).toEqual(["kassa-draft:olga:2026-11-18","kassa-draft:olga:2026-11-19","theme"]);
+ // A draft from before the limit existed starts its clock now.
+ expect(JSON.parse(h.values.get("kassa-draft:olga:2026-11-18")).savedAt).toBe(now);
+});
+test("a saved draft records when it was typed",()=>{
+ const h=harness();const before=Date.now();h.scope.save(h.form("olga","2026-11-20",undefined,undefined));
+ const draft=JSON.parse([...h.values.values()][0]);expect(draft.savedAt).toBeGreaterThanOrEqual(before);expect(draft.fields.services).toBe("100");
+});
+test("an expired draft is not restored",()=>{
+ const h=harness();const old=h.form("olga","2026-11-20",undefined,undefined);h.scope.save(old);
+ const key=[...h.values.keys()][0];const draft=JSON.parse(h.values.get(key));draft.savedAt=Date.now()-8*DAY;h.values.set(key,JSON.stringify(draft));
+ const reload=h.form("olga","2026-11-20",undefined,undefined);reload.elements[1].value="";h.scope.restore(reload);
+ expect(reload.elements[1].value).toBe("");expect(h.values.size).toBe(0);
+});
+test("signing out clears every person's drafts and nothing else",()=>{
+ const h=harness();h.scope.save(h.form("olga","2026-11-20","new","t1"));h.scope.save(h.form("maria","2026-11-20",undefined,undefined));h.values.set("theme","dark");
+ h.scope.clearAll(h.scope.window.localStorage);
+ expect([...h.values.keys()]).toEqual(["theme"]);
 });

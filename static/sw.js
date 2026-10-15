@@ -2,7 +2,7 @@
 // Caches versioned static assets and serves an offline fallback page when offline.
 // HTML and dynamic data always come from the network.
 
-const CACHE_NAME = 'kassa-v2';
+const CACHE_NAME = 'kassa-v3';
 const OFFLINE_URL = '/offline';
 
 const PRECACHE_ASSETS = [
@@ -10,7 +10,7 @@ const PRECACHE_ASSETS = [
 	'/static/app.css',
 	'/static/app.css?v=2',
 	'/static/datastar.js',
-	'/static/draft.js',
+	'/static/draft.js?v=3', // views.DraftScript
 	'/static/icons/favicon.svg',
 	'/static/icons/apple-touch-icon.png',
 	'/static/fonts/onest-cyrillic-wght-normal.woff2',

@@ -77,7 +77,7 @@ func newApp(cfg Config) (*app, error) {
 }
 
 // New returns the app's HTTP handler: panic recovery, security headers,
-// request logs and cross-origin (CSRF) protection around the routes.
+// request logs, no caching of private responses and cross-origin (CSRF) protection around the routes.
 func New(cfg Config) (http.Handler, error) {
 	a, err := newApp(cfg)
 	if err != nil {
@@ -158,7 +158,7 @@ func New(cfg Config) (http.Handler, error) {
 
 	secure := strings.HasPrefix(cfg.BaseURL, "https://")
 	protected := http.NewCrossOriginProtection().Handler(mux)
-	return recovery(securityHeaders(secure, logging(protected))), nil
+	return recovery(securityHeaders(secure, logging(noStore(protected)))), nil
 }
 
 // handleManifest serves the web app manifest, so phones install the app
