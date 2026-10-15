@@ -1,6 +1,6 @@
 # AGENTS.md
 
-**Aesthetic Lab Kassa** (`<app-host>`) is an internal, phone-first PWA for the Aesthetic Lab salon in Brussels. Four people use it (Anna = admin, Maria, Olga, Vera). It covers:
+**Aesthetic Lab Kassa** (`<app-host>`) is an internal, phone-first PWA for the Aesthetic Lab salon in Brussels. Four people use it (in these docs, fixtures and tests: Anna = admin, Maria, Olga, Vera — fictional names, not the real staff). It covers:
 - per-client revenue entries and daily totals;
 - the salon kassa (cash till + the salon's card) and each person's balance with the salon;
 - the monthly settlement (salary, dividends, who pays whom).

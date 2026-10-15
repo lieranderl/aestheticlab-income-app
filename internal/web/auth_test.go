@@ -610,3 +610,23 @@ func TestUserIndicationShowsNameAndAvatarAcrossScreens(t *testing.T) {
 		t.Fatalf("GET / missing Olga's avatar initial: %s", body)
 	}
 }
+
+func TestWrongCurrentPasswordsInTheProfileLockLikeWrongLogins(t *testing.T) {
+	s := newSite(t)
+	session := s.login("olga", olgaPass)
+	wrong := url.Values{"current": {"guess-1234"}, "new": {"olga-new-pass"}, "repeat": {"olga-new-pass"}}
+	for range 5 {
+		wantPage(t, "wrong current", s.post("/profile/password", wrong, session), http.StatusUnprocessableEntity, "Текущий пароль неверный")
+	}
+	right := url.Values{"current": {olgaPass}, "new": {"olga-new-pass"}, "repeat": {"olga-new-pass"}}
+	wantPage(t, "right current while locked", s.post("/profile/password", right, session), http.StatusTooManyRequests, "Слишком много неверных попыток")
+	res := s.post("/login", url.Values{"username": {"olga"}, "password": {olgaPass}}, nil)
+	wantPage(t, "login while locked", res, http.StatusUnprocessableEntity, "Неверное имя пользователя или пароль")
+
+	*s.clock = s.clock.Add(16 * time.Minute)
+	wantRedirect(t, "after the wait", s.post("/profile/password", right, session), "/profile?saved=password")
+	u, err := s.st.User(ctx, s.olga.ID)
+	if err != nil || u.FailedLogins != 0 || !u.LockedUntil.IsZero() {
+		t.Fatalf("after a good change: %+v, %v", u, err)
+	}
+}
