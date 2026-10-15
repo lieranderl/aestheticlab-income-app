@@ -24,7 +24,7 @@ An internal web app (PWA) that **replaces the «Aesthetic Lab Finance» Google S
 | Monthly settlement | Replaces the sheet's Debit Credit tab: salon income, expenses, manager salary (Anna €1,200), and **owner dividends = max(0, profit) split 1/3 between Anna, Olga and Maria**. These are added at month close. |
 | History | The sheet's monthly figures for **April–September 2026** will be imported (milestone M10) as read-only monthly records marked «импорт», so trends start with data. Daily records start on **1 October 2026** (decision 2026-10-14), the first month the app tracks; nothing can be dated earlier. |
 | Timezone | `Europe/Brussels`. |
-| Domain | `kassa.aestheticlab.be`. |
+| Domain | `<app-host>`. |
 | Accounts | The admin creates every account and gives out the first password. There is no self sign-up. |
 | Payments | 3 payment methods: **Card** (goes into the kassa card), **Cash** (split between the till and the master), **Certificate** (a service paid with a certificate sold earlier; the money is already in the kassa). Payments must add up to Total. Payment methods are dynamic; each one has a «куда поступают деньги» setting. |
 | Stack | Go + Datastar + templ + Tailwind 4 / daisyUI 5, on **Cloud Run** in GCP project `<project>` (europe-west1), with **Firestore**. |
@@ -32,7 +32,7 @@ An internal web app (PWA) that **replaces the «Aesthetic Lab Finance» Google S
 | Devices | **Mobile-first for everyone, the admin included.** Every screen is designed for a 375 pt-wide phone (iPhone first, Android supported) and installed as a PWA. On desktop the same page uses a wider layout. See system-design §5. |
 | Edit window | People edit their own records until the **admin closes the month**. A closed month is **locked for everyone, the admin included**. To correct it, the admin reopens it. Months are closed strictly in order, and only the most recently closed month can be reopened (§5.4). |
 | Staff-entered money movements | When a person records a deposit or an expense they paid themselves, it shows as **«ожидает подтверждения»** until the admin confirms it with one tap. It doesn't affect any balance until then. |
-| Production and the first real month (decisions 2026-10-12 and 2026-10-14) | Production only: **kassa.aestheticlab.be**, main service and main database `aestheticlab-income`, start month `2026-10`. Trial resources are retired after verified exports. **October 2026 is the first real month**, run in parallel with the sheet. The October practice entries were voided and stay as history. See MAINTAINING.md → Real October. |
+| Production and the first real month (decisions 2026-10-12 and 2026-10-14) | Production only: **<app-host>**, main service and main database `aestheticlab-income`, start month `2026-10`. Trial resources are retired after verified exports. **October 2026 is the first real month**, run in parallel with the sheet. The October practice entries were voided and stay as history. See MAINTAINING.md → Real October. |
 | Money terms over time | «Себе» %, salary and dividend share are **effective-dated**: they apply from a given month, normally next month. A change can't start in a month where the person already has reports, so one month never mixes two rates. Every month is calculated with the terms in force that month, so changing someone's salary in December never changes November, even if November is reopened. |
 | Environments | **Prod only.** Push to `main` → deploy with no traffic → check `/readyz` → shift traffic. Same pattern as the earlier `datastar-webapp`. |
 
@@ -50,7 +50,7 @@ Versions and conventions follow an earlier Go + Datastar web app (`datastar-weba
 | DB | **Firestore Native, a separate named database `aestheticlab-income`** in europe-west1 | Serverless with no idle cost. Kept apart from the `(default)` DB, which holds the Telegram bot's data. |
 | Excel / CSV | `excelize` (pure Go) for XLSX; `encoding/csv` for CSV | The CSV uses a UTF-8 BOM, `;` delimiter and decimal comma, so it opens correctly in Excel with a Belgian or Russian locale. |
 | Auth | Custom: bcrypt password hashes + a session cookie signed with HMAC | Reuses the signer and the bcrypt "dummy hash" pattern from datastar-webapp. |
-| Hosting | Cloud Run service `aestheticlab-income` (europe-west1) at **`https://kassa.aestheticlab.be`**. Image in its own Artifact Registry repo `europe-west1-docker.pkg.dev/<project>/aestheticlab-income/income`, separate from the website's, so the deployer can't touch other images | Same project and region as the other salon services. |
+| Hosting | Cloud Run service `aestheticlab-income` (europe-west1) at **`https://<app-host>`**. Image in its own Artifact Registry repo `europe-west1-docker.pkg.dev/<project>/aestheticlab-income/income`, separate from the website's, so the deployer can't touch other images | Same project and region as the other salon services. |
 | CI/CD | GitHub Actions with Workload Identity Federation (no stored keys), repo `lieranderl/aestheticlab-income-app` (private) | Copies `datastar-webapp/.github/workflows/web.yml`. |
 
 ### Why Firestore is enough
@@ -275,7 +275,7 @@ Decision 2026-10-14: the app tracks money from **1 October 2026**, the original 
 
 ### CSRF
 - SameSite=Lax.
-- `Origin` / `Sec-Fetch-Site` check on every non-GET request. Allowed origin: `https://kassa.aestheticlab.be`, plus localhost in development.
+- `Origin` / `Sec-Fetch-Site` check on every non-GET request. Allowed origin: `https://<app-host>`, plus localhost in development.
 
 ### Authorization
 - Middleware plus a policy per handler.

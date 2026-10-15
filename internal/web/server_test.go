@@ -55,7 +55,7 @@ func TestTheReadinessCheckFailsWhenTheDatabaseIsUnreachable(t *testing.T) {
 }
 
 func TestEveryResponseCarriesTheSecurityHeaders(t *testing.T) {
-	res := get(t, handler(t, web.Config{BaseURL: "https://kassa.aestheticlab.be"}), "/login")
+	res := get(t, handler(t, web.Config{BaseURL: "https://kassa.example.com"}), "/login")
 	want := map[string]string{
 		"Content-Security-Policy":   "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; manifest-src 'self'",
 		"X-Content-Type-Options":    "nosniff",

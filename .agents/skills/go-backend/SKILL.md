@@ -50,7 +50,7 @@ default:
 
 ## Config (env)
 - `PORT`.
-- `INCOME_BASE_URL` (for example `https://kassa.aestheticlab.be`): decides Secure cookies and the allowed Origin.
+- `INCOME_BASE_URL` (for example `https://<app-host>`): decides Secure cookies and the allowed Origin.
 - `INCOME_FIRESTORE_PROJECT`, `INCOME_FIRESTORE_DATABASE`: if unset, the app uses the memory store.
 - `INCOME_SESSION_KEY`: at least 32 bytes, from Secret Manager.
 - `INCOME_TZ` (default `Europe/Brussels`).

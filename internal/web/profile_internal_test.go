@@ -34,7 +34,7 @@ func TestAPasswordChangeCannotUndoAResetThatLandedMeanwhile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := newApp(Config{BaseURL: "https://kassa.aestheticlab.be", Store: st, PasswordCost: bcrypt.MinCost})
+	a, err := newApp(Config{BaseURL: "https://kassa.example.com", Store: st, PasswordCost: bcrypt.MinCost})
 	if err != nil {
 		t.Fatal(err)
 	}
