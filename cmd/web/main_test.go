@@ -14,6 +14,7 @@ func TestCloudRunRefusesToStartWithoutProductionSettings(t *testing.T) {
 		"INCOME_FIRESTORE_DATABASE": "aestheticlab-income",
 		"INCOME_SESSION_KEY":        strings.Repeat("k", 48),
 		"INCOME_BASE_URL":           "https://kassa.example.com",
+		"INCOME_START_MONTH":        "2026-10",
 	}
 	env := func(over map[string]string) func(string) string {
 		return func(k string) string {
@@ -33,6 +34,8 @@ func TestCloudRunRefusesToStartWithoutProductionSettings(t *testing.T) {
 		"no session key":        {"INCOME_SESSION_KEY": ""},
 		"no base URL":           {"INCOME_BASE_URL": ""},
 		"http base URL":         {"INCOME_BASE_URL": "http://kassa.example.com"},
+		"no start month":        {"INCOME_START_MONTH": ""},
+		"bad start month":       {"INCOME_START_MONTH": "October"},
 	} {
 		if err := checkCloudRun(env(over)); err == nil {
 			t.Errorf("%s: started anyway", name)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
+	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 	"github.com/lieranderl/aestheticlab-income-app/internal/web"
 )
 
@@ -630,10 +631,30 @@ func TestLogoutClearsDraftsOnThePhone(t *testing.T) {
 		t.Fatalf("logout marker cookie: %+v", marker)
 	}
 	page := s.get("/login", marker)
-	wantPage(t, "login after logout", page, http.StatusOK, `<script type="module" src="/static/draft.js" data-drafts-clear></script>`)
+	wantPage(t, "login after logout", page, http.StatusOK, `<script type="module" src="`+views.DraftScript+`" data-drafts-clear></script>`)
 	for _, c := range page.Result().Cookies() {
 		if c.Name == "kassa_signed_out" && c.MaxAge >= 0 {
 			t.Errorf("login page must delete the marker: %+v", c)
 		}
+	}
+}
+
+func TestWrongCurrentPasswordsInTheProfileLockLikeWrongLogins(t *testing.T) {
+	s := newSite(t)
+	session := s.login("olga", olgaPass)
+	wrong := url.Values{"current": {"guess-1234"}, "new": {"olga-new-pass"}, "repeat": {"olga-new-pass"}}
+	for range 5 {
+		wantPage(t, "wrong current", s.post("/profile/password", wrong, session), http.StatusUnprocessableEntity, "Текущий пароль неверный")
+	}
+	right := url.Values{"current": {olgaPass}, "new": {"olga-new-pass"}, "repeat": {"olga-new-pass"}}
+	wantPage(t, "right current while locked", s.post("/profile/password", right, session), http.StatusTooManyRequests, "Слишком много неверных попыток")
+	res := s.post("/login", url.Values{"username": {"olga"}, "password": {olgaPass}}, nil)
+	wantPage(t, "login while locked", res, http.StatusUnprocessableEntity, "Неверное имя пользователя или пароль")
+
+	*s.clock = s.clock.Add(16 * time.Minute)
+	wantRedirect(t, "after the wait", s.post("/profile/password", right, session), "/profile?saved=password")
+	u, err := s.st.User(ctx, s.olga.ID)
+	if err != nil || u.FailedLogins != 0 || !u.LockedUntil.IsZero() {
+		t.Fatalf("after a good change: %+v, %v", u, err)
 	}
 }

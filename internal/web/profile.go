@@ -3,12 +3,18 @@ package web
 import (
 	"log/slog"
 	"net/http"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
+)
+
+const (
+	msgReauthLocked = "Слишком много неверных попыток ввода пароля. Подождите 15 минут или попросите администратора сбросить пароль."
+	msgReauthBusy   = "Пароль уже проверяется. Подождите немного и попробуйте снова."
 )
 
 func roleLabel(r store.Role) string {
@@ -38,14 +44,46 @@ func (a *app) handleChangePassword(w http.ResponseWriter, r *http.Request, u sto
 		return
 	}
 	current, next, repeat := r.PostFormValue("current"), r.PostFormValue("new"), r.PostFormValue("repeat")
-	fail := func(msg string) {
+	show := func(status int, msg string) {
 		f := views.PasswordForm{Error: msg}
-		a.formFailed(w, r, views.PasswordFormView(f), views.ProfilePage(a.navFor(u, "/profile"), a.profile(u, f)))
+		a.formFailedStatus(w, r, status, views.PasswordFormView(f), views.ProfilePage(a.navFor(u, "/profile"), a.profile(u, f)))
 	}
-	switch {
-	case bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(current)) != nil:
+	fail := func(msg string) { show(http.StatusUnprocessableEntity, msg) }
+	// The current password is checked like a login: wrong guesses count
+	// towards the same account lock, and the compare waits for a free slot,
+	// so a stolen session cannot guess it or flood the CPU. One check per
+	// person runs at a time, against the lock as stored now.
+	if !a.throttle.beginReauth(u.ID) {
+		show(http.StatusTooManyRequests, msgReauthBusy)
+		return
+	}
+	defer a.throttle.endReauth(u.ID)
+	stored, err := a.store.User(r.Context(), u.ID)
+	if err != nil {
+		fail(problemText(r, err))
+		return
+	}
+	if a.now().Before(stored.LockedUntil) {
+		show(http.StatusTooManyRequests, msgReauthLocked)
+		return
+	}
+	var match bool
+	if !a.throttle.hash(r, func() { match = bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(current)) == nil }) {
+		show(http.StatusServiceUnavailable, msgLoginRetry)
+		return
+	}
+	if !match {
+		after, err := a.store.RecordLoginFailure(r.Context(), u.ID, loginLimit, loginLockFor)
+		switch {
+		case err != nil:
+			slog.ErrorContext(r.Context(), "record reauth failure", "error", err)
+		case a.now().Before(after.LockedUntil):
+			slog.WarnContext(r.Context(), "account locked after wrong current passwords", "uid", u.ID)
+		}
 		fail("Текущий пароль неверный")
 		return
+	}
+	switch {
 	case utf8.RuneCountInString(next) < minPassword:
 		fail("Новый пароль должен быть не короче 8 символов")
 		return
@@ -69,6 +107,7 @@ func (a *app) handleChangePassword(w http.ResponseWriter, r *http.Request, u sto
 			return store.ErrVersionConflict
 		}
 		x.PasswordHash, x.MustChangePassword = hash, false
+		x.FailedLogins, x.LockedUntil = 0, time.Time{}
 		x.SessionVersion++
 		return nil
 	})

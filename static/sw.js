@@ -10,7 +10,7 @@ const PRECACHE_ASSETS = [
 	'/static/app.css',
 	'/static/app.css?v=2',
 	'/static/datastar.js',
-	'/static/draft.js',
+	'/static/draft.js?v=3', // views.DraftScript
 	'/static/icons/favicon.svg',
 	'/static/icons/apple-touch-icon.png',
 	'/static/fonts/onest-cyrillic-wght-normal.woff2',

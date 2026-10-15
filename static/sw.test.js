@@ -109,7 +109,7 @@ test("install precaches static assets and offline page", async () => {
 	expect(staticCache.has("/static/app.css")).toBe(true);
 	expect(staticCache.has("/static/app.css?v=2")).toBe(true);
 	expect(staticCache.has("/static/datastar.js")).toBe(true);
-	expect(staticCache.has("/static/draft.js")).toBe(true);
+	expect(staticCache.has("/static/draft.js?v=3")).toBe(true);
 	expect(staticCache.has("/manifest.webmanifest")).toBe(true);
 });
 

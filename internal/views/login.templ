@@ -23,7 +23,7 @@ templ LoginPage(f LoginForm) {
 			@LoginFormView(f)
 		</div>
 		if f.ClearDrafts {
-			<script type="module" src="/static/draft.js" data-drafts-clear></script>
+			<script type="module" src={ DraftScript } data-drafts-clear></script>
 		}
 	}
 }

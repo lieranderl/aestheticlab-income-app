@@ -1,5 +1,11 @@
 package views
 
+// DraftScript is draft.js's URL. sw.js serves /static/ cache-first and
+// precaches this exact URL, so bump the version (here and in sw.js) whenever
+// draft.js changes: a worker from an older release then misses and fetches
+// the new script instead of running a stale copy.
+const DraftScript = "/static/draft.js?v=3"
+
 // NavItem is one entry of the bottom tab bar (phones) and the sidebar (lg+).
 type NavItem struct {
 	Href   string

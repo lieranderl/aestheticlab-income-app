@@ -104,13 +104,14 @@ func main() {
 // checkCloudRun refuses a Cloud Run start (K_SERVICE set) without the
 // production settings, so a missing variable never falls back to the memory
 // store (and its logged password), a random session key or plain HTTP
-// (no Secure cookies, no HSTS).
+// (no Secure cookies, no HSTS), or to the default start month, which would
+// put the real October before go-live.
 func checkCloudRun(getenv func(string) string) error {
 	if getenv("K_SERVICE") == "" {
 		return nil
 	}
 	var missing []string
-	for _, name := range []string{"INCOME_FIRESTORE_PROJECT", "INCOME_FIRESTORE_DATABASE", "INCOME_SESSION_KEY"} {
+	for _, name := range []string{"INCOME_FIRESTORE_PROJECT", "INCOME_FIRESTORE_DATABASE", "INCOME_SESSION_KEY", "INCOME_START_MONTH"} {
 		if getenv(name) == "" {
 			missing = append(missing, name)
 		}
@@ -120,6 +121,11 @@ func checkCloudRun(getenv func(string) string) error {
 	}
 	if getenv("FIRESTORE_EMULATOR_HOST") != "" {
 		return errors.New("FIRESTORE_EMULATOR_HOST is set")
+	}
+	if v := getenv("INCOME_START_MONTH"); v != "" {
+		if _, err := domain.ParseMonth(v); err != nil {
+			return fmt.Errorf("INCOME_START_MONTH: %w", err)
+		}
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing %s", strings.Join(missing, ", "))
