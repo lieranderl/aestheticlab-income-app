@@ -87,7 +87,7 @@ func TestLegacyCategoryNamedLikeATotalRemainsInRevenueDetails(t *testing.T) {
 	s.anna = s.settle(anna)
 	s.olga = s.person("olga", "Ольга", olgaPass)
 	s.h = handler(t, web.Config{
-		BaseURL: "https://kassa.aestheticlab.be", Store: st, Now: now, PasswordCost: bcrypt.MinCost,
+		BaseURL: "https://kassa.example.com", Store: st, Now: now, PasswordCost: bcrypt.MinCost,
 		SessionKey: []byte("test-session-key-test-session-key-0123456789"),
 	})
 	s.withTerms(s.olga, 7000)

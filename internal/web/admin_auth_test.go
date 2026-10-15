@@ -105,7 +105,7 @@ func TestEveryAdminRouteRequiresAuthenticationAndAdminRole(t *testing.T) {
 
 func TestSecurityHeadersAndCSPReview(t *testing.T) {
 	// HTTPS configuration (production)
-	hSecure := handler(t, web.Config{BaseURL: "https://kassa.aestheticlab.be"})
+	hSecure := handler(t, web.Config{BaseURL: "https://kassa.example.com"})
 	resSecure := get(t, hSecure, "/readyz")
 
 	headers := resSecure.Header()

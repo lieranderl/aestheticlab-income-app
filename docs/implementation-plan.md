@@ -5,7 +5,7 @@ Based on [technical-solution.md](technical-solution.md) and [system-design.md](s
 ## 1. Approach
 
 - **Every milestone ships.** Each one ends with something that works and is deployed to production.
-- **Deploy early.** `kassa.aestheticlab.be` goes live in M1.
+- **Deploy early.** `<app-host>` goes live in M1.
 - **Staff first.** The daily form ships in M5 (Release 1), so real data builds up while the admin, kassa and settlement screens are built.
 - **Test first where the money is.** Report maths, balances, settlement and dividends are written test-first. The test suite **reproduces the September 2026 numbers from the Google Sheet** before any screen relies on them.
 - **Copy, don't reinvent.** Tooling, middleware, session signing, the Dockerfile and CI come from `~/Documents/Projects/datastar-webapp`.
@@ -38,7 +38,7 @@ Based on [technical-solution.md](technical-solution.md) and [system-design.md](s
 |---|---|---|
 | 1 | GitHub repo `lieranderl/aestheticlab-income-app` (private) | ✅ Created in M0; stays private. |
 | 2 | GCP access | ✅ `<owner-email>` has `roles/owner` on `<project>`. I run the setup with the gcloud CLI. |
-| 3 | DNS | ✅ `aestheticlab.be` is in Cloud DNS zone `aestheticlab` in the same project. The domain is already verified, and two Cloud Run domain mappings already work. I add `kassa` myself. |
+| 3 | DNS | ✅ `<domain>` is in Cloud DNS zone `aestheticlab` in the same project. The domain is already verified, and two Cloud Run domain mappings already work. I add `kassa` myself. |
 | 4 | Staff | ✅ Four staff (fictional here): Anna (admin, submits reports, 45%, €1,200 salary, dividend share 1), Maria (65%, 1), Olga (65%, 1), Vera (40%, no dividends). |
 | 5 | Money rules | ✅ New client entries split services only. Cream/oil/certificate sales go fully to the selected cash/card kassa; redemption is included in services without new cash/card inflow. Legacy daily records and snapshots retain their frozen rules. See [plans/client-entries.md](plans/client-entries.md). |
 | 6 | History | ⏳ «Aesthetic Lab Finance» sheet: monthly figures for **April–September 2026** (the months before the start month), imported in M10. Nothing has been imported yet. |
@@ -77,11 +77,11 @@ Everything is scripted in `docs/MAINTAINING.md` so it can be repeated (system-de
 - **Secret** `INCOME_SESSION_KEY`.
 - **GitHub access:** a Workload Identity provider for the repo in the `aestheticlab-github` pool.
 - **Deploy pipeline:** Cloud Run `aestheticlab-income` and `.github/workflows/web.yml` (no-traffic deploy → `/readyz` → shift traffic).
-- **Domain:** a domain mapping for `kassa.aestheticlab.be`, plus a CNAME `kassa → ghs.googlehosted.com.` in Cloud DNS zone `aestheticlab`.
+- **Domain:** a domain mapping for `<app-host>`, plus a CNAME `kassa → ghs.googlehosted.com.` in Cloud DNS zone `aestheticlab`.
 - **Backups bucket and monthly export:** the bucket, plus a Cloud Scheduler export job.
 - **Monitoring:** 5xx and `/readyz` alerts, and a €5/month budget alert.
 
-**Done when:** `https://kassa.aestheticlab.be/readyz` returns 200 with a valid certificate, and a push to `main` deploys automatically.
+**Done when:** `https://<app-host>/readyz` returns 200 with a valid certificate, and a push to `main` deploys automatically.
 
 ### M2 — Domain rules, pure Go (2.5 days)
 `internal/domain`, written test-first.
@@ -163,7 +163,7 @@ Everything is scripted in `docs/MAINTAINING.md` so it can be repeated (system-de
   - Install steps on the profile screen («Как установить на iPhone / Android»).
   - The service worker and offline page stay in M11.
 - **Staff accounts:** create the accounts for Maria, Olga and Vera.
-- **Production only:** `kassa.aestheticlab.be`, main service/database `aestheticlab-income`, start month `2026-10`. Trial resources are retired. Since 2026-10-14, October is the first real month: no cleanup and no cut-off change; the earlier practice entries are voided and stay (docs/MAINTAINING.md → Real October). Automated tests remain on memory/emulator with injected clocks.
+- **Production only:** `<app-host>`, main service/database `aestheticlab-income`, start month `2026-10`. Trial resources are retired. Since 2026-10-14, October is the first real month: no cleanup and no cut-off change; the earlier practice entries are voided and stay (docs/MAINTAINING.md → Real October). Automated tests remain on memory/emulator with injected clocks.
 
 **Done when:**
 - On a real iPhone, the spec example is entered one-handed in under 60 seconds.
@@ -172,7 +172,7 @@ Everything is scripted in `docs/MAINTAINING.md` so it can be repeated (system-de
 - The app installs to the Home Screen on an iPhone and an Android phone, opens standalone with the brand icon, and stays logged in.
 - The 1 October till, card, certificate and person figures are loaded and confirmed by Anna.
 
-**➜ Release 1:** from the 2026-10-14 decision, staff enter real October data on **kassa.aestheticlab.be**, from 1 October, in the app *and* the sheet. Until M7, deposits, expenses and payouts are still recorded only in the sheet. The admin enters November's movements into the app in M7, dated when they happened (November is still open).
+**➜ Release 1:** from the 2026-10-14 decision, staff enter real October data on **<app-host>**, from 1 October, in the app *and* the sheet. Until M7, deposits, expenses and payouts are still recorded only in the sheet. The admin enters November's movements into the app in M7, dated when they happened (November is still open).
 
 ### M6 — Admin: day, month (revenue), report editing, history, change log (3 days)
 - **День:** salon card, a card per person, «Не сдали отчёт»; a table from `lg`.
@@ -277,7 +277,7 @@ Since the 2026-10-14 decision the parallel month is **October**.
 | Milestone | Days | Running total | Result |
 |---|---|---|---|
 | M0 Skeleton | 1 | 1 | Repo, CI, app shell |
-| M1 Infrastructure | 1 | 2 | Live at kassa.aestheticlab.be |
+| M1 Infrastructure | 1 | 2 | Live at <app-host> |
 | M2 Domain rules | 2.5 | 4.5 | Money maths matches the sheet |
 | M3 Storage | 2 | 6.5 | Firestore, transactions, audit |
 | M4 Login and staff | 2 | 8.5 | Secure login, staff settings |
@@ -307,7 +307,7 @@ M2 can run in parallel with M1. M6 and M7 can overlap. M9 can move after cutover
 | Rounding differs from the sheet (floats vs cents). | ±1 cent differences. | Integer cents with largest-remainder dividends. Differences up to 1 cent per person are documented as expected. |
 | A mistake found in an older closed month. | It has to be reopened. | Only the newest closed month can be reopened, so later months are reopened first (newest to oldest) and closed again in order. Rare, audited, needs a confirmation, and no snapshot can ever be stale. |
 | Opening figures missed or wrong (especially outstanding certificates). | Kassa or certificate totals off from day one. | Captured on the morning of 1 November with a checklist (technical-solution §5.6). `--dry-run` confirmed by Anna. Negative outstanding certificates show a warning. A weekly recount catches cash differences. |
-| Cloud Run domain mapping is still a preview feature. | Delay. | Already used for `aestheticlab.be` and `staging.aestheticlab.be` in this project. Fallback: an HTTPS load balancer with a serverless NEG. |
+| Cloud Run domain mapping is still a preview feature. | Delay. | Already used for `<domain>` and `staging.<domain>` in this project. Fallback: an HTTPS load balancer with a serverless NEG. |
 | iOS PWA quirks (keyboard, separate cookies). | Annoying daily form. | `sticky` bar, real-iPhone checks in M5 and M11, one login inside the installed app. |
 | Staff don't build the habit. | Gaps in data. | Early Release 1, in-person onboarding, under 60 seconds per day, «Не сдали отчёт» on the admin's day screen. |
 

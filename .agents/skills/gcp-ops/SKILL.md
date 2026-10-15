@@ -1,6 +1,6 @@
 ---
 name: gcp-ops
-description: Operating the Kassa app on Google Cloud (project <project>) — what belongs to this app vs other salon services, safe read-only checks, deploy/rollback, Cloud Run, Firestore backups/restore, DNS record for kassa.aestheticlab.be, secrets, logs. Use before running any gcloud/gh command that inspects or changes cloud resources.
+description: Operating the Kassa app on Google Cloud (project <project>) — what belongs to this app vs other salon services, safe read-only checks, deploy/rollback, Cloud Run, Firestore backups/restore, DNS record for <app-host>, secrets, logs. Use before running any gcloud/gh command that inspects or changes cloud resources.
 ---
 
 # GCP operations
@@ -20,7 +20,7 @@ Project **`<project>`**, region **`europe-west1`**. Use the gcloud CLI with `--p
 | Service account `aestheticlab-income-backup@` | **this app** | yes |
 | Budget «Kassa (app=kassa)», alert «Kassa production 5xx responses» | **this app** | yes |
 | WIF pool `aestheticlab-github` | shared | add *our* provider only |
-| Cloud DNS zone `aestheticlab`, record `kassa.aestheticlab.be.` | shared zone | **only** the `kassa` record |
+| Cloud DNS zone `aestheticlab`, record `<app-host>.` | shared zone | **only** the `kassa` record |
 | Cloud Run `aestheticlab-web`, `stage-aestheticlab-web`, `aestheticlab-calendar-telegram*` | other apps | **read-only** |
 | Firestore `(default)` | Telegram bot | **never touch** |
 
@@ -38,8 +38,8 @@ gcloud run revisions list --service aestheticlab-income --project <project> --re
 gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="aestheticlab-income" AND severity>=WARNING' --project <project> --limit 50 --freshness 1d
 gcloud firestore databases describe --database aestheticlab-income --project <project>
 gcloud firestore backups list --location europe-west1 --project <project>
-gcloud dns record-sets list --zone aestheticlab --project <project> --name kassa.aestheticlab.be.
-curl -fsS https://kassa.aestheticlab.be/readyz
+gcloud dns record-sets list --zone aestheticlab --project <project> --name <app-host>.
+curl -fsS https://<app-host>/readyz
 ```
 
 ## Rollback (ask first)

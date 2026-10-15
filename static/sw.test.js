@@ -149,7 +149,7 @@ test("navigation request returns network response when online", async () => {
 		request: {
 			method: "GET",
 			mode: "navigate",
-			url: "https://kassa.aestheticlab.be/my",
+			url: "https://kassa.example.com/my",
 		},
 		respondWith(p) {
 			respondedPromise = p;
@@ -176,7 +176,7 @@ test("navigation request falls back to /offline when offline", async () => {
 		request: {
 			method: "GET",
 			mode: "navigate",
-			url: "https://kassa.aestheticlab.be/my",
+			url: "https://kassa.example.com/my",
 		},
 		respondWith(p) {
 			respondedPromise = p;
@@ -191,7 +191,7 @@ test("static assets are served cache-first and cached on network hit", async () 
 	const h = harness();
 	const cachedCSS = new Response("css-content", { status: 200 });
 	const cache = await h.caches.open("kassa-v2");
-	await cache.put("https://kassa.aestheticlab.be/static/app.css", cachedCSS);
+	await cache.put("https://kassa.example.com/static/app.css", cachedCSS);
 
 	const fetchFn = h.listeners.get("fetch");
 	let respondedPromise;
@@ -199,7 +199,7 @@ test("static assets are served cache-first and cached on network hit", async () 
 		request: {
 			method: "GET",
 			mode: "cors",
-			url: "https://kassa.aestheticlab.be/static/app.css",
+			url: "https://kassa.example.com/static/app.css",
 		},
 		respondWith(p) {
 			respondedPromise = p;
@@ -216,7 +216,7 @@ test("static assets are served cache-first and cached on network hit", async () 
 		request: {
 			method: "GET",
 			mode: "cors",
-			url: "https://kassa.aestheticlab.be/static/fonts/test.woff2",
+			url: "https://kassa.example.com/static/fonts/test.woff2",
 		},
 		respondWith(p) {
 			respondedPromise = p;
@@ -225,7 +225,7 @@ test("static assets are served cache-first and cached on network hit", async () 
 	fetchFn(evtUncached);
 	const res2 = await respondedPromise;
 	expect(res2).toBe(networkFont);
-	const stored = await cache.match("https://kassa.aestheticlab.be/static/fonts/test.woff2");
+	const stored = await cache.match("https://kassa.example.com/static/fonts/test.woff2");
 	expect(stored).toBeDefined();
 });
 
@@ -237,7 +237,7 @@ test("non-GET requests are not intercepted", () => {
 		request: {
 			method: "POST",
 			mode: "cors",
-			url: "https://kassa.aestheticlab.be/clients",
+			url: "https://kassa.example.com/clients",
 		},
 		respondWith() {
 			called = true;

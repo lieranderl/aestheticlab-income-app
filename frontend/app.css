@@ -9,7 +9,7 @@
   logs: false;
 }
 
-/* Brand palette from aestheticlab.be (qwik-aestheticlab/src/global.css).
+/* Brand palette from the salon's website (its global.css).
    Literal colours live only here; templates use daisyUI semantic tokens. */
 @plugin "daisyui/theme" {
   name: "aesthetic";
