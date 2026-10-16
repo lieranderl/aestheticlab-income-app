@@ -24,6 +24,9 @@
 // transaction, whole or not at all. Rows already loaded with the same
 // amount are skipped, so a later run can add the person rows.
 //
+// import history loads the sheet's monthly figures for the months before the
+// start month (M10); see history.go.
+//
 // Run it locally with Application Default Credentials:
 //
 //	go run ./cmd/import opening -project <project> -database aestheticlab-income -dry-run opening.csv
@@ -49,8 +52,12 @@ import (
 func main() { os.Exit(importCmd(os.Args[1:])) }
 
 func importCmd(args []string) int {
+	if len(args) > 0 && args[0] == "history" {
+		return historyCmd(args[1:])
+	}
 	if len(args) == 0 || args[0] != "opening" {
 		fmt.Fprintln(os.Stderr, "usage: import opening [-project P] [-database D] [-start-month YYYY-MM] [-admin USERNAME] [-dry-run] FILE")
+		fmt.Fprintln(os.Stderr, "       import history [-project P] [-database D] [-start-month YYYY-MM] [-admin USERNAME] [-person NAME=USERNAME]... [-dry-run] FILE")
 		return 2
 	}
 	fs := flag.NewFlagSet("opening", flag.ContinueOnError)
