@@ -7,8 +7,9 @@ DEV_START_MONTH ?= 2026-10
 DEV_PORT ?= 8080
 GOLANGCI_LINT ?= $(GO) tool golangci-lint
 ACTIONLINT ?= $(GO) run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-# Apple's container CLI first (used locally), Docker otherwise (CI runners).
-CONTAINER_TOOL ?= $(shell command -v container 2>/dev/null || command -v docker 2>/dev/null || echo docker)
+# Apple's container CLI on macOS, Podman on Linux, Docker otherwise (CI
+# runners). Override with CONTAINER_TOOL=… when several are installed.
+CONTAINER_TOOL ?= $(shell command -v container 2>/dev/null || command -v podman 2>/dev/null || command -v docker 2>/dev/null || echo docker)
 FIRESTORE_EMULATOR_IMAGE ?= gcr.io/google.com/cloudsdktool/google-cloud-cli:587.0.0-emulators@sha256:8d8573471c489a409f03891d2c24d177fa531276184f7002b9a2d853d1b3ed54
 # Settings for local runs (see .env.web.example); never committed.
 WEB_ENV = set -a; if [ -f .env.web ]; then . ./.env.web; fi; set +a;
@@ -60,7 +61,7 @@ help:
 	@echo "  make agent-test       Local agent queue/process regression tests (no model calls)"
 	@echo ""
 	@echo "Other:"
-	@echo "  make image            Production image (Apple container, or Docker)"
+	@echo "  make image            Production image (Apple container, Podman or Docker)"
 	@echo "  make hooks            Use the repo git hooks (blocks direct pushes to main)"
 	@echo "  make agent-loop ARGS=list   Inspect the local Jev/Claude task queue"
 	@echo "  make clean            Remove build output"
