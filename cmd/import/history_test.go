@@ -232,3 +232,24 @@ func TestAnOversizedFileIsRefused(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestTheStaffBlockMayEndWithATotalColumn(t *testing.T) {
+	withTotal := strings.NewReplacer(
+		"Maria,Olga,Anna\n", "Maria,Olga,Anna,Total Revenue\n",
+		`"€4,000.00",€0.00`+"\n", `"€4,000.00",€0.00,"€10,000.00"`+"\n",
+		`"€3,800.00",€700.00`+"\n", `"€3,800.00",€700.00,"€12,000.00"`+"\n",
+	).Replace(trendDashboard)
+	st := historySalon(t)
+	if err := runHistory(ctx, st, historyOptions{admin: "anna"}, strings.NewReader(withTotal), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := imported(t, st); len(got) != 2 {
+		t.Errorf("imported %d months, want 2", len(got))
+	}
+
+	wrong := strings.Replace(withTotal, `€700.00,"€12,000.00"`, `€700.00,"€12,500.00"`, 1)
+	err := runHistory(ctx, historySalon(t), historyOptions{admin: "anna"}, strings.NewReader(wrong), &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "Total Revenue") {
+		t.Fatalf("a staff total that disagrees: err = %v", err)
+	}
+}
