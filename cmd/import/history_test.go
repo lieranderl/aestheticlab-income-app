@@ -136,6 +136,12 @@ func TestASheetFileWithMistakesIsRefusedWhole(t *testing.T) {
 		{"an unreadable amount", `€700.50,€700.50,,2026-08`, `€700.50,seven,,2026-08`, `"seven"`},
 		{"a negative revenue", "€0.00\n2026-09", "-€0.50\n2026-09", "below zero"},
 		{"no months", "\n2026-0", "\nx2026-0", "no months"},
+		{"a blank figure", `€700.50,€700.50,,2026-08`, `€700.50,,,2026-08`, "Owner Dividends"},
+		{"a dash for a figure", `€700.50,€700.50,,2026-08`, `€700.50,-,,2026-08`, "Owner Dividends"},
+		{"a blank staff cell", `"€4,000.00",€0.00`, `"€4,000.00",`, "revenue"},
+		{"negative dividends", `€500.00,€500.00,`, `€500.00,-€500.00,`, "below zero"},
+		{"no Total row", "\nTotal,", "\nSum,", "Total row"},
+		{"two Total rows", "\nAverage,", "\nTotal,", "Total rows"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			st := historySalon(t)
@@ -173,14 +179,14 @@ func TestSheetColumnsCanBeMatchedToPeopleByName(t *testing.T) {
 func TestSheetAmountsReadEitherLocale(t *testing.T) {
 	for in, want := range map[string]domain.Cents{
 		"€12,428.00": 1242800, "€699.00": 69900, "€0.00": 0, "€1,234": 123400, "12 428,50 €": 1242850,
-		"€1.234,5": 123450, "-€2.50": -250, "−€2,50": -250, "€-2.50": -250, "": 0,
+		"€1.234,50": 123450, "-€2.50": -250, "−€2,50": -250, "€-2.50": -250, "": 0,
 	} {
 		got, err := sheetAmount(in)
 		if err != nil || got != want {
 			t.Errorf("sheetAmount(%q) = %v, %v; want %v", in, got, err, want)
 		}
 	}
-	for _, in := range []string{"seven", "€1,23,4", "€1.2.3", "€12,3456.00", "€ 1 2"} {
+	for _, in := range []string{"seven", "€1,23,4", "€1.2.3", "€12,3456.00", "€ 1 2", "1,234,56", "12.", "12,", "€1,2", "€1.234,5", "-", "€ -"} {
 		if _, err := sheetAmount(in); err == nil {
 			t.Errorf("sheetAmount(%q) accepted", in)
 		}
@@ -198,4 +204,31 @@ func imported(t *testing.T, st *store.Store) map[domain.Month]domain.ImportedMon
 
 func sameHistory(a, b map[domain.Month]domain.ImportedMonth) bool {
 	return reflect.DeepEqual(a, b)
+}
+
+func TestABlankMonthRowIsLeftOut(t *testing.T) {
+	st := historySalon(t)
+	file := strings.Replace(trendDashboard, "\n2026-08,", "\n2026-07,,,,,,,,,2026-07,,,\n2026-08,", 1)
+	if err := runHistory(ctx, st, historyOptions{admin: "anna"}, strings.NewReader(file), &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := imported(t, st); len(got) != 2 {
+		t.Errorf("imported %d months, want August and September only: %v", len(got), got)
+	}
+}
+
+func TestTheHistoryCommandNeedsTheStartMonthNamed(t *testing.T) {
+	t.Setenv("INCOME_START_MONTH", "")
+	if code := historyCmd([]string{"-project", "p", "trend.csv"}); code != 2 {
+		t.Errorf("without -start-month: exit %d, want 2", code)
+	}
+}
+
+func TestAnOversizedFileIsRefused(t *testing.T) {
+	st := historySalon(t)
+	big := trendDashboard + strings.Repeat(",,,,,,,,,,,,\n", 1<<17)
+	err := runHistory(ctx, st, historyOptions{admin: "anna"}, strings.NewReader(big), &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "MiB") {
+		t.Fatalf("err = %v", err)
+	}
 }

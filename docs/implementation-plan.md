@@ -35,7 +35,7 @@ Per-milestone detail is in [progress.md](progress.md); this table must agree wit
 | M7 Kassa | ✅ done; the October backfill of movements and the till/card reconciliation are cutover work |
 | M8 Settlement | ✅ done |
 | M9 Categories, trends, export | ✅ done (archive PR 34), adapted to the client-entry model |
-| M10 History import | ⏳ not started: April–September 2026 |
+| M10 History import | 🚧 `cmd/import history` ready; production load pending |
 | M11 Offline and hardening | ✅ done (archive PR 45, restore drill 2026-10-14); real-phone checks stay with M5 |
 | M12 Parallel month and cutover | ⏳ October is the parallel month |
 

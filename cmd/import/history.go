@@ -27,8 +27,8 @@ import (
 //
 // The tab has a header row starting with «Month» and the figure columns
 // below; to its right a second «Month» column starts the staff block, one
-// column per person. Rows whose first cell is a month (YYYY-MM) are loaded;
-// the «Total» row, when present, must equal the sum of the loaded months.
+// column per person. Rows whose first cell is a month (YYYY-MM) are loaded,
+// except blank ones; the «Total» row must equal the sum of the loaded months.
 
 // historyCmd is `import history`: flags, the file and the Firestore store.
 //
@@ -37,7 +37,7 @@ func historyCmd(args []string) int {
 	fs := flag.NewFlagSet("history", flag.ContinueOnError)
 	project := fs.String("project", os.Getenv("INCOME_FIRESTORE_PROJECT"), "Google Cloud project")
 	database := fs.String("database", cmp.Or(os.Getenv("INCOME_FIRESTORE_DATABASE"), "aestheticlab-income"), "Firestore database")
-	startMonth := fs.String("start-month", cmp.Or(os.Getenv("INCOME_START_MONTH"), store.DefaultStartMonth.String()), "the first month the app keeps")
+	startMonth := fs.String("start-month", os.Getenv("INCOME_START_MONTH"), "the first month the app keeps (required; production: 2026-10)")
 	admin := fs.String("admin", "", "username of the admin the months are recorded as (default: the only active admin)")
 	dryRun := fs.Bool("dry-run", false, "check and print the figures, write nothing")
 	people := personFlag{}
@@ -47,6 +47,10 @@ func historyCmd(args []string) int {
 	}
 	if *project == "" || fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "import history: -project and one FILE are required")
+		return 2
+	}
+	if *startMonth == "" { // the code default would let the app's own months in
+		fmt.Fprintln(os.Stderr, "import history: name the start month with -start-month (production: 2026-10)")
 		return 2
 	}
 	start, err := domain.ParseMonth(*startMonth)
@@ -129,7 +133,7 @@ func runHistory(ctx context.Context, st *store.Store, opt historyOptions, in io.
 	if err != nil {
 		return err
 	}
-	months, total, people, err := parseTrend(ctx, st, records, opt.people)
+	months, people, err := parseTrend(ctx, st, records, opt.people)
 	if err != nil {
 		return err
 	}
@@ -171,9 +175,7 @@ func runHistory(ctx context.Context, st *store.Store, opt historyOptions, in io.
 	if err := tw.flush(); err != nil {
 		return err
 	}
-	if total {
-		p.printf("The sum matches the sheet's Total row.\n")
-	}
+	p.printf("The sum matches the sheet's Total row.\n")
 	p.printf("Revenue per person:\n")
 	pw := &printer{w: tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)}
 	for _, person := range people {
@@ -204,9 +206,12 @@ func runHistory(ctx context.Context, st *store.Store, opt historyOptions, in io.
 
 // readCSV reads a whole file of at most 1 MiB, comma or semicolon separated.
 func readCSV(in io.Reader) ([][]string, error) {
-	raw, err := io.ReadAll(io.LimitReader(in, 1<<20))
+	raw, err := io.ReadAll(io.LimitReader(in, 1<<20+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(raw) > 1<<20 {
+		return nil, errors.New("the file is larger than 1 MiB: is it the «4 Trend Dashboard» tab?")
 	}
 	text := strings.TrimPrefix(string(raw), "\ufeff") // Excel's BOM
 	r := csv.NewReader(strings.NewReader(text))
@@ -220,9 +225,9 @@ func readCSV(in io.Reader) ([][]string, error) {
 }
 
 // parseTrend finds the header, reads every month row and checks that the
-// sheet's figures add up. It returns the months in file order, whether a
-// Total row was checked, and the people of the staff block.
-func parseTrend(ctx context.Context, st *store.Store, records [][]string, names map[string]string) ([]sheetMonth, bool, []store.User, error) {
+// sheet's figures add up, the Total row included. It returns the months in
+// file order and the people of the staff block.
+func parseTrend(ctx context.Context, st *store.Store, records [][]string, names map[string]string) ([]sheetMonth, []store.User, error) {
 	head := -1
 	for i, rec := range records {
 		if len(rec) > 0 && strings.EqualFold(strings.TrimSpace(rec[0]), colMonth) {
@@ -231,7 +236,7 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 		}
 	}
 	if head < 0 {
-		return nil, false, nil, errors.New("no header row: the first column of one row must be «Month» (download the «4 Trend Dashboard» tab)")
+		return nil, nil, errors.New("no header row: the first column of one row must be «Month» (download the «4 Trend Dashboard» tab)")
 	}
 	header := records[head]
 	col := map[string]int{}
@@ -246,15 +251,15 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 	}
 	for _, name := range []string{colRevenue, colSalon, colOverhead, colSalary, colProfit, colDividend} {
 		if _, ok := col[strings.ToLower(name)]; !ok {
-			return nil, false, nil, fmt.Errorf("the header has no %q column", name)
+			return nil, nil, fmt.Errorf("the header has no %q column", name)
 		}
 	}
 	if staffAt < 0 {
-		return nil, false, nil, errors.New("the header has no staff block (a second «Month» column followed by one column per person)")
+		return nil, nil, errors.New("the header has no staff block (a second «Month» column followed by one column per person)")
 	}
 	people, err := staffColumns(ctx, st, header[staffAt+1:], names)
 	if err != nil {
-		return nil, false, nil, err
+		return nil, nil, err
 	}
 
 	cell := func(rec []string, i int) string {
@@ -265,6 +270,9 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 	}
 	figure := func(rec []string, line int, name string, signed bool) (domain.Cents, error) {
 		raw := cell(rec, col[strings.ToLower(name)])
+		if blankCell(raw) {
+			return 0, fmt.Errorf("line %d: %s is blank", line, name)
+		}
 		c, err := sheetAmount(raw)
 		if err != nil {
 			return 0, fmt.Errorf("line %d: %s %q: %w", line, name, raw, err)
@@ -283,6 +291,9 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 		line := head + i + 2
 		first := cell(rec, 0)
 		if strings.EqualFold(first, "Total") {
+			if totalRow != nil {
+				return nil, nil, fmt.Errorf("two Total rows (lines %d and %d)", totalLine, line)
+			}
 			totalRow, totalLine = rec, line
 			continue
 		}
@@ -291,29 +302,35 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 			continue // a title, a blank line, the «Average» row
 		}
 		if prev, dup := seen[m]; dup {
-			return nil, false, nil, fmt.Errorf("line %d: %s is in the file twice (also line %d)", line, m, prev)
+			return nil, nil, fmt.Errorf("line %d: %s is in the file twice (also line %d)", line, m, prev)
+		}
+		if blankRow(rec[1:]) {
+			continue // a month the sheet hasn't filled in
 		}
 		seen[m] = line
 		if !m.Before(st.StartMonth()) {
-			return nil, false, nil, fmt.Errorf("line %d: %s is kept by the app; only months before %s are history", line, m, st.StartMonth())
+			return nil, nil, fmt.Errorf("line %d: %s is kept by the app; only months before %s are history", line, m, st.StartMonth())
 		}
 		if got := cell(rec, staffAt); got != m.String() {
-			return nil, false, nil, fmt.Errorf("line %d: the staff block is for %q, not %s", line, got, m)
+			return nil, nil, fmt.Errorf("line %d: the staff block is for %q, not %s", line, got, m)
 		}
 		f, err := monthFigures(rec, line, figure)
 		if err != nil {
-			return nil, false, nil, err
+			return nil, nil, err
 		}
 		f.RevenueByPerson = map[string]domain.Cents{}
 		var staff domain.Cents
 		for j, person := range people {
 			raw := cell(rec, staffAt+1+j)
+			if blankCell(raw) {
+				return nil, nil, fmt.Errorf("line %d: %s's revenue is blank", line, person.DisplayName)
+			}
 			c, err := sheetAmount(raw)
 			if err != nil {
-				return nil, false, nil, fmt.Errorf("line %d: %s's revenue %q: %w", line, person.DisplayName, raw, err)
+				return nil, nil, fmt.Errorf("line %d: %s's revenue %q: %w", line, person.DisplayName, raw, err)
 			}
 			if c < 0 {
-				return nil, false, nil, fmt.Errorf("line %d: %s's revenue %s is below zero", line, person.DisplayName, domain.FormatEUR(c))
+				return nil, nil, fmt.Errorf("line %d: %s's revenue %s is below zero", line, person.DisplayName, domain.FormatEUR(c))
 			}
 			if c != 0 {
 				f.RevenueByPerson[person.ID] += c
@@ -321,41 +338,42 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 			staff += c
 		}
 		if staff != f.RevenueTotal {
-			return nil, false, nil, fmt.Errorf("line %d: %s staff revenue adds up to %s, not the Total Revenue %s", line, m, domain.FormatEUR(staff), domain.FormatEUR(f.RevenueTotal))
+			return nil, nil, fmt.Errorf("line %d: %s staff revenue adds up to %s, not the Total Revenue %s", line, m, domain.FormatEUR(staff), domain.FormatEUR(f.RevenueTotal))
 		}
 		if want := f.SalonIncome - f.Expenses - f.ManagerSalary; f.Profit != want {
-			return nil, false, nil, fmt.Errorf("line %d: %s profit %s is not salon share − overhead − manager salary = %s", line, m, domain.FormatEUR(f.Profit), domain.FormatEUR(want))
+			return nil, nil, fmt.Errorf("line %d: %s profit %s is not salon share − overhead − manager salary = %s", line, m, domain.FormatEUR(f.Profit), domain.FormatEUR(want))
 		}
 		if _, ok := col[strings.ToLower(colExpenses)]; ok {
 			got, err := figure(rec, line, colExpenses, false)
 			if err != nil {
-				return nil, false, nil, err
+				return nil, nil, err
 			}
 			if want := f.Expenses + f.ManagerSalary; got != want {
-				return nil, false, nil, fmt.Errorf("line %d: %s Total Salon Expenses %s is not overhead + manager salary = %s", line, m, domain.FormatEUR(got), domain.FormatEUR(want))
+				return nil, nil, fmt.Errorf("line %d: %s Total Salon Expenses %s is not overhead + manager salary = %s", line, m, domain.FormatEUR(got), domain.FormatEUR(want))
 			}
 		}
 		months = append(months, sheetMonth{month: m, figure: f})
 	}
 	if len(months) == 0 {
-		return nil, false, nil, errors.New("no months in the file (rows whose first cell is YYYY-MM)")
+		return nil, nil, errors.New("no months in the file (rows whose first cell is YYYY-MM)")
 	}
-	if totalRow != nil {
-		want, err := monthFigures(totalRow, totalLine, figure)
-		if err != nil {
-			return nil, false, nil, err
-		}
-		var sum domain.ImportedMonth
-		for _, m := range months {
-			sum = addMonth(sum, m.figure)
-		}
-		if want.RevenueByPerson = nil; !reflect.DeepEqual(sum, want) {
-			return nil, false, nil, fmt.Errorf("line %d: the months add up to revenue %s, salon %s, overhead %s, salary %s, profit %s, dividends %s — not the sheet's Total row (%s, %s, %s, %s, %s, %s)",
-				totalLine, domain.FormatEUR(sum.RevenueTotal), domain.FormatEUR(sum.SalonIncome), domain.FormatEUR(sum.Expenses), domain.FormatEUR(sum.ManagerSalary), domain.FormatEUR(sum.Profit), domain.FormatEUR(sum.Dividends),
-				domain.FormatEUR(want.RevenueTotal), domain.FormatEUR(want.SalonIncome), domain.FormatEUR(want.Expenses), domain.FormatEUR(want.ManagerSalary), domain.FormatEUR(want.Profit), domain.FormatEUR(want.Dividends))
-		}
+	if totalRow == nil {
+		return nil, nil, errors.New("no Total row: the sum of the months is checked against it")
 	}
-	return months, totalRow != nil, people, nil
+	want, err := monthFigures(totalRow, totalLine, figure)
+	if err != nil {
+		return nil, nil, err
+	}
+	var sum domain.ImportedMonth
+	for _, m := range months {
+		sum = addMonth(sum, m.figure)
+	}
+	if want.RevenueByPerson = nil; !reflect.DeepEqual(sum, want) {
+		return nil, nil, fmt.Errorf("line %d: the months add up to revenue %s, salon %s, overhead %s, salary %s, profit %s, dividends %s — not the sheet's Total row (%s, %s, %s, %s, %s, %s)",
+			totalLine, domain.FormatEUR(sum.RevenueTotal), domain.FormatEUR(sum.SalonIncome), domain.FormatEUR(sum.Expenses), domain.FormatEUR(sum.ManagerSalary), domain.FormatEUR(sum.Profit), domain.FormatEUR(sum.Dividends),
+			domain.FormatEUR(want.RevenueTotal), domain.FormatEUR(want.SalonIncome), domain.FormatEUR(want.Expenses), domain.FormatEUR(want.ManagerSalary), domain.FormatEUR(want.Profit), domain.FormatEUR(want.Dividends))
+	}
+	return months, people, nil
 }
 
 // monthFigures reads a row's totals (no staff block).
@@ -368,7 +386,7 @@ func monthFigures(rec []string, line int, figure func([]string, int, string, boo
 		signed bool
 	}{
 		{colRevenue, &f.RevenueTotal, false}, {colSalon, &f.SalonIncome, false}, {colOverhead, &f.Expenses, false},
-		{colSalary, &f.ManagerSalary, false}, {colProfit, &f.Profit, true}, {colDividend, &f.Dividends, true},
+		{colSalary, &f.ManagerSalary, false}, {colProfit, &f.Profit, true}, {colDividend, &f.Dividends, false},
 	} {
 		if *c.dst, err = figure(rec, line, c.name, c.signed); err != nil {
 			return f, err
@@ -459,13 +477,20 @@ func sheetAmount(s string) (domain.Cents, error) {
 		return r
 	}, s)
 	s = strings.TrimSpace(s)
-	neg := strings.HasPrefix(s, "-")
-	s = strings.TrimSpace(strings.TrimPrefix(s, "-"))
 	if s == "" {
 		return 0, nil
 	}
+	neg := strings.HasPrefix(s, "-")
+	s = strings.TrimSpace(strings.TrimPrefix(s, "-"))
+	if s == "" {
+		return 0, domain.ErrInvalidAmount
+	}
 	whole, frac := s, ""
-	if i := strings.LastIndexAny(s, ",."); i >= 0 && len(s)-i-1 <= 2 {
+	if i := strings.LastIndexAny(s, ",."); i >= 0 && len(s)-i-1 < 3 {
+		// A decimal separator: two digits after it, and it groups nothing.
+		if len(s)-i-1 != 2 || strings.IndexByte(s[:i], s[i]) >= 0 {
+			return 0, domain.ErrInvalidAmount
+		}
 		whole, frac = s[:i], s[i+1:]
 	}
 	if strings.Contains(whole, ",") && strings.Contains(whole, ".") {
@@ -489,4 +514,21 @@ func sheetAmount(s string) (domain.Cents, error) {
 		c = -c
 	}
 	return c, nil
+}
+
+// blankCell is an empty figure, or one the sheet shows as a dash.
+func blankCell(s string) bool {
+	return strings.Trim(s, "€-− \u00a0\u202f") == ""
+}
+
+// blankRow is a row with no figure at all after its month.
+func blankRow(rec []string) bool {
+	for _, c := range rec {
+		if c = strings.TrimSpace(c); c != "" && !blankCell(c) {
+			if _, err := domain.ParseMonth(c); err != nil {
+				return false
+			}
+		}
+	}
+	return true
 }
