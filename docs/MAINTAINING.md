@@ -258,6 +258,24 @@ go run ./cmd/import opening -project <project> -database aestheticlab-income -st
 ```
 Always pass `-start-month 2026-10`: the tool's default is the code default `2026-11`, and production uses October.
 
+## Sheet history (`cmd/import history`, April–September)
+«Динамика» and the export show the sheet's months before the start month as «импорт» (M10). They are totals only, never balances. Download the sheet's **«4 Trend Dashboard»** tab with File → Download → Comma-separated values (current sheet). Keep it on your machine only, since `*.csv` is gitignored. The tool reads the row whose first cell is «Month» and the figure columns under it. The staff block starts at the second «Month» column, one column per person. It loads every `YYYY-MM` row before the start month and checks the rest of the sheet before anything is written:
+- staff revenue adds up to Total Revenue;
+- Net Operating Profit = Salon Retained Share − Overhead Expenses − Manager Salary;
+- Total Salon Expenses = overhead + salary;
+- the months add up to the «Total» row, which must be there.
+
+A blank or «-» figure is refused, except in a row whose figures are all blank (a month the sheet hasn't filled in), which is left out. Dividends can't be negative. `-start-month 2026-10` is required, so the sheet's October can never be loaded as history.
+
+A staff column matches a person by username, display name or the display name's first word, ignoring case. When a column matches nobody, name the person with `-person "Name=username"` (repeatable). Former staff need a user in the app; they can be inactive.
+```bash
+go run ./cmd/import history -project <project> -database aestheticlab-income -start-month 2026-10 -dry-run trend.csv
+```
+```bash
+go run ./cmd/import history -project <project> -database aestheticlab-income -start-month 2026-10 trend.csv
+```
+Compare the dry run's table and per-person totals with the tab. Have Anna confirm whether the sheet's «Salon Retained Share» includes certificate sales, which the app's salon income leaves out. Then ask before the real run. The months load in one transaction, each with an «Импорт месяца» audit row. A month already loaded with the same figures is skipped. A month whose figures differ in the file replaces the old ones and gets its own audit row, so after a correction in the sheet, run it again.
+
 ## Renaming a kassa account
 The app has no screen for account names. `cmd/renameaccount` changes only the display name, audited as `cli:renameaccount`. Run the dry run, then the real command after approval:
 ```bash

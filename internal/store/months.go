@@ -588,31 +588,48 @@ func (r importedRecord) imported() domain.ImportedMonth {
 // SaveImportedMonth stores a month of sheet history (admin only, cmd/import).
 // Only months before the start month: history never overlaps app data.
 func (s *Store) SaveImportedMonth(ctx context.Context, actor Actor, m domain.Month, im domain.ImportedMonth, source string) error {
+	return s.SaveImportedMonths(ctx, actor, map[domain.Month]domain.ImportedMonth{m: im}, source)
+}
+
+// SaveImportedMonths stores months of sheet history in one transaction:
+// all of them or, if any is refused, none. Each month gets its own audit row.
+func (s *Store) SaveImportedMonths(ctx context.Context, actor Actor, months map[domain.Month]domain.ImportedMonth, source string) error {
 	if !actor.Admin {
 		return ErrForbidden
 	}
-	if !m.Before(s.start) {
-		return &domain.ValidationError{Field: "month", Problem: ProblemNotHistory}
-	}
-	rec := importedRecord{
-		RevenueByPerson: maps.Clone(nonNil(im.RevenueByPerson)), RevenueTotal: im.RevenueTotal,
-		SalonIncome: im.SalonIncome, Expenses: im.Expenses, ManagerSalary: im.ManagerSalary,
-		Profit: im.Profit, Dividends: im.Dividends, Source: trimmed(source),
+	order := slices.SortedFunc(maps.Keys(months), func(a, b domain.Month) int { return cmp.Compare(a.String(), b.String()) })
+	for _, m := range order {
+		if !m.Before(s.start) {
+			return &domain.ValidationError{Field: "month", Problem: ProblemNotHistory}
+		}
 	}
 	return s.db.run(ctx, false, func(t tx) error {
-		var before importedRecord
-		existed, err := t.get(importedPath(m), &before)
-		if err != nil {
-			return err
+		before := make([]any, len(order))
+		for i, m := range order { // every read before any write
+			var rec importedRecord
+			existed, err := t.get(importedPath(m), &rec)
+			if err != nil {
+				return err
+			}
+			if existed {
+				before[i] = rec
+			}
 		}
-		if err := t.set(importedPath(m), rec); err != nil {
-			return err
+		for i, m := range order {
+			im := months[m]
+			rec := importedRecord{
+				RevenueByPerson: maps.Clone(nonNil(im.RevenueByPerson)), RevenueTotal: im.RevenueTotal,
+				SalonIncome: im.SalonIncome, Expenses: im.Expenses, ManagerSalary: im.ManagerSalary,
+				Profit: im.Profit, Dividends: im.Dividends, Source: trimmed(source),
+			}
+			if err := t.set(importedPath(m), rec); err != nil {
+				return err
+			}
+			if err := s.audit(t, EntityImported, m.String(), ActionUpdate, actor.UID, before[i], rec); err != nil {
+				return err
+			}
 		}
-		var prev any
-		if existed {
-			prev = before
-		}
-		return s.audit(t, EntityImported, m.String(), ActionUpdate, actor.UID, prev, rec)
+		return nil
 	})
 }
 

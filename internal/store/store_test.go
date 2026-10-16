@@ -897,6 +897,34 @@ func TestImportedHistoryComesBeforeTheStartMonth(t *testing.T) {
 	})
 }
 
+func TestImportedHistoryLoadsWholeOrNotAtAll(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		aug := domain.ImportedMonth{RevenueTotal: 1368000, Profit: 153700}
+		sep := domain.ImportedMonth{RevenueTotal: 1529500, Profit: 99790}
+		err := s.SaveImportedMonths(ctx, s.admin, map[domain.Month]domain.ImportedMonth{
+			month(t, "2026-08"): aug, month(t, "2026-11"): sep,
+		}, "sheet")
+		wantProblem(t, "a file reaching into the app's months", err, store.ProblemNotHistory)
+		if got, err := s.ImportedMonths(ctx); err != nil || len(got) != 0 {
+			t.Fatalf("a refused file wrote %v (err %v)", got, err)
+		}
+
+		must(t, s.SaveImportedMonths(ctx, s.admin, map[domain.Month]domain.ImportedMonth{
+			month(t, "2026-08"): aug, month(t, "2026-09"): sep,
+		}, "sheet"))
+		got, err := s.ImportedMonths(ctx)
+		must(t, err)
+		if got[month(t, "2026-08")].Profit != 153700 || got[month(t, "2026-09")].RevenueTotal != 1529500 || len(got) != 2 {
+			t.Errorf("imported = %+v", got)
+		}
+		for _, m := range []string{"2026-08", "2026-09"} {
+			if got := s.actions(t, m); !reflect.DeepEqual(got, []string{store.ActionUpdate}) {
+				t.Errorf("audit %s = %v", m, got)
+			}
+		}
+	})
+}
+
 func TestTermsStartOnlyInAMonthWithoutReports(t *testing.T) {
 	eachSalon(t, func(t *testing.T, s *salon) {
 		_, err := s.SaveReport(ctx, s.actor(s.olga), day(s.olga, "2026-11-10", t, 100, 0))
