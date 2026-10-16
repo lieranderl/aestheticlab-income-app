@@ -71,14 +71,14 @@ Run a milestone end to end with **`/milestone M<N>`**.
 | `make firestore-reset` / `make firestore-stop` | Wipe the emulator's data and seed again / stop the emulator |
 | `make web-dev` / `make web` | App with the settings in `.env.web`, with / without Air |
 | `make test` | `bun test` (frontend helpers) + `go test -race ./...` |
-| `make firestore` / `make test-store` | Firestore emulator on :8086 via Apple `container` (keeps a running one) / store contract tests against it |
+| `make firestore` / `make test-store` | Firestore emulator on :8086 via Apple `container` (macOS) or Podman (Linux) (keeps a running one) / store contract tests against it |
 | `make mobile` | Playwright phone checks on `cmd/e2e` (memory store, seeded staff, fixed November clock): every screen at iPhone SE (3rd gen) / iPhone 15 / Pixel 7 in light and dark, the client/movement/payout flows and the 4G speed budget. First run: `bunx playwright install chromium webkit` |
 | `make help` | Every target, grouped |
 | `make lint` | templ check, assets check, `go vet`, staticcheck, golangci-lint, gofmt |
 | `make security` | govulncheck + gosec |
 | `make ci` | Everything CI runs: assets, templ, lint, test, security, build |
 | `make templ` / `bun run assets` | Generate templ Go code / build CSS and icons |
-| `make image` | Production image (distroless), built with Apple's `container` CLI locally (start its service once: `container system start`), Docker in CI |
+| `make image` | Production image (distroless), built with Apple's `container` CLI on macOS (start its service once: `container system start`), Podman on Linux, Docker in CI. Override with `CONTAINER_TOOL=…` |
 
 ## Skills (`.agents/skills/`)
 - **Project skills:** `money-rules`, `mobile-ui`, `firestore-store`, `gcp-ops`, `tdd`, `milestone`.

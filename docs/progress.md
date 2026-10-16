@@ -42,6 +42,10 @@ Merged in archive PR 40 to resolve native date picker activation across Safari/C
 - **Service Worker Cache Invalidation:** Bumped service worker cache from `kassa-v1` to `kassa-v2` in `static/sw.js` and added `?v=2` query versioning to `/static/app.css` in `internal/views/layout.templ`, forcing older installed clients/PWAs to fetch updated styles and clear stale cached bundles.
 - **Verification:** Unit tests and HTTP regressions updated in `internal/web/clients_test.go`, `internal/web/ui_clarity_test.go`, `internal/web/server_test.go`, and `static/sw.test.js`. Full CI passed.
 
+## Linux dev machine with Podman (2026-10-16)
+- The Makefile picks Apple `container`, then Docker (GitHub runners have Podman too), then Podman (`CONTAINER_TOOL` overrides). The Dockerfile uses fully qualified image names, which Podman's short-name policy requires. `.claude/launch.json` starts a login `bash` so the preview finds user-local Go/Bun.
+- **Verification (Fedora 44, Podman 5.8):** `make test` and `make test-store` (emulator in Podman) pass, `make dev` seeds and serves the login page, `make image` builds.
+
 ## Date picker overlay and cross-browser calendar popup (2026-10-14)
 
 Merged in archive PR 38 to fix native date picker invocation across browsers:
