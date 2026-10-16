@@ -259,7 +259,7 @@ go run ./cmd/import opening -project <project> -database aestheticlab-income -st
 Always pass `-start-month 2026-10`: the tool's default is the code default `2026-11`, and production uses October.
 
 ## Sheet history (`cmd/import history`, April–September)
-«Динамика» and the export show the sheet's months before the start month as «импорт» (M10). They are totals only, never balances. Download the sheet's **«4 Trend Dashboard»** tab with File → Download → Comma-separated values (current sheet). Keep it on your machine only, since `*.csv` is gitignored. The tool reads the row whose first cell is «Month» and the figure columns under it. The staff block starts at the second «Month» column, one column per person. It loads every `YYYY-MM` row before the start month and checks the rest of the sheet before anything is written:
+«Динамика» and the export show the sheet's months before the start month as «импорт» (M10). They are totals only, never balances. Download the sheet's **«4 Trend Dashboard»** tab with File → Download → Comma-separated values (current sheet). Keep it on your machine only, since `*.csv` is gitignored. The tool reads the row whose first cell is «Month» and the figure columns under it. The staff block starts at the second «Month» column, one column per person. It ends at a blank column or at a «Total Revenue» column, which must equal the month's Total Revenue. It loads every `YYYY-MM` row before the start month and checks the rest of the sheet before anything is written:
 - staff revenue adds up to Total Revenue;
 - Net Operating Profit = Salon Retained Share − Overhead Expenses − Manager Salary;
 - Total Salon Expenses = overhead + salary;

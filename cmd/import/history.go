@@ -27,7 +27,8 @@ import (
 //
 // The tab has a header row starting with «Month» and the figure columns
 // below; to its right a second «Month» column starts the staff block, one
-// column per person. Rows whose first cell is a month (YYYY-MM) are loaded,
+// column per person, ending at a blank column or a «Total…» column (checked
+// against Total Revenue). Rows whose first cell is a month (YYYY-MM) are loaded,
 // except blank ones; the «Total» row must equal the sum of the loaded months.
 
 // historyCmd is `import history`: flags, the file and the Firestore store.
@@ -257,7 +258,21 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 	if staffAt < 0 {
 		return nil, nil, errors.New("the header has no staff block (a second «Month» column followed by one column per person)")
 	}
-	people, err := staffColumns(ctx, st, header[staffAt+1:], names)
+	// The staff block ends at a blank column or at its own «Total…» column,
+	// which must equal the month's Total Revenue.
+	staffHeader, staffTotalAt := header[staffAt+1:], -1
+	for i, h := range staffHeader {
+		h = strings.TrimSpace(h)
+		if h == "" {
+			staffHeader = staffHeader[:i]
+			break
+		}
+		if strings.HasPrefix(strings.ToLower(h), "total") {
+			staffHeader, staffTotalAt = staffHeader[:i], staffAt+1+i
+			break
+		}
+	}
+	people, err := staffColumns(ctx, st, staffHeader, names)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -336,6 +351,16 @@ func parseTrend(ctx context.Context, st *store.Store, records [][]string, names 
 				f.RevenueByPerson[person.ID] += c
 			}
 			staff += c
+		}
+		if staffTotalAt >= 0 {
+			raw := cell(rec, staffTotalAt)
+			got, err := sheetAmount(raw)
+			if blankCell(raw) || err != nil {
+				return nil, nil, fmt.Errorf("line %d: the staff block's Total Revenue %q is not an amount", line, raw)
+			}
+			if got != f.RevenueTotal {
+				return nil, nil, fmt.Errorf("line %d: %s the staff block's Total Revenue %s is not the Total Revenue %s", line, m, domain.FormatEUR(got), domain.FormatEUR(f.RevenueTotal))
+			}
 		}
 		if staff != f.RevenueTotal {
 			return nil, nil, fmt.Errorf("line %d: %s staff revenue adds up to %s, not the Total Revenue %s", line, m, domain.FormatEUR(staff), domain.FormatEUR(f.RevenueTotal))
