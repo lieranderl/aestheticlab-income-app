@@ -137,7 +137,9 @@ func TestCategoryPageShowsGuidanceForFixedCategories(t *testing.T) {
 		"Базовую категорию нельзя архивировать или удалить. Новое название видно в категориях и отчётах за день, но не в форме записи клиента.")
 }
 
-func TestDateSwitcherProvidesAccessibleCalendarPicker(t *testing.T) {
+// iOS WebKit (Safari and Chrome alike) ignores showPicker() on a hidden date
+// input, so the input itself must sit on top and take the tap.
+func TestDateSwitcherDateInputTakesTheTap(t *testing.T) {
 	s := newSite(t)
 	olga := s.login("olga", olgaPass)
 	page := s.get("/", olga)
@@ -145,16 +147,15 @@ func TestDateSwitcherProvidesAccessibleCalendarPicker(t *testing.T) {
 		t.Fatalf("get /: %d", page.Code)
 	}
 	body := page.Body.String()
-	if !strings.Contains(body, `aria-label="Выбрать день"`) {
-		t.Fatal("date switcher button missing aria-label")
+	if !strings.Contains(body, `type="date" name="date"`) || !strings.Contains(body, `class="date-overlay peer absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none text-base opacity-0" aria-label="Выбрать день"`) {
+		t.Fatal("date switcher input is not the tappable overlay")
 	}
-	if !strings.Contains(body, `data-on:click="try { el.nextElementSibling.showPicker?.() } catch (_) {}"`) {
-		t.Fatal("date switcher button missing showPicker click trigger")
+	for _, stale := range []string{"pointer-events-none absolute inset-0 -z-10", "showPicker", `tabindex="-1" aria-label="Выбрать день"`} {
+		if strings.Contains(body, stale) {
+			t.Fatalf("date switcher still hides the input behind the label: %q", stale)
+		}
 	}
-	if !strings.Contains(body, `class="pointer-events-none absolute inset-0 -z-10 h-full w-full opacity-0"`) {
-		t.Fatal("date switcher date input missing non-blocking positioning")
-	}
-	if !strings.Contains(body, `tabindex="-1" aria-label="Выбрать день" data-on:input="el.value && (el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit())" data-on:change="el.value && (el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit())"`) {
-		t.Fatal("date switcher date input missing accessible label and input/change submission handlers")
+	if !strings.Contains(body, `data-on:input="el.value && el.form.submit()" data-on:change="el.value && el.form.submit()"`) {
+		t.Fatal("date switcher input missing input/change submission handlers")
 	}
 }

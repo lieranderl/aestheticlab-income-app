@@ -190,32 +190,29 @@ templ DailyPage(nav Nav, f ReportForm) {
 	}
 }
 
-// DateSwitcher is «‹ 20.11.2026 ›»; tapping the date opens the phone's picker.
+// DateSwitcher is «‹ 20.11.2026 ›». A transparent date input lies over the
+// label and takes the tap itself: iOS WebKit opens no picker for showPicker()
+// on a hidden input. The server clamps out-of-range days, so submit() skips
+// min/max validation that would otherwise swallow the pick silently.
 templ DateSwitcher(f ReportForm) {
 	<nav class="flex items-center justify-between gap-2 py-3" aria-label="Выбор дня">
 		@dayLink(f.Prev, "chevron-left", "Предыдущий день")
 		<form method="get" action={ templ.SafeURL(pickerAction(f)) } class="relative inline-flex items-center">
-			<button
-				type="button"
-				class="btn btn-ghost h-auto min-h-12 flex-col gap-0 px-4 py-1"
-				aria-label="Выбрать день"
-				data-on:click="try { el.nextElementSibling.showPicker?.() } catch (_) {}"
-			>
-				<span class="text-lg font-semibold">{ f.DayLabel }</span>
-				<span class="text-xs font-normal text-base-content/60">{ f.Weekday }</span>
-			</button>
 			<input
 				type="date"
 				name="date"
 				value={ f.Date }
 				min={ f.Min }
 				max={ f.Max }
-				class="pointer-events-none absolute inset-0 -z-10 h-full w-full opacity-0"
-				tabindex="-1"
+				class="date-overlay peer absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none text-base opacity-0"
 				aria-label="Выбрать день"
-				data-on:input="el.value && (el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit())"
-				data-on:change="el.value && (el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit())"
+				data-on:input="el.value && el.form.submit()"
+				data-on:change="el.value && el.form.submit()"
 			/>
+			<span class="btn btn-ghost pointer-events-none h-auto min-h-12 flex-col gap-0 px-4 py-1 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary" aria-hidden="true">
+				<span class="text-lg font-semibold">{ f.DayLabel }</span>
+				<span class="text-xs font-normal text-base-content/60">{ f.Weekday }</span>
+			</span>
 			<noscript><button type="submit" class="btn btn-sm">Открыть</button></noscript>
 		</form>
 		@dayLink(f.Next, "chevron-right", "Следующий день")

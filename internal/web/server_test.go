@@ -181,7 +181,7 @@ func TestServiceWorkerAndOfflinePageAreServed(t *testing.T) {
 	if allowed := sw.Header().Get("Service-Worker-Allowed"); allowed != "/" {
 		t.Errorf("sw.js Service-Worker-Allowed = %q, want /", allowed)
 	}
-	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v3") {
+	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v4") {
 		t.Errorf("sw.js body missing expected contents: %s", sw.Body.String())
 	}
 	// Pages load draft.js by a versioned URL the worker precaches, so a worker
