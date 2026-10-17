@@ -103,11 +103,11 @@ test("install precaches static assets and offline page", async () => {
 	await waitedPromise;
 
 	expect(h.getSkippedWaiting()).toBe(true);
-	expect(h.cacheStore.has("kassa-v3")).toBe(true);
-	const staticCache = h.cacheStore.get("kassa-v3");
+	expect(h.cacheStore.has("kassa-v4")).toBe(true);
+	const staticCache = h.cacheStore.get("kassa-v4");
 	expect(staticCache.has("/offline")).toBe(true);
 	expect(staticCache.has("/static/app.css")).toBe(true);
-	expect(staticCache.has("/static/app.css?v=2")).toBe(true);
+	expect(staticCache.has("/static/app.css?v=3")).toBe(true);
 	expect(staticCache.has("/static/datastar.js")).toBe(true);
 	expect(staticCache.has("/static/draft.js?v=3")).toBe(true);
 	expect(staticCache.has("/manifest.webmanifest")).toBe(true);
@@ -117,7 +117,7 @@ test("activate removes outdated caches and claims clients", async () => {
 	const h = harness();
 	h.cacheStore.set("old-cache-v0", new Map());
 	h.cacheStore.set("kassa-v1", new Map());
-	h.cacheStore.set("kassa-v3", new Map());
+	h.cacheStore.set("kassa-v4", new Map());
 
 	const activateFn = h.listeners.get("activate");
 	expect(activateFn).toBeDefined();
@@ -134,7 +134,7 @@ test("activate removes outdated caches and claims clients", async () => {
 	expect(h.getClaimedClients()).toBe(true);
 	expect(h.cacheStore.has("old-cache-v0")).toBe(false);
 	expect(h.cacheStore.has("kassa-v1")).toBe(false);
-	expect(h.cacheStore.has("kassa-v3")).toBe(true);
+	expect(h.cacheStore.has("kassa-v4")).toBe(true);
 });
 
 test("navigation request returns network response when online", async () => {
@@ -163,7 +163,7 @@ test("navigation request returns network response when online", async () => {
 test("navigation request falls back to /offline when offline", async () => {
 	const h = harness();
 	const offlineResponse = new Response("<html>offline</html>", { status: 200 });
-	const cache = await h.caches.open("kassa-v3");
+	const cache = await h.caches.open("kassa-v4");
 	await cache.put("/offline", offlineResponse);
 
 	const fetchFn = h.listeners.get("fetch");
@@ -190,7 +190,7 @@ test("navigation request falls back to /offline when offline", async () => {
 test("static assets are served cache-first and cached on network hit", async () => {
 	const h = harness();
 	const cachedCSS = new Response("css-content", { status: 200 });
-	const cache = await h.caches.open("kassa-v3");
+	const cache = await h.caches.open("kassa-v4");
 	await cache.put("https://kassa.example.com/static/app.css", cachedCSS);
 
 	const fetchFn = h.listeners.get("fetch");
