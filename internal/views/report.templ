@@ -192,7 +192,9 @@ templ DailyPage(nav Nav, f ReportForm) {
 
 // DateSwitcher is «‹ 20.11.2026 ›». A transparent date input lies over the
 // label and takes the tap itself: iOS WebKit opens no picker for showPicker()
-// on a hidden input. The server clamps out-of-range days, so submit() skips
+// on a hidden input. WebKit/Blink open it from the stretched calendar
+// indicator (app.css); Firefox has none, so a click there calls showPicker().
+// The server clamps out-of-range days, so submit() skips
 // min/max validation that would otherwise swallow the pick silently.
 templ DateSwitcher(f ReportForm) {
 	<nav class="flex items-center justify-between gap-2 py-3" aria-label="Выбор дня">
@@ -206,6 +208,7 @@ templ DateSwitcher(f ReportForm) {
 				max={ f.Max }
 				class="date-overlay peer absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none text-base opacity-0"
 				aria-label="Выбрать день"
+				data-on:click="try { CSS.supports('selector(::-webkit-calendar-picker-indicator)') || el.showPicker() } catch (_) {}"
 				data-on:input="el.value && el.form.submit()"
 				data-on:change="el.value && el.form.submit()"
 			/>

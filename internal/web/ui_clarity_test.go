@@ -150,7 +150,11 @@ func TestDateSwitcherDateInputTakesTheTap(t *testing.T) {
 	if !strings.Contains(body, `type="date" name="date"`) || !strings.Contains(body, `class="date-overlay peer absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none text-base opacity-0" aria-label="Выбрать день"`) {
 		t.Fatal("date switcher input is not the tappable overlay")
 	}
-	for _, stale := range []string{"pointer-events-none absolute inset-0 -z-10", "showPicker", `tabindex="-1" aria-label="Выбрать день"`} {
+	// Firefox has no calendar indicator to stretch, so a click opens the picker.
+	if !strings.Contains(body, `aria-label="Выбрать день" data-on:click="try { CSS.supports('selector(::-webkit-calendar-picker-indicator)') || el.showPicker() } catch (_) {}"`) {
+		t.Fatal("date switcher input missing the showPicker fallback for browsers without the calendar indicator")
+	}
+	for _, stale := range []string{"pointer-events-none absolute inset-0 -z-10", "nextElementSibling.showPicker", `tabindex="-1" aria-label="Выбрать день"`} {
 		if strings.Contains(body, stale) {
 			t.Fatalf("date switcher still hides the input behind the label: %q", stale)
 		}
