@@ -64,8 +64,8 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	if terms, ok := history(entries).For(m); ok && status != domain.MonthClosed {
 		if p, ok := domain.SelfProgressFor(sum.SelfBase, terms); ok {
 			page.Progress, page.Reached = progressText(p, baseLabel(sum), anyHandSet(reports)), p.Reached
-			if p.Reached && page.Split.Self != "" {
-				page.Split.Note = "Без доплаты за ставку " + percent(p.HighPct) + ": она начислится при закрытии месяца."
+			if bonus := domain.SelfBonusFor(sum.SelfBase, sum.BonusBase, terms); bonus > 0 && page.Split.Self != "" {
+				page.Split.Note = "Без доплаты " + domain.FormatEUR(bonus) + " за ставку " + percent(p.HighPct) + ": она начислится при закрытии месяца."
 			}
 		}
 	}
@@ -141,11 +141,15 @@ func progressText(p domain.SelfProgress, label string, handSet bool) string {
 // baseLabel names what the «Себе» base adds up: services only for client
 // entries, but legacy days may count other categories too.
 func baseLabel(s domain.Summary) string {
-	if s.SelfBase == s.ByCategory["services"] {
+	if servicesOnly(s) {
 		return "Услуги за месяц"
 	}
 	return "Услуги и продажи для «Себе» за месяц"
 }
+
+// servicesOnly is whether the «Себе» base is just services, as for client
+// entries; legacy days may have counted creams, oil or other sales too.
+func servicesOnly(s domain.Summary) bool { return s.SelfBase == s.ByCategory["services"] }
 
 func anyHandSet(rs []store.SavedReport) bool {
 	for _, r := range rs {
