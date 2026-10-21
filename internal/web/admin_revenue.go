@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/ru"
@@ -54,6 +53,9 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	legacySum := domain.Summarize(personReports(legacy))
 	sum := domain.Summarize(personReports(reports))
+	// A closed month's reports are locked, so the live kassa total matches a
+	// statsVersion=1 snapshot and still exists for an old one without it.
+	actual := actualRows(sum.KassaCash+sum.KassaCard, sum.CashKept, 0, false)
 	if month.Snapshot != nil {
 		frozen := month.Snapshot.Result
 		sum.Clients = frozen.Clients
@@ -67,10 +69,11 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 		Payments:   categoryRows(cats, store.KindPayment, legacySum.ByPayment),
 		Closed:     month.Status == domain.MonthClosed,
 	}
-	p.Figures = append(withRevenueCategories(p.Figures, cats, sum.ByCategory), actualRows(sum.KassaCash+sum.KassaCard, sum.CashKept, 0, false)...)
+	p.Figures = withRevenueCategories(p.Figures, cats, sum.ByCategory)
 	if month.Snapshot != nil && month.Snapshot.Result.StatsVersion < 1 {
 		p.Figures = removeUnavailableClientStats(p.Figures)
 	}
+	p.Figures = append(p.Figures, actual...)
 	if prev := m.Prev(); !prev.Before(start) {
 		p.Prev = "/admin/month?m=" + prev.String()
 	}
@@ -81,7 +84,6 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 		if s, ok := sum.People[person.ID]; ok {
 			personSum := domain.Summarize(personReports(reportsForPerson(reports, person.ID)))
 			detail := withRevenueCategories(summaryFigures(personSum, true), cats, personSum.ByCategory)
-			detail = append(detail, actualRows(personSum.KassaCash+personSum.KassaCard, s.CashKept, s.BalanceDelta, true)...)
 			actual := actualRows(personSum.KassaCash+personSum.KassaCard, s.CashKept, s.BalanceDelta, true)
 			clients := strconv.Itoa(s.Clients)
 			if month.Snapshot != nil {
@@ -91,8 +93,6 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 					clients = ""
 				} else {
 					detail = withRevenueCategories(clientSummary(domain.Summary{Clients: pr.Clients, Total: pr.Revenue, ByCategory: pr.RevenueByCategory, CertificateSales: pr.RevenueByCategory["certificates"], KassaCash: pr.KassaCash, KassaCard: pr.KassaCard}), cats, pr.RevenueByCategory)
-					actual = actualRows(pr.KassaCash+pr.KassaCard, s.CashKept, s.BalanceDelta, true)
-					detail = append(detail, actual...)
 					clients = strconv.Itoa(pr.Clients)
 				}
 			}
@@ -312,9 +312,17 @@ func reportCard(rep store.SavedReport, users []store.User, cats []store.Category
 // recordActual is one record's money as it moved: «В кассу €427 · себе
 // наличными €100 · салон должен €113,50».
 func recordActual(r domain.Report) string {
-	settle := settleRow(r.BalanceDelta)
-	return "В кассу " + domain.FormatEUR(r.CashToKassa+r.CardIn+r.TransferToCard) + " · себе наличными " + domain.FormatEUR(r.CashKept()) +
-		" · " + strings.ToLower(strings.TrimPrefix(settle.Name, "По записям: ")) + " " + settle.Value
+	s := "В кассу " + domain.FormatEUR(r.CashToKassa+r.CardIn+r.TransferToCard) + " · себе наличными " + domain.FormatEUR(r.CashKept())
+	if r.Prepaid > 0 {
+		s += " · сертификатом " + domain.FormatEUR(r.Prepaid)
+	}
+	switch {
+	case r.BalanceDelta > 0:
+		return s + " · салон должен " + domain.FormatEUR(r.BalanceDelta)
+	case r.BalanceDelta < 0:
+		return s + " · долг перед салоном " + domain.FormatEUR(-r.BalanceDelta)
+	}
+	return s + " · без долга"
 }
 
 func categoryRows(cats []store.Category, kind store.CategoryKind, sums map[string]domain.Cents) []views.MoneyRow {

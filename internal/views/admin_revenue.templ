@@ -134,6 +134,7 @@ templ RevenueDetails(rows []MoneyRow, period string) {
 	if contributions := namedMoneyRows(rows, actualNames...); len(contributions) > 0 {
 		if len(namedMoneyRows(rows, "Оставили себе наличными")) > 0 {
 			@breakdown("Деньги по факту за " + period, contributions)
+			<p class="-mt-2 px-1 text-sm text-base-content/60">По записям клиентов. Взносы, выплаты и расходы — в разделе «Касса».</p>
 		} else {
 			@breakdown("Внесено в кассу за " + period, contributions)
 		}
