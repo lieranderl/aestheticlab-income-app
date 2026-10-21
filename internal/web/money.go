@@ -66,6 +66,20 @@ func moneyView(s domain.Summary, period string, who audience) views.MoneyView {
 	return v
 }
 
+// freezeShares replaces the expected shares of a closed month with the
+// figures its snapshot froze.
+func freezeShares(v *views.MoneyView, revenue, self, salon domain.Cents, who audience) {
+	label := "«Себе»"
+	switch who {
+	case ownMoney:
+		label = "Ваши «Себе»"
+	case salonMoney:
+		label = "«Себе» сотрудников"
+	}
+	v.Expected = []views.MoneyLine{{Name: "Выручка", Value: domain.FormatEUR(revenue)}, {Name: label, Value: domain.FormatEUR(self)}, {Name: "«Салону»", Value: domain.FormatEUR(salon)}}
+	v.Explain, v.Frozen = "", true
+}
+
 // salonStatus states both sides of the salon's open debts; opposite debts
 // of different people never cancel out.
 func salonStatus(toStaff, toSalon domain.Cents) (string, int) {

@@ -49,8 +49,9 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		return
 	}
 	if status == domain.MonthClosed {
-		// The frozen settlement replaces what was expected; keep only the fact.
-		page.Money.Expected, page.Money.Explain = nil, ""
+		if page.Money.Status != "" {
+			freezeShares(&page.Money, own.Revenue, own.Self, own.SalonShare(), ownMoney)
+		}
 		page.Details = nil
 		if own.StatsVersion >= 1 {
 			page.Details = append(clientSummary(domain.Summary{Clients: own.Clients, Total: own.Revenue, ByCategory: own.RevenueByCategory, CertificateSales: own.RevenueByCategory["certificates"], KassaCash: own.KassaCash, KassaCard: own.KassaCard}),

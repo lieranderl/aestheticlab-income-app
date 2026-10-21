@@ -61,6 +61,9 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	if month.Snapshot != nil {
 		frozen := month.Snapshot.Result
+		if money.Status != "" {
+			freezeShares(&money, frozen.Revenue, frozen.Self, frozen.SalonShare(), salonMoney)
+		}
 		sum.Clients = frozen.Clients
 		sum.KassaCash = frozen.KassaCash
 		sum.KassaCard = frozen.KassaCard
@@ -97,9 +100,14 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 					clients = strconv.Itoa(pr.Clients)
 				}
 			}
+			personMoney := moneyView(personSum, "месяца", staffMoney)
+			if month.Snapshot != nil {
+				pr := month.Snapshot.Result.People[person.ID]
+				freezeShares(&personMoney, pr.Revenue, pr.Self, pr.SalonShare(), staffMoney)
+			}
 			p.People = append(p.People, views.MonthPerson{
 				Name: person.DisplayName, Days: strconv.Itoa(s.WorkingDays), Clients: clients, Details: detail,
-				Money: moneyView(personSum, "месяца", staffMoney),
+				Money: personMoney,
 			})
 		}
 	}
@@ -179,8 +187,10 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 		dayForm.Locked = "Отчёты принимаются с " + ru.Date(a.store.StartMonth().FirstDay().Time())
 	}
 	p := views.AdminDay{Date: dayForm, Figures: withRevenueCategories(summaryFigures(sum, true), cats, sum.ByCategory)}
+	closed := err == nil && month.Status == domain.MonthClosed
 	if len(reports) > 0 {
 		p.Money = moneyView(sum, "дня", salonMoney)
+		p.Money.Frozen = closed // saved records are frozen; in a closed month they are final
 	}
 	if r.URL.Query().Get("removed") == "1" {
 		p.Notice = "Клиент удалён"
@@ -194,7 +204,9 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 		}
 		if len(own) > 0 {
 			ownSum := domain.Summarize(personReports(own))
-			p.People = append(p.People, views.DayPerson{Name: person.DisplayName, Money: moneyView(ownSum, "дня", staffMoney), Details: withRevenueCategories(summaryFigures(ownSum, true), cats, ownSum.ByCategory)})
+			personMoney := moneyView(ownSum, "дня", staffMoney)
+			personMoney.Frozen = closed
+			p.People = append(p.People, views.DayPerson{Name: person.DisplayName, Money: personMoney, Details: withRevenueCategories(summaryFigures(ownSum, true), cats, ownSum.ByCategory)})
 		}
 	}
 	for _, rep := range reports {

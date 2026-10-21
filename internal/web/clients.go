@@ -52,6 +52,9 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 	var dayMoney views.MoneyView
 	if len(selected) > 0 {
 		dayMoney = moneyView(sum, "дня", ownMoney)
+		if month, err := a.store.Month(r.Context(), day.Month()); err == nil && month.Status == domain.MonthClosed {
+			dayMoney.Frozen = true // saved records are frozen; in a closed month they are final
+		}
 	}
 	picker := dayPicker(a, day, "/")
 	if dc, err := a.loadDay(r.Context(), u, day); err == nil {

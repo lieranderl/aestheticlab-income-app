@@ -17,6 +17,7 @@ type MoneyView struct {
 	Fact        []MoneyLine
 	Expected    []MoneyLine
 	Explain     string // how the expected share meets the fact
+	Frozen      bool   // a closed month: the shares are final, not expected
 }
 
 // MoneyPanel is the full period view: status, «Факт», «Ожидается».
@@ -31,7 +32,7 @@ templ MoneyPanel(v MoneyView) {
 		</section>
 		@factCard(v.Fact)
 		if len(v.Expected) > 0 {
-			@expectedCard(v.Expected, v.Explain)
+			@expectedCard(v.Expected, v.Explain, v.Frozen)
 		}
 	}
 }
@@ -51,14 +52,23 @@ templ factCard(lines []MoneyLine) {
 	</section>
 }
 
-templ expectedCard(lines []MoneyLine, explain string) {
+templ expectedCard(lines []MoneyLine, explain string, frozen bool) {
 	<section class="rounded-box border border-dashed border-base-content/50 p-4 text-sm" aria-labelledby="expected-title">
 		<div class="mb-2 flex items-center justify-between gap-2 text-base-content/70">
 			<h2 id="expected-title" class="flex items-center gap-2 text-base font-semibold">
-				@Icon("calculator", "size-5")
-				Доли по ставке
+				if frozen {
+					@Icon("lock", "size-5")
+					Зафиксировано при закрытии
+				} else {
+					@Icon("calculator", "size-5")
+					Доли по ставке
+				}
 			</h2>
-			<span class="badge badge-ghost border-dashed border-base-content/50">Ожидается</span>
+			if frozen {
+				<span class="badge badge-neutral badge-soft">Закрыто</span>
+			} else {
+				<span class="badge badge-ghost border-dashed border-base-content/50">Ожидается</span>
+			}
 		</div>
 		@moneyLines(lines, true)
 		if explain != "" {
@@ -96,7 +106,13 @@ templ PersonMoneyCard(name string, v MoneyView, details []MoneyRow, period strin
 				@moneyLines(v.Fact, false)
 			</div>
 			<div class="border-t border-dashed border-base-content/50 pt-3">
-				<p class="mb-1 text-sm font-semibold text-base-content/70">Ожидается</p>
+				<p class="mb-1 text-sm font-semibold text-base-content/70">
+					if v.Frozen {
+						Зафиксировано при закрытии
+					} else {
+						Ожидается
+					}
+				</p>
 				@moneyLines(v.Expected, true)
 			</div>
 			if len(details) > 0 {
