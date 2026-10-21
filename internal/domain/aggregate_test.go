@@ -201,3 +201,21 @@ func TestASummarysCashKeptPlusBalanceAlwaysEqualsSelf(t *testing.T) {
 		}
 	}
 }
+
+// Opposite debts never cancel out: the salon owing Maria €70 and Olga owing
+// the salon €70 is two open debts, not «всё сдано».
+func TestTheSalonsOpenDebtsAreSummedPerSideNotNetted(t *testing.T) {
+	maria, err := domain.NewClientReport("maria", date(t, "2026-11-20"), domain.ClientInput{Services: 10000, CertificatePaid: 10000}, 7000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	olga, err := domain.NewClientReport("olga", date(t, "2026-11-20"), domain.ClientInput{Services: 10000}, 3000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := domain.Summarize([]domain.PersonReport{maria, olga})
+	toStaff, toSalon := s.OpenDebts()
+	if s.BalanceDelta != 0 || toStaff != 7000 || toSalon != 7000 {
+		t.Errorf("net %d, salon owes %d, staff owe %d; want 0, 70, 70", s.BalanceDelta, toStaff, toSalon)
+	}
+}

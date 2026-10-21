@@ -13,8 +13,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
-	"github.com/lieranderl/aestheticlab-income-app/static"
 	"github.com/lieranderl/aestheticlab-income-app/internal/web"
+	"github.com/lieranderl/aestheticlab-income-app/static"
 )
 
 // get serves one GET request; a recorder needs no body to close.

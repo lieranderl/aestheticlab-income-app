@@ -34,7 +34,7 @@ templ MyPage(nav Nav, m MyMonth) {
 		@PageHeader("Мои записи", "")
 		<div class="flex flex-col gap-4">
 			@Alert("", m.Notice)
-			<section class="card bg-base-100"><div class="card-body p-4"><div class="flex items-center justify-between gap-2"><h2 class="font-semibold">Текущий баланс</h2><span class="badge badge-info badge-soft">Сейчас</span></div><p class={ "text-lg", templ.KV("text-success",m.BalanceSign>0), templ.KV("text-error",m.BalanceSign<0) }>{ m.Balance }</p><p class="text-sm text-base-content/60">На { m.AsOf }</p></div></section>
+			<section class="card bg-base-100"><div class="card-body p-4"><div class="flex items-center justify-between gap-2"><h2 class="font-semibold">Текущий баланс</h2><span class="badge badge-neutral badge-soft">Сейчас</span></div><p class={ "text-lg", templ.KV("text-success",m.BalanceSign>0), templ.KV("text-error",m.BalanceSign<0) }>{ m.Balance }</p><p class="text-sm text-base-content/60">На { m.AsOf }</p></div></section>
 			@MovementSheet(m.MovementForm)
 			@MonthSwitcher(m.Month, m.Prev, m.Next)
 			@MoneyPanel(m.Money)
@@ -91,7 +91,7 @@ templ myReportCard(r MyReport) {
 				@statusChip(r.Status, r.Owed)
 			</div>
 			<p class="text-sm">{ r.Fact }</p>
-			<p class="text-sm text-base-content/60">{ r.Expected }</p>
+			<p class="text-sm text-base-content/70">{ r.Expected }</p>
 			if r.Href != "" {
 				<div class="card-actions justify-end">
 					<a href={ templ.SafeURL(r.Href) } class="btn btn-ghost btn-sm min-h-11">

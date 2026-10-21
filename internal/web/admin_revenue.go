@@ -55,7 +55,10 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 	sum := domain.Summarize(personReports(reports))
 	// A closed month's reports are locked, so the live money view matches a
 	// statsVersion=1 snapshot and still exists for an old one without it.
-	money := moneyView(sum, "месяца", salonMoney)
+	var money views.MoneyView
+	if len(reports) > 0 {
+		money = moneyView(sum, "месяца", salonMoney)
+	}
 	if month.Snapshot != nil {
 		frozen := month.Snapshot.Result
 		sum.Clients = frozen.Clients
@@ -175,7 +178,10 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 	} else if day.Month().Before(a.store.StartMonth()) {
 		dayForm.Locked = "Отчёты принимаются с " + ru.Date(a.store.StartMonth().FirstDay().Time())
 	}
-	p := views.AdminDay{Date: dayForm, Figures: withRevenueCategories(summaryFigures(sum, true), cats, sum.ByCategory), Money: moneyView(sum, "дня", salonMoney)}
+	p := views.AdminDay{Date: dayForm, Figures: withRevenueCategories(summaryFigures(sum, true), cats, sum.ByCategory)}
+	if len(reports) > 0 {
+		p.Money = moneyView(sum, "дня", salonMoney)
+	}
 	if r.URL.Query().Get("removed") == "1" {
 		p.Notice = "Клиент удалён"
 	}

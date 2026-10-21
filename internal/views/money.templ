@@ -13,7 +13,7 @@ type MoneyView struct {
 	StatusLabel string // «Итог дня по записям»
 	Status      string // «Салон должен вам €113,50»
 	StatusNote  string
-	Tone        int // +1 the viewer is owed, −1 the viewer owes, 0 settled
+	Tone        int // +1 the salon owes the person(s), −1 they owe the salon, 0 settled or both
 	Fact        []MoneyLine
 	Expected    []MoneyLine
 	Explain     string // how the expected share meets the fact
@@ -22,7 +22,7 @@ type MoneyView struct {
 // MoneyPanel is the full period view: status, «Факт», «Ожидается».
 templ MoneyPanel(v MoneyView) {
 	if v.Status != "" {
-		<section role="status" aria-label={ v.StatusLabel } class={ "alert alert-soft flex flex-col items-start gap-1", templ.KV("alert-success", v.Tone > 0), templ.KV("alert-warning", v.Tone < 0), templ.KV("alert-info", v.Tone == 0) }>
+		<section aria-label={ v.StatusLabel } class={ "alert alert-soft flex flex-col items-start gap-1", templ.KV("alert-success", v.Tone > 0), templ.KV("alert-warning", v.Tone < 0), templ.KV("alert-info", v.Tone == 0) }>
 			<span class="text-sm">{ v.StatusLabel }</span>
 			<strong class="text-xl font-semibold">{ v.Status }</strong>
 			if v.StatusNote != "" {
@@ -30,19 +30,21 @@ templ MoneyPanel(v MoneyView) {
 			}
 		</section>
 		@factCard(v.Fact)
-		@expectedCard(v.Expected, v.Explain)
+		if len(v.Expected) > 0 {
+			@expectedCard(v.Expected, v.Explain)
+		}
 	}
 }
 
 templ factCard(lines []MoneyLine) {
-	<section class="card bg-base-100 shadow-sm" aria-label="Факт">
+	<section class="card bg-base-100 shadow-sm" aria-labelledby="fact-title">
 		<div class="card-body gap-2 p-4">
 			<div class="flex items-center justify-between gap-2">
-				<h2 class="flex items-center gap-2 font-semibold">
+				<h2 id="fact-title" class="flex items-center gap-2 font-semibold">
 					@Icon("wallet", "size-5")
 					Деньги по записям
 				</h2>
-				<span class="badge badge-info badge-soft">Факт</span>
+				<span class="badge badge-neutral badge-soft">Факт</span>
 			</div>
 			@moneyLines(lines, false)
 		</div>
@@ -50,17 +52,17 @@ templ factCard(lines []MoneyLine) {
 }
 
 templ expectedCard(lines []MoneyLine, explain string) {
-	<section class="rounded-box border border-dashed border-base-content/30 p-4 text-sm" aria-label="Ожидается">
+	<section class="rounded-box border border-dashed border-base-content/50 p-4 text-sm" aria-labelledby="expected-title">
 		<div class="mb-2 flex items-center justify-between gap-2 text-base-content/70">
-			<h2 class="flex items-center gap-2 text-base font-semibold">
+			<h2 id="expected-title" class="flex items-center gap-2 text-base font-semibold">
 				@Icon("calculator", "size-5")
 				Доли по ставке
 			</h2>
-			<span class="badge badge-ghost border-dashed border-base-content/30">Ожидается</span>
+			<span class="badge badge-ghost border-dashed border-base-content/50">Ожидается</span>
 		</div>
 		@moneyLines(lines, true)
 		if explain != "" {
-			<p class="mt-2 text-sm text-base-content/60">{ explain }</p>
+			<p class="mt-2 text-sm text-base-content/70">{ explain }</p>
 		}
 	</section>
 }
@@ -93,7 +95,7 @@ templ PersonMoneyCard(name string, v MoneyView, details []MoneyRow, period strin
 				<p class="mb-1 flex items-center gap-2 text-sm font-semibold">Факт</p>
 				@moneyLines(v.Fact, false)
 			</div>
-			<div class="border-t border-dashed border-base-content/30 pt-3">
+			<div class="border-t border-dashed border-base-content/50 pt-3">
 				<p class="mb-1 text-sm font-semibold text-base-content/70">Ожидается</p>
 				@moneyLines(v.Expected, true)
 			</div>

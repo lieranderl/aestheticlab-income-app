@@ -49,6 +49,10 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 		{Name: "«Салону»", Value: domain.FormatEUR(sum.SalonShare)},
 		{Name: "Оплачено сертификатами", Value: domain.FormatEUR(sum.Prepaid)},
 	}...)
+	var dayMoney views.MoneyView
+	if len(selected) > 0 {
+		dayMoney = moneyView(sum, "дня", ownMoney)
+	}
 	picker := dayPicker(a, day, "/")
 	if dc, err := a.loadDay(r.Context(), u, day); err == nil {
 		picker.Locked = dc.form(nil).Locked
@@ -57,7 +61,7 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 	if r.URL.Query().Get("removed") == "1" {
 		notice = "Клиент удалён"
 	}
-	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, moneyView(sum, "дня", ownMoney), notice))
+	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, dayMoney, notice))
 }
 
 func clientSummary(s domain.Summary) []views.MoneyRow {

@@ -27,6 +27,12 @@ function harness() {
 			const key = typeof req === "string" ? req : req.url;
 			this.items.set(key, res);
 		}
+		async keys() {
+			return Array.from(this.items.keys()).map((url) => ({ url }));
+		}
+		async delete(req) {
+			return this.items.delete(typeof req === "string" ? req : req.url);
+		}
 	}
 
 	const caches = {
@@ -39,10 +45,16 @@ function harness() {
 		async delete(name) {
 			return cacheStore.delete(name);
 		},
-		async match(req) {
+		async match(req, opts = {}) {
 			const key = typeof req === "string" ? req : req.url;
+			const bare = (u) => u.split("?")[0];
 			for (const store of cacheStore.values()) {
 				if (store.has(key)) return store.get(key);
+				if (opts.ignoreSearch) {
+					for (const [k, v] of store) {
+						if (bare(k) === bare(key)) return v;
+					}
+				}
 			}
 			return null;
 		},
@@ -247,4 +259,43 @@ test("non-GET requests are not intercepted", () => {
 	};
 	fetchFn(evt);
 	expect(called).toBe(false);
+});
+
+test("offline, a not-yet-cached stylesheet version falls back to the cached copy", async () => {
+	const h = harness();
+	const precached = new Response("old-css", { status: 200 });
+	const cache = await h.caches.open("kassa-v5");
+	await cache.put("https://kassa.example.com/static/app.css", precached);
+	h.scope.fetch = async () => {
+		throw new Error("Failed to fetch (offline)");
+	};
+	let respondedPromise;
+	h.listeners.get("fetch")({
+		request: { method: "GET", mode: "no-cors", url: "https://kassa.example.com/static/app.css?v=newhash" },
+		respondWith(p) {
+			respondedPromise = p;
+		},
+	});
+	expect(await respondedPromise).toBe(precached);
+});
+
+test("a new stylesheet version replaces the older versions in the cache", async () => {
+	const h = harness();
+	const cache = await h.caches.open("kassa-v5");
+	await cache.put("https://kassa.example.com/static/app.css?v=old", new Response("old"));
+	await cache.put("https://kassa.example.com/static/app.css", new Response("bare"));
+	h.scope.fetch = async () => new Response("new", { status: 200 });
+	let respondedPromise;
+	h.listeners.get("fetch")({
+		request: { method: "GET", mode: "no-cors", url: "https://kassa.example.com/static/app.css?v=new" },
+		respondWith(p) {
+			respondedPromise = p;
+		},
+	});
+	await respondedPromise;
+	await new Promise((r) => setTimeout(r, 10));
+	const keys = Array.from(h.cacheStore.get("kassa-v5").keys());
+	expect(keys).toContain("https://kassa.example.com/static/app.css?v=new");
+	expect(keys).not.toContain("https://kassa.example.com/static/app.css?v=old");
+	expect(keys).toContain("https://kassa.example.com/static/app.css"); // the offline fallback stays
 });

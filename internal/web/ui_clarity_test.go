@@ -33,11 +33,11 @@ func TestDashboardSeparatesPeriodContributionsFromCurrentSettlementBalance(t *te
 	page := s.get("/admin/month?m=2026-11", cookie)
 	wantPage(t, "grouped month", page, http.StatusOK, "Сверка месяца по записям", "Внесено в кассу", "Сертификаты", "€120", "€50", "€70", "€40")
 	body := page.Body.String()
-	status, fact, expected := strings.Index(body, `aria-label="Сверка месяца по записям"`), strings.Index(body, `aria-label="Факт"`), strings.Index(body, `aria-label="Ожидается"`)
+	status, fact, expected := strings.Index(body, `aria-label="Сверка месяца по записям"`), strings.Index(body, `aria-labelledby="fact-title"`), strings.Index(body, `aria-labelledby="expected-title"`)
 	if status < 0 || fact < status || expected < fact {
 		t.Fatal("the result, then the actual money, then the expected shares")
 	}
-	shares := regexp.MustCompile(`(?s)<section[^>]*aria-label="Ожидается"[^>]*>(.*?)</section>`).FindStringSubmatch(body)
+	shares := regexp.MustCompile(`(?s)<section[^>]*aria-labelledby="expected-title"[^>]*>(.*?)</section>`).FindStringSubmatch(body)
 	if len(shares) != 2 {
 		t.Fatal("missing expected shares region")
 	}
@@ -196,7 +196,7 @@ func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
 	anna := s.login("anna", annaPass)
 	res := s.get("/admin/month?m=2026-11", anna)
 	wantPage(t, "month", res, http.StatusOK, "Сверка месяца по записям", "Сотрудники должны салону €19",
-		"Ожидалось салону €546 · поступило €527 (из них сертификатами €100)", "Долг перед салоном €19")
+		"Ожидалось салону €546 · зачтено €527 (из них сертификатами €100)", "Долг перед салоном €19")
 	month := res.Body.String()
 	row(month, "Внесено в кассу", "€427")
 	row(month, "Наличными у сотрудников", "€465")
@@ -209,4 +209,30 @@ func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
 		"Факт: в кассу €427 · у сотрудника €100", "Ожидается: «Себе» €213,50 · «Салону» €313,50")
 	wantPage(t, "redeemed", s.get("/admin/day?date=2026-11-18", anna), http.StatusOK,
 		"Факт: в кассу €0 · у сотрудника €0 · сертификатом €100", "Салон должен €50")
+}
+
+func TestTheSalonHeadlineNeverNetsOppositeDebts(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.maria, 7000)
+	s.withTerms(s.olga, 3000)
+	for _, c := range []struct {
+		login string
+		pass  string
+		form  url.Values
+	}{
+		{"maria", mariaPass, url.Values{"token": {"opposite-debts-maria-token"}, "services": {"100"}, "certificatePaid": {"100"}}},
+		{"olga", olgaPass, url.Values{"token": {"opposite-debts-olga-token"}, "services": {"100"}}},
+	} {
+		c.form.Set("date", "2026-11-20")
+		c.form.Set("version", "0")
+		c.form.Set("extrasDestination", "cash")
+		if res := s.post("/clients", c.form, s.login(c.login, c.pass)); res.Code != http.StatusSeeOther {
+			t.Fatalf("save %s: %d %s", c.login, res.Code, res.Body.String())
+		}
+	}
+	page := s.get("/admin/day?date=2026-11-20", s.login("anna", annaPass))
+	wantPage(t, "both sides", page, http.StatusOK, "Салон должен сотрудникам €70 · сотрудники должны салону €70")
+	if strings.Contains(page.Body.String(), "Всё сдано") {
+		t.Error("opposite debts of two people read as settled")
+	}
 }

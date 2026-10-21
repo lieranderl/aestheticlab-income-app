@@ -82,7 +82,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<section class=\"card bg-base-100\"><div class=\"card-body p-4\"><div class=\"flex items-center justify-between gap-2\"><h2 class=\"font-semibold\">Текущий баланс</h2><span class=\"badge badge-info badge-soft\">Сейчас</span></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<section class=\"card bg-base-100\"><div class=\"card-body p-4\"><div class=\"flex items-center justify-between gap-2\"><h2 class=\"font-semibold\">Текущий баланс</h2><span class=\"badge badge-neutral badge-soft\">Сейчас</span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -111,7 +111,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(m.Balance)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 37, Col: 358}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 37, Col: 361}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -124,7 +124,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(m.AsOf)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 37, Col: 417}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 37, Col: 420}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -429,7 +429,7 @@ func myReportCard(r MyReport) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</p><p class=\"text-sm text-base-content/60\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</p><p class=\"text-sm text-base-content/70\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

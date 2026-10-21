@@ -32,7 +32,10 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	}
 	sum := domain.Summarize(personReports(reports))
 	page := views.MyMonth{
-		Month: monthLabel(m), Details: summaryFigures(sum, false), Money: moneyView(sum, "месяца", ownMoney),
+		Month: monthLabel(m), Details: summaryFigures(sum, false),
+	}
+	if len(reports) > 0 {
+		page.Money = moneyView(sum, "месяца", ownMoney)
 	}
 	if prev := m.Prev(); !prev.Before(start) {
 		page.Prev = "/my?m=" + prev.String()
@@ -46,6 +49,8 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		return
 	}
 	if status == domain.MonthClosed {
+		// The frozen settlement replaces what was expected; keep only the fact.
+		page.Money.Expected, page.Money.Explain = nil, ""
 		page.Details = nil
 		if own.StatsVersion >= 1 {
 			page.Details = append(clientSummary(domain.Summary{Clients: own.Clients, Total: own.Revenue, ByCategory: own.RevenueByCategory, CertificateSales: own.RevenueByCategory["certificates"], KassaCash: own.KassaCash, KassaCard: own.KassaCard}),

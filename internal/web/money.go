@@ -51,7 +51,8 @@ func moneyView(s domain.Summary, period string, who audience) views.MoneyView {
 	if who == salonMoney {
 		v.Expected = append(v.Expected, views.MoneyLine{Name: "«Салону»", Value: domain.FormatEUR(s.SalonShare)}, views.MoneyLine{Name: self, Value: domain.FormatEUR(s.Self)})
 		v.StatusLabel = "Сверка " + period + " по записям"
-		v.StatusNote = "Ожидалось салону " + domain.FormatEUR(s.SalonShare) + " · поступило " + domain.FormatEUR(s.KassaCredit)
+		v.Status, v.Tone = salonStatus(s.OpenDebts())
+		v.StatusNote = "Ожидалось салону " + domain.FormatEUR(s.SalonShare) + " · зачтено " + domain.FormatEUR(s.KassaCredit)
 		if s.Prepaid > 0 {
 			v.StatusNote += " (из них сертификатами " + domain.FormatEUR(s.Prepaid) + ")"
 		}
@@ -63,6 +64,20 @@ func moneyView(s domain.Summary, period string, who audience) views.MoneyView {
 		v.StatusNote = "Взносы и выплаты здесь не учтены — они в балансе."
 	}
 	return v
+}
+
+// salonStatus states both sides of the salon's open debts; opposite debts
+// of different people never cancel out.
+func salonStatus(toStaff, toSalon domain.Cents) (string, int) {
+	switch {
+	case toStaff > 0 && toSalon > 0:
+		return "Салон должен сотрудникам " + domain.FormatEUR(toStaff) + " · сотрудники должны салону " + domain.FormatEUR(toSalon), 0
+	case toStaff > 0:
+		return "Салон должен сотрудникам " + domain.FormatEUR(toStaff), 1
+	case toSalon > 0:
+		return "Сотрудники должны салону " + domain.FormatEUR(toSalon), -1
+	}
+	return "Всё сдано: долгов нет", 0
 }
 
 // statusText is what records leave between a person and the salon, worded
@@ -77,14 +92,6 @@ func statusText(delta domain.Cents, who audience) (string, int) {
 			return "Вы должны салону " + domain.FormatEUR(-delta), -1
 		}
 		return "Расчёт с салоном: €0", 0
-	case salonMoney:
-		switch {
-		case delta > 0:
-			return "Салон должен сотрудникам " + domain.FormatEUR(delta), 1
-		case delta < 0:
-			return "Сотрудники должны салону " + domain.FormatEUR(-delta), -1
-		}
-		return "Всё сдано: расчёт €0", 0
 	}
 	switch {
 	case delta > 0:

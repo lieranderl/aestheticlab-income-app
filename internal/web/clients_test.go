@@ -380,7 +380,7 @@ func TestTheDayAlwaysSeparatesActualMoneyFromExpectedShares(t *testing.T) {
 			token := tokens.Token()
 			if kind == html.StartTagToken && token.Data == "section" {
 				for _, a := range token.Attr {
-					if a.Key == "aria-label" && a.Val == label {
+					if (a.Key == "aria-label" || a.Key == "aria-labelledby") && a.Val == label {
 						active = true
 					}
 				}
@@ -398,7 +398,7 @@ func TestTheDayAlwaysSeparatesActualMoneyFromExpectedShares(t *testing.T) {
 	check := func(label, cash string) {
 		t.Helper()
 		body := s.get("/admin/day?date=2026-11-20", admin).Body.String()
-		fact, expected := section(body, "Факт"), section(body, "Ожидается")
+		fact, expected := section(body, "fact-title"), section(body, "expected-title")
 		for _, want := range []string{"В кассу — наличные", cash, "В кассу — карта салона", "Наличными у сотрудников"} {
 			if !strings.Contains(fact, want) {
 				t.Errorf("%s: «Факт» lacks %s", label, want)
@@ -419,7 +419,9 @@ func TestTheDayAlwaysSeparatesActualMoneyFromExpectedShares(t *testing.T) {
 			t.Errorf("%s lacks separate certificate activity", label)
 		}
 	}
-	check("empty day", "€0")
+	if body := s.get("/admin/day?date=2026-11-20", admin).Body.String(); strings.Contains(body, "fact-title") {
+		t.Error("an empty day shows a panel of zeros")
+	}
 	s.saveDay(s.olga, 20, map[string]domain.Cents{"services": 10000}, map[string]domain.Cents{"cash": 10000})
 	check("legacy only", "€30")
 	z := s.login("olga", olgaPass)

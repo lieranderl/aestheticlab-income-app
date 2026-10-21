@@ -67,13 +67,27 @@ self.addEventListener('fetch', (event) => {
 				if (cached) {
 					return cached;
 				}
-				return fetch(event.request).then((response) => {
-					if (response.ok) {
-						const copy = response.clone();
-						caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-					}
-					return response;
-				});
+				return fetch(event.request)
+					.then((response) => {
+						if (response.ok) {
+							const copy = response.clone();
+							caches.open(CACHE_NAME).then(async (cache) => {
+								// A content-versioned asset (?v=<hash>) replaces its older versions.
+								if (url.search) {
+									for (const old of await cache.keys()) {
+										const o = new URL(old.url);
+										if (o.pathname === url.pathname && o.search && o.search !== url.search) {
+											await cache.delete(old);
+										}
+									}
+								}
+								await cache.put(event.request, copy);
+							});
+						}
+						return response;
+					})
+					// Offline before this version was cached: any cached copy beats none.
+					.catch(() => caches.match(event.request, { ignoreSearch: true }));
 			}),
 		);
 		return;

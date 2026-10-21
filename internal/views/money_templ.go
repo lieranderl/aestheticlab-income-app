@@ -21,7 +21,7 @@ type MoneyView struct {
 	StatusLabel string // «Итог дня по записям»
 	Status      string // «Салон должен вам €113,50»
 	StatusNote  string
-	Tone        int // +1 the viewer is owed, −1 the viewer owes, 0 settled
+	Tone        int // +1 the salon owes the person(s), −1 they owe the salon, 0 settled or both
 	Fact        []MoneyLine
 	Expected    []MoneyLine
 	Explain     string // how the expected share meets the fact
@@ -55,14 +55,14 @@ func MoneyPanel(v MoneyView) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section role=\"status\" aria-label=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(v.StatusLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 25, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 25, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -138,9 +138,11 @@ func MoneyPanel(v MoneyView) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = expectedCard(v.Expected, v.Explain).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
+			if len(v.Expected) > 0 {
+				templ_7745c5c3_Err = expectedCard(v.Expected, v.Explain).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
 		}
 		return nil
@@ -168,7 +170,7 @@ func factCard(lines []MoneyLine) templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<section class=\"card bg-base-100 shadow-sm\" aria-label=\"Факт\"><div class=\"card-body gap-2 p-4\"><div class=\"flex items-center justify-between gap-2\"><h2 class=\"flex items-center gap-2 font-semibold\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<section class=\"card bg-base-100 shadow-sm\" aria-labelledby=\"fact-title\"><div class=\"card-body gap-2 p-4\"><div class=\"flex items-center justify-between gap-2\"><h2 id=\"fact-title\" class=\"flex items-center gap-2 font-semibold\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -176,7 +178,7 @@ func factCard(lines []MoneyLine) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, " Деньги по записям</h2><span class=\"badge badge-info badge-soft\">Факт</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, " Деньги по записям</h2><span class=\"badge badge-neutral badge-soft\">Факт</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -213,7 +215,7 @@ func expectedCard(lines []MoneyLine, explain string) templ.Component {
 			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<section class=\"rounded-box border border-dashed border-base-content/30 p-4 text-sm\" aria-label=\"Ожидается\"><div class=\"mb-2 flex items-center justify-between gap-2 text-base-content/70\"><h2 class=\"flex items-center gap-2 text-base font-semibold\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<section class=\"rounded-box border border-dashed border-base-content/50 p-4 text-sm\" aria-labelledby=\"expected-title\"><div class=\"mb-2 flex items-center justify-between gap-2 text-base-content/70\"><h2 id=\"expected-title\" class=\"flex items-center gap-2 text-base font-semibold\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -221,7 +223,7 @@ func expectedCard(lines []MoneyLine, explain string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " Доли по ставке</h2><span class=\"badge badge-ghost border-dashed border-base-content/30\">Ожидается</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " Доли по ставке</h2><span class=\"badge badge-ghost border-dashed border-base-content/50\">Ожидается</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -230,14 +232,14 @@ func expectedCard(lines []MoneyLine, explain string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if explain != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<p class=\"mt-2 text-sm text-base-content/60\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<p class=\"mt-2 text-sm text-base-content/70\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(explain)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 63, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 65, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -329,7 +331,7 @@ func moneyLines(lines []MoneyLine, muted bool) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(l.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 72, Col: 153}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 74, Col: 153}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -364,7 +366,7 @@ func moneyLines(lines []MoneyLine, muted bool) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(l.Value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 73, Col: 111}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 75, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -430,7 +432,7 @@ func statusChip(text string, tone int) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 81, Col: 211}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 83, Col: 211}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -473,7 +475,7 @@ func PersonMoneyCard(name string, v MoneyView, details []MoneyRow, period string
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 89, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/money.templ`, Line: 91, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -495,7 +497,7 @@ func PersonMoneyCard(name string, v MoneyView, details []MoneyRow, period string
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</div><div class=\"border-t border-dashed border-base-content/30 pt-3\"><p class=\"mb-1 text-sm font-semibold text-base-content/70\">Ожидается</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</div><div class=\"border-t border-dashed border-base-content/50 pt-3\"><p class=\"mb-1 text-sm font-semibold text-base-content/70\">Ожидается</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

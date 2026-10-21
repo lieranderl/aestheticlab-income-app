@@ -47,6 +47,19 @@ type Summary struct {
 	People           map[string]PersonSummary
 }
 
+// OpenDebts are what the records leave open between the salon and its
+// people, per side: one person's credit never cancels another's debt.
+func (s Summary) OpenDebts() (toStaff, toSalon Cents) {
+	for _, p := range s.People {
+		if p.BalanceDelta > 0 {
+			toStaff += p.BalanceDelta
+		} else {
+			toSalon -= p.BalanceDelta
+		}
+	}
+	return toStaff, toSalon
+}
+
 // Summarize adds up reports by category, payment method and person.
 func Summarize(reports []PersonReport) Summary {
 	s := Summary{ByCategory: map[string]Cents{}, ByPayment: map[string]Cents{}, People: map[string]PersonSummary{}}
