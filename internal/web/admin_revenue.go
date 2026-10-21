@@ -53,17 +53,23 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	legacySum := domain.Summarize(personReports(legacy))
 	sum := domain.Summarize(personReports(reports))
-	// A closed month's reports are locked, so the live kassa total matches a
+	// A closed month's reports are locked, so the live money view matches a
 	// statsVersion=1 snapshot and still exists for an old one without it.
-	actual := actualRows(sum.KassaCash+sum.KassaCard, sum.CashKept, 0, false)
+	var money views.MoneyView
+	if len(reports) > 0 {
+		money = moneyView(sum, "месяца", salonMoney)
+	}
 	if month.Snapshot != nil {
 		frozen := month.Snapshot.Result
+		if money.Status != "" {
+			freezeShares(&money, frozen.Revenue, frozen.Self, frozen.SalonShare(), salonMoney)
+		}
 		sum.Clients = frozen.Clients
 		sum.KassaCash = frozen.KassaCash
 		sum.KassaCard = frozen.KassaCard
 	}
 	p := views.AdminMonth{
-		Key: m.String(), Month: monthLabel(m), Figures: summaryFigures(sum, false),
+		Money: money, Key: m.String(), Month: monthLabel(m), Figures: summaryFigures(sum, false),
 		RecordsURL: "/admin/history?from=" + m.FirstDay().String() + "&to=" + m.LastDay().String(),
 		Categories: categoryRows(cats, store.KindRevenue, sum.ByCategory),
 		Payments:   categoryRows(cats, store.KindPayment, legacySum.ByPayment),
@@ -73,7 +79,6 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 	if month.Snapshot != nil && month.Snapshot.Result.StatsVersion < 1 {
 		p.Figures = removeUnavailableClientStats(p.Figures)
 	}
-	p.Figures = append(p.Figures, actual...)
 	if prev := m.Prev(); !prev.Before(start) {
 		p.Prev = "/admin/month?m=" + prev.String()
 	}
@@ -84,7 +89,6 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 		if s, ok := sum.People[person.ID]; ok {
 			personSum := domain.Summarize(personReports(reportsForPerson(reports, person.ID)))
 			detail := withRevenueCategories(summaryFigures(personSum, true), cats, personSum.ByCategory)
-			actual := actualRows(personSum.KassaCash+personSum.KassaCard, s.CashKept, s.BalanceDelta, true)
 			clients := strconv.Itoa(s.Clients)
 			if month.Snapshot != nil {
 				pr := month.Snapshot.Result.People[person.ID]
@@ -96,9 +100,14 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 					clients = strconv.Itoa(pr.Clients)
 				}
 			}
+			personMoney := moneyView(personSum, "месяца", staffMoney)
+			if month.Snapshot != nil {
+				pr := month.Snapshot.Result.People[person.ID]
+				freezeShares(&personMoney, pr.Revenue, pr.Self, pr.SalonShare(), staffMoney)
+			}
 			p.People = append(p.People, views.MonthPerson{
-				Name: person.DisplayName, Total: domain.FormatEUR(s.Total),
-				Self: domain.FormatEUR(s.Self), Salon: domain.FormatEUR(s.SalonShare), Days: strconv.Itoa(s.WorkingDays), Clients: clients, Details: detail, Actual: actual,
+				Name: person.DisplayName, Days: strconv.Itoa(s.WorkingDays), Clients: clients, Details: detail,
+				Money: personMoney,
 			})
 		}
 	}
@@ -177,7 +186,12 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 	} else if day.Month().Before(a.store.StartMonth()) {
 		dayForm.Locked = "Отчёты принимаются с " + ru.Date(a.store.StartMonth().FirstDay().Time())
 	}
-	p := views.AdminDay{Date: dayForm, Figures: append(withRevenueCategories(summaryFigures(sum, true), cats, sum.ByCategory), actualRows(sum.KassaCash+sum.KassaCard, sum.CashKept, 0, false)...)}
+	p := views.AdminDay{Date: dayForm, Figures: withRevenueCategories(summaryFigures(sum, true), cats, sum.ByCategory)}
+	closed := err == nil && month.Status == domain.MonthClosed
+	if len(reports) > 0 {
+		p.Money = moneyView(sum, "дня", salonMoney)
+		p.Money.Frozen = closed // saved records are frozen; in a closed month they are final
+	}
 	if r.URL.Query().Get("removed") == "1" {
 		p.Notice = "Клиент удалён"
 	}
@@ -190,7 +204,9 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 		}
 		if len(own) > 0 {
 			ownSum := domain.Summarize(personReports(own))
-			p.People = append(p.People, views.DayPerson{Name: person.DisplayName, Figures: append(withRevenueCategories(summaryFigures(ownSum, true), cats, ownSum.ByCategory), actualRows(ownSum.KassaCash+ownSum.KassaCard, ownSum.CashKept, ownSum.BalanceDelta, true)...)})
+			personMoney := moneyView(ownSum, "дня", staffMoney)
+			personMoney.Frozen = closed
+			p.People = append(p.People, views.DayPerson{Name: person.DisplayName, Money: personMoney, Details: withRevenueCategories(summaryFigures(ownSum, true), cats, ownSum.ByCategory)})
 		}
 	}
 	for _, rep := range reports {
@@ -233,28 +249,6 @@ func summaryFigures(s domain.Summary, day bool) []views.MoneyRow {
 	return rows
 }
 
-// actualRows are the money as it moved: paid into the kassa, kept in cash
-// and, for one person, what their records leave to settle with the salon.
-func actualRows(kassa, kept, delta domain.Cents, person bool) []views.MoneyRow {
-	rows := []views.MoneyRow{{Name: "Внесено в кассу", Value: domain.FormatEUR(kassa)}, {Name: "Оставили себе наличными", Value: domain.FormatEUR(kept)}}
-	if person {
-		rows = append(rows, settleRow(delta))
-	}
-	return rows
-}
-
-// settleRow is what records leave between one person and the salon, in
-// gender-neutral words for the admin.
-func settleRow(delta domain.Cents) views.MoneyRow {
-	switch {
-	case delta > 0:
-		return views.MoneyRow{Name: "По записям: салон должен", Value: domain.FormatEUR(delta)}
-	case delta < 0:
-		return views.MoneyRow{Name: "По записям: долг перед салоном", Value: domain.FormatEUR(-delta)}
-	}
-	return views.MoneyRow{Name: "По записям: расчёт", Value: "€0"}
-}
-
 func withRevenueCategories(rows []views.MoneyRow, cats []store.Category, sums map[string]domain.Cents) []views.MoneyRow {
 	for _, c := range cats {
 		if c.Kind != store.KindRevenue || sums[c.ID] == 0 {
@@ -295,11 +289,12 @@ func reportCard(rep store.SavedReport, users []store.User, cats []store.Category
 	r := rep.Report
 	card := views.AdminReport{
 		Client: rep.Client, Name: personName(users, rep.Person), Day: ru.Date(rep.Date.Time()) + " · " + clientLabel(rep),
-		Href:  "/admin/reports/" + rep.Person + "/" + rep.Date.String(),
-		Total: domain.FormatEUR(r.Total), Self: domain.FormatEUR(r.SelfAmount), Salon: domain.FormatEUR(r.SalonShare),
+		Href:        "/admin/reports/" + rep.Person + "/" + rep.Date.String(),
+		Total:       domain.FormatEUR(r.Total),
 		Details:     append(categoryRows(cats, store.KindRevenue, rep.Revenue), categoryRows(cats, store.KindPayment, rep.Payments)...),
-		CashToKassa: domain.FormatEUR(r.CashToKassa), TransferToCard: domain.FormatEUR(r.TransferToCard),
-		Actual: recordActual(r)}
+		CashToKassa: domain.FormatEUR(r.CashToKassa), TransferToCard: domain.FormatEUR(r.TransferToCard)}
+	card.Status, card.Tone = statusText(r.BalanceDelta, staffMoney)
+	card.Fact, card.Expected = recordLines(r, staffMoney)
 	if rep.Client {
 		card.Href = "/clients/" + rep.ID
 	}
@@ -307,22 +302,6 @@ func reportCard(rep store.SavedReport, users []store.User, cats []store.Category
 		card.Details = clientSummary(domain.Summarize([]domain.PersonReport{rep.PersonReport}))
 	}
 	return card
-}
-
-// recordActual is one record's money as it moved: «В кассу €427 · себе
-// наличными €100 · салон должен €113,50».
-func recordActual(r domain.Report) string {
-	s := "В кассу " + domain.FormatEUR(r.CashToKassa+r.CardIn+r.TransferToCard) + " · себе наличными " + domain.FormatEUR(r.CashKept())
-	if r.Prepaid > 0 {
-		s += " · сертификатом " + domain.FormatEUR(r.Prepaid)
-	}
-	switch {
-	case r.BalanceDelta > 0:
-		return s + " · салон должен " + domain.FormatEUR(r.BalanceDelta)
-	case r.BalanceDelta < 0:
-		return s + " · долг перед салоном " + domain.FormatEUR(-r.BalanceDelta)
-	}
-	return s + " · без долга"
 }
 
 func categoryRows(cats []store.Category, kind store.CategoryKind, sums map[string]domain.Cents) []views.MoneyRow {

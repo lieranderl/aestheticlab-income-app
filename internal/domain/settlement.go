@@ -72,6 +72,11 @@ type MonthResult struct {
 	People             map[string]PersonResult
 }
 
+// SalonShare is the month's «Салону»: revenue less «Себе».
+func (r MonthResult) SalonShare() Cents {
+	return r.Revenue - r.Self
+}
+
 // Closing is what closing a month writes: the result, the salary, «Себе»
 // bonus and dividend accruals, the closing balances and the terms used.
 type Closing struct {

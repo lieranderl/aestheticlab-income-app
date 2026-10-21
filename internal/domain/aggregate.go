@@ -39,11 +39,25 @@ type Summary struct {
 	Prepaid          Cents // paid with certificates
 	MoneyReceived    Cents // card + cash: new money, unlike certificate payments
 	CashKept         Cents // cash the person kept; CashKept + BalanceDelta == Self
+	KassaCredit      Cents // kassa cash + card + certificate payments; KassaCredit − SalonShare == BalanceDelta
 	BalanceDelta     Cents // + the salon owes the person, − the person owes the salon
 	ByCategory       map[string]Cents
 	ByPayment        map[string]Cents
 	WorkingDays      int
 	People           map[string]PersonSummary
+}
+
+// OpenDebts are what the records leave open between the salon and its
+// people, per side: one person's credit never cancels another's debt.
+func (s Summary) OpenDebts() (toStaff, toSalon Cents) {
+	for _, p := range s.People {
+		if p.BalanceDelta > 0 {
+			toStaff += p.BalanceDelta
+		} else {
+			toSalon -= p.BalanceDelta
+		}
+	}
+	return toStaff, toSalon
 }
 
 // Summarize adds up reports by category, payment method and person.
@@ -70,6 +84,7 @@ func Summarize(reports []PersonReport) Summary {
 		s.TransferToCard += r.TransferToCard
 		s.Prepaid += r.Prepaid
 		s.CashKept += r.CashKept()
+		s.KassaCredit += r.KassaCredit
 		s.BalanceDelta += r.BalanceDelta
 		for c, v := range pr.Revenue {
 			if v != 0 {

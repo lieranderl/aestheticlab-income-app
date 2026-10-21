@@ -2,14 +2,13 @@ package views
 
 // MyReport is one day's report card on «Мои записи».
 type MyReport struct {
-	Day    string // «пт, 20.11»
-	Href   string // the day on the daily form; "" for people who don't report
-	Total  string
-	Self   string
-	Salon  string
-	Effect string // what the day did to the balance, in words
-	Explain string // how a client record's «Себе» is made up; "" for legacy days
-	Owed   int    // +1 the salon owes the person, −1 the person owes the salon, 0 settled
+	Day      string // «пт, 20.11»
+	Href     string // the day on the daily form; "" for people who don't report
+	Total    string
+	Status   string // what the record leaves to settle: «Салон должен вам €113,50»
+	Owed     int    // +1 the salon owes the person, −1 the person owes the salon, 0 settled
+	Fact     string // «Факт: в кассу €427 · у вас €100»
+	Expected string // «Ожидается: «Себе» €213,50 · «Салону» €313,50»
 }
 
 // MyMonth is the person's month on «Мои записи» (system-design §6.4; the
@@ -23,14 +22,10 @@ type MyMonth struct {
 	MovementForm          MovementFormData
 	Month                 string // «Ноябрь 2026»
 	Prev, Next            string // the neighbouring months' links; "" when out of range
-	Total                 string
-	Self                  string
-	Salon                 string
-	WorkingDays           string // «2»
 	Progress              string // progress to the higher «Себе» rate, if the terms have one
 	Reached               bool
 	Reports               []MyReport
-	Split                 SelfSplit
+	Money                 MoneyView
 }
 
 // MyPage is «Мои записи».
@@ -39,10 +34,10 @@ templ MyPage(nav Nav, m MyMonth) {
 		@PageHeader("Мои записи", "")
 		<div class="flex flex-col gap-4">
 			@Alert("", m.Notice)
-			<section class="card bg-base-100"><div class="card-body p-4"><h2 class="font-semibold">Текущий баланс</h2><p class={ "text-lg", templ.KV("text-success",m.BalanceSign>0), templ.KV("text-error",m.BalanceSign<0) }>{ m.Balance }</p><p class="text-sm text-base-content/60">На { m.AsOf }</p></div></section>
+			<section class="card bg-base-100"><div class="card-body p-4"><div class="flex items-center justify-between gap-2"><h2 class="font-semibold">Текущий баланс</h2><span class="badge badge-neutral badge-soft">Сейчас</span></div><p class={ "text-lg", templ.KV("text-success",m.BalanceSign>0), templ.KV("text-error",m.BalanceSign<0) }>{ m.Balance }</p><p class="text-sm text-base-content/60">На { m.AsOf }</p></div></section>
 			@MovementSheet(m.MovementForm)
 			@MonthSwitcher(m.Month, m.Prev, m.Next)
-			@PersonRevenueSummary(myRevenueRows(m), "месяц", m.Split)
+			@MoneyPanel(m.Money)
  if len(m.ClosedFigures)>0 {
 				<section class="card bg-base-100"><div class="card-body p-4"><h2 class="font-semibold">Начислено при закрытии месяца</h2>@moneyRows(m.ClosedFigures)
 </div></section>
@@ -53,6 +48,7 @@ templ MyPage(nav Nav, m MyMonth) {
 					<span>{ m.Progress }</span>
 				</div>
 			}
+			@RevenueDetails(m.Details, "месяц")
 			<section class="flex flex-col gap-3" aria-label="Движения"><h2 class="text-lg font-semibold">Движения за месяц</h2>@movementCards(m.Movements)
 </section>
 			<section class="flex flex-col gap-3" aria-label="Отчёты">
@@ -65,18 +61,6 @@ templ MyPage(nav Nav, m MyMonth) {
 				}
 			</section>
 		</div>
-	}
-}
-
-func myRevenueRows(m MyMonth) []MoneyRow {
-	if len(m.Details) > 0 {
-		return m.Details
-	}
-	return []MoneyRow{
-		{Name: "Выручка", Value: m.Total},
-		{Name: "«Себе»", Value: m.Self},
-		{Name: "«Салону»", Value: m.Salon},
-		{Name: "Рабочие дни", Value: m.WorkingDays},
 	}
 }
 
@@ -98,16 +82,16 @@ templ figure(label, value string) {
 
 templ myReportCard(r MyReport) {
 	<article class="card bg-base-100 shadow-sm">
-		<div class="card-body gap-1 p-4">
+		<div class="card-body gap-2 p-4">
 			<div class="flex items-baseline justify-between gap-3">
 				<h3 class="font-semibold">{ r.Day }</h3>
 				<p class="text-lg font-semibold">{ r.Total }</p>
 			</div>
-			<p class="text-sm">«Себе» { r.Self } · «Салону» { r.Salon }</p>
-			<p class={ "text-sm", templ.KV("text-success", r.Owed > 0), templ.KV("text-error", r.Owed < 0), templ.KV("text-base-content/60", r.Owed == 0) }>{ r.Effect }</p>
-			if r.Explain != "" {
-				<p class="text-sm text-base-content/60">{ r.Explain }</p>
-			}
+			<div>
+				@statusChip(r.Status, r.Owed)
+			</div>
+			<p class="text-sm">{ r.Fact }</p>
+			<p class="text-sm text-base-content/70">{ r.Expected }</p>
 			if r.Href != "" {
 				<div class="card-actions justify-end">
 					<a href={ templ.SafeURL(r.Href) } class="btn btn-ghost btn-sm min-h-11">

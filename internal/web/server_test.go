@@ -1,6 +1,8 @@
 package web_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 	"github.com/lieranderl/aestheticlab-income-app/internal/web"
+	"github.com/lieranderl/aestheticlab-income-app/static"
 )
 
 // get serves one GET request; a recorder needs no body to close.
@@ -181,13 +184,28 @@ func TestServiceWorkerAndOfflinePageAreServed(t *testing.T) {
 	if allowed := sw.Header().Get("Service-Worker-Allowed"); allowed != "/" {
 		t.Errorf("sw.js Service-Worker-Allowed = %q, want /", allowed)
 	}
-	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v4") {
+	if !strings.Contains(sw.Body.String(), "/offline") || !strings.Contains(sw.Body.String(), "kassa-v5") {
 		t.Errorf("sw.js body missing expected contents: %s", sw.Body.String())
 	}
 	// Pages load draft.js by a versioned URL the worker precaches, so a worker
 	// from an older release (cache-first) can never answer it with a stale copy.
 	if !strings.HasPrefix(views.DraftScript, "/static/draft.js?v=") || !strings.Contains(sw.Body.String(), "'"+views.DraftScript+"'") {
 		t.Errorf("sw.js does not precache %s", views.DraftScript)
+	}
+
+	// The stylesheet's URL carries a hash of its content, so a cache-first
+	// worker misses on every new build instead of serving old CSS; nothing
+	// pins an old hand-numbered version.
+	css, _ := static.Files.ReadFile("app.css")
+	sum := sha256.Sum256(css)
+	if want := "/static/app.css?v=" + hex.EncodeToString(sum[:6]); views.StyleURL != want {
+		t.Errorf("StyleURL = %s, want %s", views.StyleURL, want)
+	}
+	if strings.Contains(sw.Body.String(), "app.css?v=") {
+		t.Error("sw.js pins a versioned stylesheet")
+	}
+	if page := get(t, h, "/login"); !strings.Contains(page.Body.String(), `href="`+views.StyleURL+`"`) {
+		t.Error("pages do not load the content-versioned stylesheet")
 	}
 
 	// 2. Offline fallback page is publicly served.

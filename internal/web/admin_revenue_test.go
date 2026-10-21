@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -234,6 +235,17 @@ func TestAdminEditsAnotherPersonsReportWithTheirTermsAndAudit(t *testing.T) {
 	}
 	wantPage(t, "closed admin form", s.get(path, anna), http.StatusOK, "Месяц закрыт — изменения недоступны")
 	wantPage(t, "closed admin day", s.get("/admin/day?date=2026-11-01", anna), http.StatusOK, "Месяц закрыт — изменения недоступны")
+	// A closed month's shares are final, never shown as still expected.
+	for label, page := range map[string]*httptest.ResponseRecorder{
+		"closed admin month": s.get("/admin/month?m=2026-11", anna),
+		"closed own month":   s.get("/my?m=2026-11", s.login("olga", olgaPass)),
+		"closed admin day":   s.get("/admin/day?date=2026-11-01", anna),
+	} {
+		wantPage(t, label, page, http.StatusOK, "Зафиксировано при закрытии", "€300", "€210")
+		if strings.Contains(page.Body.String(), ">Ожидается<") {
+			t.Errorf("%s labels final shares as expected", label)
+		}
+	}
 	values.Set("version", "2")
 	wantPage(t, "closed admin save", s.post(path, values, anna), http.StatusUnprocessableEntity, "Месяц закрыт — изменения недоступны")
 }

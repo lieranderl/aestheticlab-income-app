@@ -2,13 +2,12 @@
 // Caches versioned static assets and serves an offline fallback page when offline.
 // HTML and dynamic data always come from the network.
 
-const CACHE_NAME = 'kassa-v4';
+const CACHE_NAME = 'kassa-v5';
 const OFFLINE_URL = '/offline';
 
 const PRECACHE_ASSETS = [
 	OFFLINE_URL,
-	'/static/app.css',
-	'/static/app.css?v=3',
+	'/static/app.css', // pages load it by views.StyleURL (content hash), cached on first use
 	'/static/datastar.js',
 	'/static/draft.js?v=3', // views.DraftScript
 	'/static/icons/favicon.svg',
@@ -68,13 +67,27 @@ self.addEventListener('fetch', (event) => {
 				if (cached) {
 					return cached;
 				}
-				return fetch(event.request).then((response) => {
-					if (response.ok) {
-						const copy = response.clone();
-						caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-					}
-					return response;
-				});
+				return fetch(event.request)
+					.then((response) => {
+						if (response.ok) {
+							const copy = response.clone();
+							caches.open(CACHE_NAME).then(async (cache) => {
+								// A content-versioned asset (?v=<hash>) replaces its older versions.
+								if (url.search) {
+									for (const old of await cache.keys()) {
+										const o = new URL(old.url);
+										if (o.pathname === url.pathname && o.search && o.search !== url.search) {
+											await cache.delete(old);
+										}
+									}
+								}
+								await cache.put(event.request, copy);
+							});
+						}
+						return response;
+					})
+					// Offline before this version was cached: any cached copy beats none.
+					.catch(() => caches.match(event.request, { ignoreSearch: true }));
 			}),
 		);
 		return;
