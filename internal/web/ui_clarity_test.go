@@ -163,3 +163,29 @@ func TestDateSwitcherDateInputTakesTheTap(t *testing.T) {
 		t.Fatal("date switcher input missing input/change submission handlers")
 	}
 }
+
+// 2026-10-21: the admin saw only the expected split. Every admin period and
+// record now also shows the money as it moved: into the kassa, kept in cash,
+// and what each person's records leave to settle.
+func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 5000)
+	olga := s.login("olga", olgaPass)
+	for token, v := range map[string]url.Values{
+		"actual-cash-card-day-token": {"date": {"2026-11-19"}, "services": {"427"}, "serviceCard": {"327"}, "creams": {"100"}, "extrasDestination": {"kassa_card"}},
+		"actual-cash-cash-day-token": {"date": {"2026-11-20"}, "services": {"365"}, "extrasDestination": {"cash"}},
+	} {
+		v.Set("token", token)
+		v.Set("version", "0")
+		if res := s.post("/clients", v, olga); res.Code != http.StatusSeeOther {
+			t.Fatalf("save %s: %d %s", token, res.Code, res.Body.String())
+		}
+	}
+	anna := s.login("anna", annaPass)
+	wantPage(t, "month", s.get("/admin/month?m=2026-11", anna), http.StatusOK,
+		"Деньги по факту за месяц", "Внесено в кассу", "€427", "Оставили себе наличными", "€465",
+		"По записям: долг перед салоном", "€69")
+	wantPage(t, "day", s.get("/admin/day?date=2026-11-19", anna), http.StatusOK,
+		"Деньги по факту за день", "Оставили себе наличными", "€100", "По записям: салон должен", "€113,50",
+		"В кассу €427 · себе наличными €100")
+}

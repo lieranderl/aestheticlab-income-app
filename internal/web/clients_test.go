@@ -230,11 +230,11 @@ func TestClientMonthAndAuditDescribeActualContributionsOnly(t *testing.T) {
 	if strings.Contains(body, "По способам оплаты") {
 		t.Fatal("client month claims uncollected payment method breakdown")
 	}
-	desktop := strings.Split(body, `<div class="hidden overflow-x-auto rounded-box bg-base-100 lg:block">`)
-	if len(desktop) != 2 || !strings.Contains(desktop[1], "Клиенты") || !strings.Contains(desktop[1], "Касса — карта салона") {
-		t.Fatal("desktop omits client count or actual contribution details")
+	people := strings.Split(body, `<div class="grid gap-3 lg:grid-cols-2">`)
+	if len(people) != 2 || !strings.Contains(people[1], "Клиенты") || !strings.Contains(people[1], "Касса — карта салона") {
+		t.Fatal("person cards omit client count or actual contribution details")
 	}
-	phone := strings.Split(strings.Split(body, `<div class="flex flex-col gap-3 lg:hidden">`)[1], `<div class="hidden overflow-x-auto`)[0]
+	phone := strings.Split(people[1], `<a class="btn min-h-11"`)[0]
 	if strings.Count(phone, ">Выручка</dt>") != 1 {
 		t.Fatal("person month revenue duplicated")
 	}
@@ -416,7 +416,7 @@ func TestPrimaryDaySummaryAlwaysShowsActualKassaTotals(t *testing.T) {
 		}
 		contributions := ""
 		for _, section := range regexp.MustCompile(`(?s)<section\b.*?</section>`).FindAllString(body, -1) {
-			if strings.Contains(section, "Внесено в кассу за день") {
+			if strings.Contains(section, "Деньги по факту за день") {
 				contributions = section
 				break
 			}
