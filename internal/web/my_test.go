@@ -105,3 +105,19 @@ func TestPersonalPagesExplainHowCashKeptMakesUpSelf(t *testing.T) {
 		}
 	}
 }
+
+func TestTheSelfSplitPreviewsOnlyABonusThatCloseWillAccrue(t *testing.T) {
+	s := newSite(t)
+	terms := domain.Terms{SelfPct: 7000, HighSelfFromCents: 10000, HighSelfPct: 8000}
+	if err := s.st.SetTerms(ctx, s.anna.Actor(), s.olga.ID, s.st.StartMonth(), terms, ""); err != nil {
+		t.Fatal(err)
+	}
+	olga := s.login("olga", olgaPass)
+	s.seedLegacyForm(s.olga, 19, url.Values{"r_services": {"200"}, "p_card": {"200"}, "selfManual": {"1"}, "selfOverride": {"50"}, "version": {"0"}})
+	if body := s.get("/my", olga).Body.String(); strings.Contains(body, "Без доплаты") {
+		t.Error("promises a bonus although every day above the threshold was set by hand")
+	}
+	s.seedLegacyForm(s.olga, 20, url.Values{"r_services": {"100"}, "r_creams": {"50"}, "p_card": {"150"}, "version": {"0"}})
+	wantPage(t, "with an eligible day", s.get("/my", olga), http.StatusOK,
+		"Без доплаты €15 за ставку 80%", "ваша доля от услуг и продаж, которые идут в «Себе»")
+}

@@ -25,6 +25,7 @@ type Summary struct {
 	Clients          int
 	Total            Cents
 	SelfBase         Cents // what «Себе» is computed from
+	BonusBase        Cents // SelfBase without hand-set days: what the higher rate applies to
 	Self             Cents // «Себе»
 	SalonShare       Cents // «Салону»
 	SalonIncome      Cents
@@ -54,6 +55,9 @@ func Summarize(reports []PersonReport) Summary {
 		s.KassaCard += r.CardIn + r.TransferToCard
 		s.Total += r.Total
 		s.SelfBase += r.SelfBase
+		if !r.SelfOverridden {
+			s.BonusBase += r.SelfBase
+		}
 		s.Self += r.SelfAmount
 		s.SalonShare += r.SalonShare
 		s.SalonIncome += r.SalonIncome
