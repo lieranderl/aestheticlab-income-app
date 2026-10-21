@@ -7,15 +7,17 @@ import (
 
 // PersonSummary is one person's part of a day or month summary.
 type PersonSummary struct {
-	ByCategory  map[string]Cents
-	KassaCash   Cents
-	KassaCard   Cents
-	Clients     int
-	Total       Cents
-	SelfBase    Cents
-	Self        Cents
-	SalonShare  Cents
-	WorkingDays int
+	ByCategory   map[string]Cents
+	KassaCash    Cents
+	KassaCard    Cents
+	Clients      int
+	Total        Cents
+	SelfBase     Cents
+	Self         Cents
+	SalonShare   Cents
+	CashKept     Cents // cash the person kept; CashKept + BalanceDelta == Self
+	BalanceDelta Cents // + the salon owes the person, − the person owes the salon
+	WorkingDays  int
 }
 
 // Summary adds reports up for the day and month screens.
@@ -101,6 +103,8 @@ func Summarize(reports []PersonReport) Summary {
 		p.SelfBase += r.SelfBase
 		p.Self += r.SelfAmount
 		p.SalonShare += r.SalonShare
+		p.CashKept += r.CashKept()
+		p.BalanceDelta += r.BalanceDelta
 		s.People[pr.Person] = p
 	}
 	s.MoneyReceived = s.CardIn + s.Cash

@@ -5,6 +5,7 @@ type AdminReport struct {
 	Client                              bool
 	Name, Day, Href, Total, Self, Salon string
 	CashToKassa, TransferToCard         string
+	Actual                              string // «В кассу €427 · себе наличными €100 · салон должен €113,50»
 	Details                             []MoneyRow
 }
 type DayPerson struct {
@@ -53,31 +54,10 @@ templ AdminDayPage(nav Nav, p AdminDay) {
 			}
 			if len(p.People) > 0 {
 				<h2 class="text-lg font-semibold">По сотрудникам</h2>
-				<div class="flex flex-col gap-3 lg:hidden">
+				<div class="grid gap-3 lg:grid-cols-2">
 					for _,person := range p.People {
 						@personSummary(person.Name, person.Figures, "день")
 					}
-				</div>
-				<div class="hidden overflow-x-auto rounded-box bg-base-100 lg:block">
-					<table class="table">
-						<thead><tr><th>Сотрудник</th><th>Выручка</th><th>«Себе»</th><th>«Салону»</th><th>Клиенты</th><th class="w-64 max-w-64 whitespace-normal">Подробнее</th></tr></thead>
-						<tbody>
-							for _, person := range p.People {
-								<tr>
-									<th class="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere]">{ person.Name }</th>
-									for _, row := range primaryRevenueRows(person.Figures) {
-										<td>{ row.Value }</td>
-									}
-									<td class="w-64 max-w-64 whitespace-normal [overflow-wrap:anywhere]">
-										<details class="collapse collapse-arrow bg-base-200">
-											<summary class="collapse-title min-h-14">Услуги, продажи и касса</summary>
-											<div class="collapse-content flex flex-col gap-3">@RevenueDetails(person.Figures, "день")</div>
-										</details>
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
 				</div>
 			}
 			<h2 class="text-lg font-semibold">Записи за день</h2>
@@ -151,8 +131,13 @@ templ RevenueDetails(rows []MoneyRow, period string) {
 			<div class="collapse-content">@moneyRows(details)</div>
 		</details>
 	}
-	if contributions := namedMoneyRows(rows, "Касса — наличные", "Касса — карта салона"); len(contributions) > 0 {
-		@breakdown("Внесено в кассу за " + period, contributions)
+	if contributions := namedMoneyRows(rows, actualNames...); len(contributions) > 0 {
+		if len(namedMoneyRows(rows, "Оставили себе наличными")) > 0 {
+			@breakdown("Деньги по факту за " + period, contributions)
+			<p class="-mt-2 px-1 text-sm text-base-content/60">По записям клиентов. Взносы, выплаты и расходы — в разделе «Касса».</p>
+		} else {
+			@breakdown("Внесено в кассу за " + period, contributions)
+		}
 	}
 	if certificates := namedMoneyRows(rows, "Продажа сертификатов", "Оплачено сертификатами"); len(certificates) > 0 {
 		<details class="collapse collapse-arrow bg-base-100 shadow-sm">
@@ -170,12 +155,32 @@ templ personSummary(name string, rows []MoneyRow, period string) {
 		<div class="card-body min-w-0 gap-3 p-4">
 			<h3 class="font-semibold [overflow-wrap:anywhere]">{ name }</h3>
 			@moneyRows(primaryRevenueRows(rows))
+			if actual := namedMoneyRows(rows, personActualNames...); len(actual) > 0 {
+				<div class="border-t border-base-300 pt-3">@moneyRows(actual)</div>
+			}
 			<details class="collapse collapse-arrow bg-base-200">
 				<summary class="collapse-title min-h-14">Подробнее</summary>
-				<div class="collapse-content flex flex-col gap-3">@RevenueDetails(rows, period)</div>
+				<div class="collapse-content flex flex-col gap-3">@RevenueDetails(withoutNames(rows, personActualNames...), period)</div>
 			</details>
 		</div>
 	</article>
+}
+
+// actualNames are the rows of the money as it moved (admin pages add the
+// last ones); personActualNames are what a person card shows up front.
+var (
+	actualNames       = []string{"Касса — наличные", "Касса — карта салона", "Внесено в кассу", "Оставили себе наличными", "По записям: салон должен", "По записям: долг перед салоном", "По записям: расчёт"}
+	personActualNames = actualNames[2:]
+)
+
+func withoutNames(rows []MoneyRow, names ...string) []MoneyRow {
+	var out []MoneyRow
+	for _, row := range rows {
+		if len(namedMoneyRows([]MoneyRow{row}, names...)) == 0 {
+			out = append(out, row)
+		}
+	}
+	return out
 }
 
 func primaryRevenueRows(rows []MoneyRow) []MoneyRow {
@@ -199,7 +204,10 @@ func revenueDetailRows(rows []MoneyRow) []MoneyRow {
 	var out []MoneyRow
 	for _, row := range rows {
 		switch row.Name {
-		case "Выручка", "«Себе»", "«Салону»", "Клиенты", "Касса — наличные", "Касса — карта салона", "Продажа сертификатов", "Оплачено сертификатами", "Рабочие дни":
+		case "Выручка", "«Себе»", "«Салону»", "Клиенты", "Продажа сертификатов", "Оплачено сертификатами", "Рабочие дни":
+			continue
+		}
+		if len(namedMoneyRows([]MoneyRow{row}, actualNames...)) > 0 {
 			continue
 		}
 		if row.Name == "Услуги" || row.Value != "€0" {
@@ -225,7 +233,7 @@ templ moneyRows(rows []MoneyRow) {
 }
 
 templ adminReports(rows []AdminReport) {
-	<div class="flex flex-col gap-3 lg:hidden">
+	<div class="flex flex-col gap-3">
 		for _, r := range rows {
 			<details class="collapse collapse-arrow bg-base-100 shadow-sm">
 				<summary class="collapse-title min-h-14">
@@ -237,6 +245,9 @@ templ adminReports(rows []AdminReport) {
 					</span>
 					<span class="block text-sm text-base-content/70">
 						«Себе» { r.Self } · «Салону» { r.Salon }
+					</span>
+					<span class="block text-sm">
+						{ r.Actual }
 					</span>
 				</summary>
 				<div class="collapse-content flex flex-col gap-3">
@@ -252,51 +263,12 @@ templ adminReports(rows []AdminReport) {
 			</details>
 		}
 	</div>
-	<div class="hidden overflow-x-auto rounded-box bg-base-100 lg:block">
-		<table class="table">
-			<thead><tr><th>Сотрудник / день</th><th>Выручка</th><th>«Себе»</th><th>«Салону»</th><th class="w-64 min-w-56 max-w-64 whitespace-normal">Категории и оплаты</th><th>В кассу</th><th></th></tr></thead>
-			<tbody>
-				for _, r := range rows {
-					<tr>
-						<th class="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere]">
-							{ r.Name }
-							<span class="block font-normal">
-								{ r.Day }
-							</span>
-						</th>
-						<td>
-							{ r.Total }
-						</td>
-						<td>
-							{ r.Self }
-						</td>
-						<td>
-							{ r.Salon }
-						</td>
-						<td class="w-64 min-w-56 max-w-64 whitespace-normal [overflow-wrap:anywhere]">
-							@moneyRows(r.Details)
-						</td>
-						<td>
-							if !r.Client {
-								<p>
-									Наличными { r.CashToKassa }
-								</p>
-								<p>
-									На карту { r.TransferToCard }
-								</p>
-							}
-						</td>
-						<td><a class="btn btn-ghost min-h-11" href={ templ.SafeURL(r.Href) }>Изменить</a></td>
-					</tr>
-				}
-			</tbody>
-		</table>
-	</div>
 }
 
 type MonthPerson struct {
 	Name, Total, Self, Salon, Days, Clients string
 	Details                                 []MoneyRow
+	Actual                                  []MoneyRow // into the kassa, kept in cash, left to settle
 }
 type AdminMonth struct {
 	Key, Month, Prev, Next, RecordsURL string
@@ -324,39 +296,10 @@ templ AdminMonthPage(nav Nav, p AdminMonth) {
 				if len(p.People) == 0 {
 					<p class="rounded-box bg-base-100 p-4 text-base-content/60">Отчётов за этот месяц нет.</p>
 				}
-				<div class="flex flex-col gap-3 lg:hidden">
+				<div class="grid gap-3 lg:grid-cols-2">
 					for _, person := range p.People {
 						@personSummary(person.Name, monthPersonRows(person), "месяц")
 					}
-				</div>
-				<div class="hidden overflow-x-auto rounded-box bg-base-100 lg:block">
-					<table class="table">
-						<thead><tr><th>Сотрудник</th><th>Выручка</th><th>«Себе»</th><th>«Салону»</th><th>Клиенты</th><th>Рабочие дни</th><th class="w-64 max-w-64 whitespace-normal">Подробнее</th></tr></thead>
-						<tbody>
-							for _, person := range p.People {
-								<tr>
-									<th class="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere]">{ person.Name }</th>
-									<td>{ person.Total }</td>
-									<td>{ person.Self }</td>
-									<td>{ person.Salon }</td>
-									<td>
-										if person.Clients != "" {
-											{ person.Clients }
-										} else {
-											<span class="text-base-content/60">Нет данных</span>
-										}
-									</td>
-									<td>{ person.Days }</td>
-									<td class="w-64 max-w-64 whitespace-normal [overflow-wrap:anywhere]">
-										<details class="collapse collapse-arrow bg-base-200">
-											<summary class="collapse-title min-h-14">Услуги, продажи и касса</summary>
-											<div class="collapse-content flex flex-col gap-3">@RevenueDetails(person.Details, "месяц")</div>
-										</details>
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
 				</div>
 			</section>
 			<a class="btn min-h-11" href={ templ.SafeURL(p.RecordsURL) }>Открыть записи за месяц</a>
@@ -377,7 +320,8 @@ templ breakdown(title string, rows []MoneyRow) {
 }
 
 func monthPersonRows(person MonthPerson) []MoneyRow {
-	rows := append([]MoneyRow{{Name: "Выручка", Value: person.Total}, {Name: "«Себе»", Value: person.Self}, {Name: "«Салону»", Value: person.Salon}, {Name: "Рабочие дни", Value: person.Days}}, person.Details...)
+	rows := append([]MoneyRow{{Name: "Выручка", Value: person.Total}, {Name: "«Себе»", Value: person.Self}, {Name: "«Салону»", Value: person.Salon}, {Name: "Рабочие дни", Value: person.Days}}, withoutNames(person.Details, personActualNames...)...)
+	rows = append(rows, person.Actual...)
 	if person.Clients != "" {
 		rows = append(rows, MoneyRow{Name: "Клиенты", Value: person.Clients})
 	}

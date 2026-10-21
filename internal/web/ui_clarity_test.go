@@ -163,3 +163,43 @@ func TestDateSwitcherDateInputTakesTheTap(t *testing.T) {
 		t.Fatal("date switcher input missing input/change submission handlers")
 	}
 }
+
+// 2026-10-21: the admin saw only the expected split. Every admin period and
+// record now also shows the money as it moved: into the kassa, kept in cash,
+// and what each person's records leave to settle.
+func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 5000)
+	olga := s.login("olga", olgaPass)
+	for token, v := range map[string]url.Values{
+		"actual-cash-redeemed-token": {"date": {"2026-11-18"}, "services": {"100"}, "certificatePaid": {"100"}, "extrasDestination": {"cash"}},
+		"actual-cash-card-day-token": {"date": {"2026-11-19"}, "services": {"427"}, "serviceCard": {"327"}, "creams": {"100"}, "extrasDestination": {"kassa_card"}},
+		"actual-cash-cash-day-token": {"date": {"2026-11-20"}, "services": {"365"}, "extrasDestination": {"cash"}},
+	} {
+		v.Set("token", token)
+		v.Set("version", "0")
+		if res := s.post("/clients", v, olga); res.Code != http.StatusSeeOther {
+			t.Fatalf("save %s: %d %s", token, res.Code, res.Body.String())
+		}
+	}
+	row := func(page, name, value string) {
+		t.Helper()
+		if !regexp.MustCompile(regexp.QuoteMeta(name) + `\s*</dt>\s*<dd[^>]*>\s*` + regexp.QuoteMeta(value) + `\s*</dd>`).MatchString(page) {
+			t.Errorf("row %q is not %s", name, value)
+		}
+	}
+	anna := s.login("anna", annaPass)
+	res := s.get("/admin/month?m=2026-11", anna)
+	wantPage(t, "month", res, http.StatusOK, "Деньги по факту за месяц", "По записям клиентов")
+	month := res.Body.String()
+	row(month, "Внесено в кассу", "€427")
+	row(month, "Оставили себе наличными", "€465")
+	row(month, "По записям: долг перед салоном", "€19") // −69 for the two paid days, +50 for the redeemed one
+	res = s.get("/admin/day?date=2026-11-19", anna)
+	day := res.Body.String()
+	row(day, "Оставили себе наличными", "€100")
+	row(day, "По записям: салон должен", "€113,50")
+	wantPage(t, "day", res, http.StatusOK, "Деньги по факту за день", "В кассу €427 · себе наличными €100 · салон должен €113,50")
+	wantPage(t, "redeemed", s.get("/admin/day?date=2026-11-18", anna), http.StatusOK,
+		"В кассу €0 · себе наличными €0 · сертификатом €100 · салон должен €50")
+}
