@@ -204,7 +204,7 @@ templ InstallBanner() {
 	</section>
 }
 
-templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, notice string) {
+templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, split SelfSplit, notice string) {
 	@Layout("Клиенты", nav) {
 		@InstallBanner()
 		if notice != "" {
@@ -224,7 +224,7 @@ templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, 
 		}
 		<div class="my-4 flex flex-col gap-4">
 			<h2 class="font-semibold">Итоги дня</h2>
-			@RevenueSummary(totals, "день")
+			@PersonRevenueSummary(totals, "день", split)
 		</div>
 		<section class="flex flex-col gap-3">
 			for _, r := range cards {

@@ -69,3 +69,36 @@ func TestTheHigherRateLeavesOutHandSetDays(t *testing.T) {
 	s.seedLegacyForm(s.olga, 20, url.Values{"r_services": {"100"}, "p_card": {"100"}, "selfManual": {"1"}, "selfOverride": {"50"}, "version": {"0"}})
 	wantPage(t, "with a hand-set day", s.get("/my", olga), http.StatusOK, "кроме дней, где «Себе» задано вручную")
 }
+
+// The screenshots of 2026-10-21: the cash kept and «Себе» looked like two
+// unrelated numbers. Every personal total and record now shows how they meet.
+func TestPersonalPagesExplainHowCashKeptMakesUpSelf(t *testing.T) {
+	s := newSite(t)
+	if err := s.st.SetTerms(ctx, s.anna.Actor(), s.olga.ID, s.st.StartMonth(), domain.Terms{SelfPct: 5000, HighSelfFromCents: 300000, HighSelfPct: 7000}, ""); err != nil {
+		t.Fatal(err)
+	}
+	olga := s.login("olga", olgaPass)
+	for token, v := range map[string]url.Values{
+		"self-clarity-card-day-token": {"date": {"2026-11-19"}, "services": {"427"}, "serviceCard": {"327"}, "creams": {"100"}, "extrasDestination": {"kassa_card"}},
+		"self-clarity-cash-day-token": {"date": {"2026-11-20"}, "services": {"365"}, "extrasDestination": {"cash"}},
+	} {
+		v.Set("token", token)
+		v.Set("version", "0")
+		if res := s.post("/clients", v, olga); res.Code != http.StatusSeeOther {
+			t.Fatalf("save %s: %d %s", token, res.Code, res.Body.String())
+		}
+	}
+	wantPage(t, "day", s.get("/?date=2026-11-19", olga), http.StatusOK,
+		"Ваши «Себе» за день", "Наличными у вас", "€100", "По записям салон должен вам", "+ €113,50", "€213,50",
+		"«Себе» €213,50 = €100 наличными у вас + €113,50 от салона")
+	page := s.get("/my", olga)
+	wantPage(t, "month", page, http.StatusOK,
+		"Ваши «Себе» за месяц", "€465", "По записям вы должны салону", "− €69", "€396",
+		"Вы должны салону €182,50", "«Себе» €182,50 = €365 наличными у вас − €182,50 салону",
+		"Услуги за месяц €792 из €3 000", "€2 208,01")
+	for _, confusing := range []string{"База «Себе»", "У вас остаётся"} {
+		if strings.Contains(page.Body.String(), confusing) {
+			t.Errorf("still says %q", confusing)
+		}
+	}
+}

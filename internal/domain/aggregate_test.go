@@ -144,3 +144,31 @@ func TestASummaryAddsUpTheSelfBase(t *testing.T) {
 		t.Errorf("«Себе» base = %d, anna's %d; want 650 (the certificate sale is not part of it)", s.SelfBase, s.People["anna"].SelfBase)
 	}
 }
+
+// The screenshots of 2026-10-21: «Себе» is not the cash in hand, it is the
+// cash in hand plus what the salon owes (or minus what is owed to it).
+func TestSelfIsTheCashKeptPlusWhatTheSalonOwes(t *testing.T) {
+	cardDay, err := domain.NewClientReport("olga", date(t, "2026-10-02"), domain.ClientInput{
+		Services: 42700, ServiceCard: 32700, Extras: map[string]domain.Cents{"creams": 10000}, ExtrasDestination: domain.ToKassaCard,
+	}, 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cashDay, err := domain.NewClientReport("olga", date(t, "2026-10-20"), domain.ClientInput{Services: 36500}, 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cardDay.Report.CashKept(); got != 10000 {
+		t.Errorf("card day: cash kept %d, want 100", got)
+	}
+	if got := cashDay.Report.CashKept(); got != 36500 {
+		t.Errorf("cash day: cash kept %d, want 365", got)
+	}
+	s := domain.Summarize([]domain.PersonReport{cardDay, cashDay})
+	if s.Self != 39600 || s.CashKept != 46500 || s.BalanceDelta != -6900 {
+		t.Errorf("month: «Себе» %d, kept %d, delta %d; want 396 = 465 − 69", s.Self, s.CashKept, s.BalanceDelta)
+	}
+	if s.CashKept+s.BalanceDelta != s.Self {
+		t.Error("kept + delta must equal «Себе»")
+	}
+}

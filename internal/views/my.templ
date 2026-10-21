@@ -8,6 +8,7 @@ type MyReport struct {
 	Self   string
 	Salon  string
 	Effect string // what the day did to the balance, in words
+	Explain string // how a client record's «Себе» is made up; "" for legacy days
 	Owed   int    // +1 the salon owes the person, −1 the person owes the salon, 0 settled
 }
 
@@ -29,6 +30,7 @@ type MyMonth struct {
 	Progress              string // progress to the higher «Себе» rate, if the terms have one
 	Reached               bool
 	Reports               []MyReport
+	Split                 SelfSplit
 }
 
 // MyPage is «Мои записи».
@@ -40,7 +42,7 @@ templ MyPage(nav Nav, m MyMonth) {
 			<section class="card bg-base-100"><div class="card-body p-4"><h2 class="font-semibold">Текущий баланс</h2><p class={ "text-lg", templ.KV("text-success",m.BalanceSign>0), templ.KV("text-error",m.BalanceSign<0) }>{ m.Balance }</p><p class="text-sm text-base-content/60">На { m.AsOf }</p></div></section>
 			@MovementSheet(m.MovementForm)
 			@MonthSwitcher(m.Month, m.Prev, m.Next)
-			@RevenueSummary(myRevenueRows(m), "месяц")
+			@PersonRevenueSummary(myRevenueRows(m), "месяц", m.Split)
  if len(m.ClosedFigures)>0 {
 				<section class="card bg-base-100"><div class="card-body p-4"><h2 class="font-semibold">Начислено при закрытии месяца</h2>@moneyRows(m.ClosedFigures)
 </div></section>
@@ -103,6 +105,9 @@ templ myReportCard(r MyReport) {
 			</div>
 			<p class="text-sm">«Себе» { r.Self } · «Салону» { r.Salon }</p>
 			<p class={ "text-sm", templ.KV("text-success", r.Owed > 0), templ.KV("text-error", r.Owed < 0), templ.KV("text-base-content/60", r.Owed == 0) }>{ r.Effect }</p>
+			if r.Explain != "" {
+				<p class="text-sm text-base-content/60">{ r.Explain }</p>
+			}
 			if r.Href != "" {
 				<div class="card-actions justify-end">
 					<a href={ templ.SafeURL(r.Href) } class="btn btn-ghost btn-sm min-h-11">

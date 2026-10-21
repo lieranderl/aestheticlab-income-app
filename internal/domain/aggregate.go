@@ -35,6 +35,8 @@ type Summary struct {
 	TransferToCard   Cents // the salon's share sent to the kassa card instead of the till
 	Prepaid          Cents // paid with certificates
 	MoneyReceived    Cents // card + cash: new money, unlike certificate payments
+	CashKept         Cents // cash the person kept; CashKept + BalanceDelta == Self
+	BalanceDelta     Cents // + the salon owes the person, − the person owes the salon
 	ByCategory       map[string]Cents
 	ByPayment        map[string]Cents
 	WorkingDays      int
@@ -61,6 +63,8 @@ func Summarize(reports []PersonReport) Summary {
 		s.CashToKassa += r.CashToKassa
 		s.TransferToCard += r.TransferToCard
 		s.Prepaid += r.Prepaid
+		s.CashKept += r.CashKept()
+		s.BalanceDelta += r.BalanceDelta
 		for c, v := range pr.Revenue {
 			if v != 0 {
 				s.ByCategory[c] += v

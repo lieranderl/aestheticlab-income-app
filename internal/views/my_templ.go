@@ -10,13 +10,14 @@ import templruntime "github.com/a-h/templ/runtime"
 
 // MyReport is one day's report card on «Мои записи».
 type MyReport struct {
-	Day    string // «пт, 20.11»
-	Href   string // the day on the daily form; "" for people who don't report
-	Total  string
-	Self   string
-	Salon  string
-	Effect string // what the day did to the balance, in words
-	Owed   int    // +1 the salon owes the person, −1 the person owes the salon, 0 settled
+	Day     string // «пт, 20.11»
+	Href    string // the day on the daily form; "" for people who don't report
+	Total   string
+	Self    string
+	Salon   string
+	Effect  string // what the day did to the balance, in words
+	Explain string // how a client record's «Себе» is made up; "" for legacy days
+	Owed    int    // +1 the salon owes the person, −1 the person owes the salon, 0 settled
 }
 
 // MyMonth is the person's month on «Мои записи» (system-design §6.4; the
@@ -37,6 +38,7 @@ type MyMonth struct {
 	Progress              string // progress to the higher «Себе» rate, if the terms have one
 	Reached               bool
 	Reports               []MyReport
+	Split                 SelfSplit
 }
 
 // MyPage is «Мои записи».
@@ -114,7 +116,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(m.Balance)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 40, Col: 238}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 42, Col: 238}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -127,7 +129,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(m.AsOf)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 40, Col: 297}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 42, Col: 297}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -145,7 +147,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = RevenueSummary(myRevenueRows(m), "месяц").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = PersonRevenueSummary(myRevenueRows(m), "месяц", m.Split).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -197,7 +199,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(m.Progress)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 51, Col: 23}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 53, Col: 23}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -295,7 +297,7 @@ func MonthSwitcher(label, prev, next string) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 85, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 87, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -345,7 +347,7 @@ func figure(label, value string) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 92, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 94, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -358,7 +360,7 @@ func figure(label, value string) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 93, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 95, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -400,7 +402,7 @@ func myReportCard(r MyReport) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(r.Day)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 101, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 103, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -413,7 +415,7 @@ func myReportCard(r MyReport) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(r.Total)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 102, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 104, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -426,7 +428,7 @@ func myReportCard(r MyReport) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(r.Self)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 104, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 106, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -439,7 +441,7 @@ func myReportCard(r MyReport) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(r.Salon)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 104, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 106, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -474,7 +476,7 @@ func myReportCard(r MyReport) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(r.Effect)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 105, Col: 157}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 107, Col: 157}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -484,21 +486,40 @@ func myReportCard(r MyReport) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if r.Href != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div class=\"card-actions justify-end\"><a href=\"")
+		if r.Explain != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<p class=\"text-sm text-base-content/60\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var23 templ.SafeURL
-			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(r.Href))
+			var templ_7745c5c3_Var23 string
+			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(r.Explain)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 108, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 109, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" class=\"btn btn-ghost btn-sm min-h-11\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if r.Href != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"card-actions justify-end\"><a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var24 templ.SafeURL
+			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(r.Href))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/my.templ`, Line: 113, Col: 36}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" class=\"btn btn-ghost btn-sm min-h-11\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -506,12 +527,12 @@ func myReportCard(r MyReport) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, " Открыть</a></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, " Открыть</a></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</div></article>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div></article>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
