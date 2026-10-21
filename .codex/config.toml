@@ -1,0 +1,13 @@
+[mcp_servers.gopls]
+command = "gopls"
+args = ["mcp"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = [
+    "-y",
+    "@playwright/mcp@0.0.82",
+    "--device",
+    "iPhone 15",
+    "--isolated",
+]
