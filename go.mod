@@ -1,12 +1,12 @@
 module github.com/lieranderl/aestheticlab-income-app
 
-go 1.27.2
+go 1.27.3
 
 require (
 	cloud.google.com/go/firestore v1.26.0
 	github.com/a-h/templ v0.3.1070
 	github.com/starfederation/datastar-go v1.2.2
-	github.com/xuri/excelize/v2 v2.11.0
+	github.com/xuri/excelize/v2 v2.11.1-0.20260915055537-22f76f9acb94
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.60.0
 	google.golang.org/api v0.301.0
@@ -193,7 +193,7 @@ require (
 	github.com/quasilyte/regex/syntax v0.0.0-20210819130434-b3f0c404a727 // indirect
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/raeperd/recvcheck v0.3.0 // indirect
-	github.com/richardlehane/mscfb v1.0.7 // indirect
+	github.com/richardlehane/mscfb v1.0.8 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect

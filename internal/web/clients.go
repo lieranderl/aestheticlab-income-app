@@ -41,7 +41,7 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 		if rep.Client {
 			href = "/clients/" + rep.ID
 		}
-		cards = append(cards, views.MyReport{Day: clientLabel(rep), Href: href, Total: domain.FormatEUR(rep.Report.Total), Self: domain.FormatEUR(rep.Report.SelfAmount), Salon: domain.FormatEUR(rep.Report.SalonShare), Effect: clientEffect(rep)})
+		cards = append(cards, views.MyReport{Day: clientLabel(rep), Href: href, Total: domain.FormatEUR(rep.Report.Total), Self: domain.FormatEUR(rep.Report.SelfAmount), Salon: domain.FormatEUR(rep.Report.SalonShare), Effect: clientEffect(rep), Explain: selfEquation(rep), Owed: sign(rep.Report.BalanceDelta)})
 	}
 	sum := domain.Summarize(personReports(selected))
 	figures := append(clientSummary(sum), []views.MoneyRow{
@@ -49,6 +49,10 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 		{Name: "«Салону»", Value: domain.FormatEUR(sum.SalonShare)},
 		{Name: "Оплачено сертификатами", Value: domain.FormatEUR(sum.Prepaid)},
 	}...)
+	var daySplit views.SelfSplit
+	if len(selected) > 0 {
+		daySplit = selfSplit(sum, "день")
+	}
 	picker := dayPicker(a, day, "/")
 	if dc, err := a.loadDay(r.Context(), u, day); err == nil {
 		picker.Locked = dc.form(nil).Locked
@@ -57,7 +61,7 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 	if r.URL.Query().Get("removed") == "1" {
 		notice = "Клиент удалён"
 	}
-	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, notice))
+	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, daySplit, notice))
 }
 
 func clientSummary(s domain.Summary) []views.MoneyRow {
@@ -176,7 +180,7 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 	f.Salon = domain.FormatEUR(show.SalonShare)
 	f.Cash = domain.FormatEUR(show.CashToKassa)
 	f.Card = domain.FormatEUR(show.CardIn + show.TransferToCard)
-	f.Held = domain.FormatEUR(show.Cash - show.CashToKassa - show.TransferToCard)
+	f.Held = domain.FormatEUR(show.CashKept())
 	f.Effect = "По этой записи расчёт с салоном — €0"
 	switch {
 	case show.BalanceDelta < 0:
@@ -295,7 +299,43 @@ func clientEffect(rep store.SavedReport) string {
 	if !rep.Client {
 		return effectLine(rep.Report)
 	}
-	return "У вас остаётся " + domain.FormatEUR(rep.Report.Cash-rep.Report.CashToKassa-rep.Report.TransferToCard) + ". " + effectLine(domain.Report{BalanceDelta: rep.Report.BalanceDelta})
+	switch d := rep.Report.BalanceDelta; {
+	case d > 0:
+		return "По записи: салон должен вам " + domain.FormatEUR(d)
+	case d < 0:
+		return "По записи: вы должны салону " + domain.FormatEUR(-d)
+	}
+	return "По записи: расчёт с салоном €0"
+}
+
+// selfEquation spells out how a client record's «Себе» is made up:
+// «Себе» €213,50 = €100 оставили себе наличными + €113,50 от салона.
+func selfEquation(rep store.SavedReport) string {
+	if !rep.Client {
+		return ""
+	}
+	r := rep.Report
+	s := "«Себе» " + domain.FormatEUR(r.SelfAmount) + " = " + domain.FormatEUR(r.CashKept()) + " оставили себе наличными"
+	switch {
+	case r.BalanceDelta > 0:
+		s += " + " + domain.FormatEUR(r.BalanceDelta) + " от салона"
+	case r.BalanceDelta < 0:
+		s += " − " + domain.FormatEUR(-r.BalanceDelta) + " салону"
+	}
+	return s
+}
+
+// selfSplit is the «Ваши «Себе»» card of a person's own day or month.
+func selfSplit(s domain.Summary, period string) views.SelfSplit {
+	settle := views.MoneyRow{Name: "По записям расчёт с салоном", Value: "€0"}
+	switch {
+	case s.BalanceDelta > 0:
+		settle = views.MoneyRow{Name: "По записям салон должен вам", Value: signedMoney(s.BalanceDelta)}
+	case s.BalanceDelta < 0:
+		settle = views.MoneyRow{Name: "По записям вы должны салону", Value: signedMoney(s.BalanceDelta)}
+	}
+	return views.SelfSplit{Period: period, Self: domain.FormatEUR(s.Self), Owed: sign(s.BalanceDelta),
+		Rows: []views.MoneyRow{{Name: "Оставили себе наличными", Value: domain.FormatEUR(s.CashKept)}, settle}}
 }
 
 func clientProblem(r *http.Request, err error) string {

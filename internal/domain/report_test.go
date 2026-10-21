@@ -212,7 +212,7 @@ func TestCashKeptPlusBalanceAlwaysEqualsSelf(t *testing.T) {
 		if err != nil {
 			t.Fatalf("case %d %+v: %v", i, in, err)
 		}
-		if kept := r.Cash - r.CashToKassa - r.TransferToCard; kept+r.BalanceDelta != r.SelfAmount {
+		if kept := r.CashKept(); kept+r.BalanceDelta != r.SelfAmount {
 			t.Fatalf("case %d %+v: kept %d + balance %d != «Себе» %d", i, in, kept, r.BalanceDelta, r.SelfAmount)
 		}
 		if r.SelfAmount+r.SalonShare != r.Total || r.SuggestedToKassa < 0 || r.SuggestedToKassa > r.Cash {

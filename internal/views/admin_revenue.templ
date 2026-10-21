@@ -100,6 +100,49 @@ templ RevenueSummary(rows []MoneyRow, period string) {
 	@RevenueDetails(rows, period)
 }
 
+// SelfSplit shows how a person's «Себе» is made up: the cash they kept plus
+// what the salon owes them by these records (or minus what they owe).
+type SelfSplit struct {
+	Period string     // «день», «месяц»
+	Rows   []MoneyRow // the cash kept, then the records' settlement
+	Self   string
+	Owed   int    // +1 the salon owes the person, −1 the person owes the salon
+	Note   string // e.g. the higher-rate bonus still to come at close
+}
+
+// PersonRevenueSummary is RevenueSummary for a person's own day or month.
+templ PersonRevenueSummary(rows []MoneyRow, period string, split SelfSplit) {
+	@adminFigures(primaryRevenueRows(rows))
+	@selfSplit(split)
+	@RevenueDetails(rows, period)
+}
+
+templ selfSplit(s SelfSplit) {
+	if len(s.Rows) > 0 {
+	<section class="card min-w-0 bg-base-100 shadow-sm" aria-label="Ваши «Себе»">
+		<div class="card-body min-w-0 gap-3 p-4">
+			<h2 class="font-semibold">Ваши «Себе» за { s.Period }</h2>
+			<p class="text-sm text-base-content/60">«Себе» — ваша доля от услуг. Часть уже у вас наличными, остальное — расчёт с салоном.</p>
+			<dl class="flex flex-col gap-2">
+				for i, row := range s.Rows {
+					<div class="flex justify-between gap-4">
+						<dt class="text-base-content/70">{ row.Name }</dt>
+						<dd class={ "font-semibold", templ.KV("text-success", i > 0 && s.Owed > 0), templ.KV("text-error", i > 0 && s.Owed < 0) }>{ row.Value }</dd>
+					</div>
+				}
+				<div class="flex justify-between gap-4 border-t border-base-300 pt-2">
+					<dt class="font-semibold">= Ваши «Себе»</dt>
+					<dd class="text-lg font-semibold">{ s.Self }</dd>
+				</div>
+			</dl>
+			if s.Note != "" {
+				<p class="text-sm text-base-content/60">{ s.Note }</p>
+			}
+		</div>
+	</section>
+	}
+}
+
 templ RevenueDetails(rows []MoneyRow, period string) {
 	if details := revenueDetailRows(rows); len(details) > 0 {
 		<details class="collapse collapse-arrow bg-base-100 shadow-sm">

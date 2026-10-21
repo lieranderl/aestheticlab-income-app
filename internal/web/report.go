@@ -411,7 +411,7 @@ func (dc dayContext) reportCatalog() domain.Catalog {
 // «Остальные €150 наличными — ваши. Салон должен вам €175».
 func effectLine(r domain.Report) string {
 	var b strings.Builder
-	if kept := r.Cash - r.CashToKassa - r.TransferToCard; kept > 0 {
+	if kept := r.CashKept(); kept > 0 {
 		b.WriteString("Остальные " + domain.FormatEUR(kept) + " наличными — ваши. ")
 	}
 	switch d := r.BalanceDelta; {

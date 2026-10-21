@@ -68,6 +68,9 @@ type Report struct {
 	BalanceDelta     Cents // + the salon owes the person, − the person owes the salon
 }
 
+// CashKept is the cash the person kept: CashKept + BalanceDelta == SelfAmount.
+func (r Report) CashKept() Cents { return r.Cash - r.CashToKassa - r.TransferToCard }
+
 // Problem names why an input was rejected; the UI maps it to Russian text.
 type Problem string
 

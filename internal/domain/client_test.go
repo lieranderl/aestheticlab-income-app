@@ -77,6 +77,9 @@ func TestClientFundsHeldAndBalanceAlwaysEqualSelf(t *testing.T) {
 			t.Fatal(err)
 		}
 		held := services - pre - cash - card
+		if pr.Report.CashKept() != held {
+			t.Fatalf("cash kept %d, want %d: %+v", pr.Report.CashKept(), held, in)
+		}
 		if held+pr.Report.BalanceDelta != pr.Report.SelfAmount {
 			t.Fatalf("invariant %+v -> %+v", in, pr.Report)
 		}

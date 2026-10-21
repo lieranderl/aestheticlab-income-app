@@ -36,6 +36,9 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		Total: domain.FormatEUR(sum.Total), Self: domain.FormatEUR(sum.Self), Salon: domain.FormatEUR(sum.SalonShare),
 		WorkingDays: strconv.Itoa(sum.People[u.ID].WorkingDays), Details: summaryFigures(sum, false),
 	}
+	if len(reports) > 0 {
+		page.Split = selfSplit(sum, "месяц")
+	}
 	if prev := m.Prev(); !prev.Before(start) {
 		page.Prev = "/my?m=" + prev.String()
 	}
@@ -60,7 +63,10 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	}
 	if terms, ok := history(entries).For(m); ok && status != domain.MonthClosed {
 		if p, ok := domain.SelfProgressFor(sum.SelfBase, terms); ok {
-			page.Progress, page.Reached = progressText(p, anyHandSet(reports)), p.Reached
+			page.Progress, page.Reached = progressText(p, baseLabel(sum), anyHandSet(reports)), p.Reached
+			if p.Reached && page.Split.Self != "" {
+				page.Split.Note = "Без доплаты за ставку " + percent(p.HighPct) + ": она начислится при закрытии месяца."
+			}
 		}
 	}
 	for i := len(reports) - 1; i >= 0; i-- { // newest first
@@ -68,7 +74,7 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		card := views.MyReport{
 			Day: ru.DayWithWeekday(rep.Date.Time()) + " · " + clientLabel(rep), Total: domain.FormatEUR(rep.Report.Total),
 			Self: domain.FormatEUR(rep.Report.SelfAmount), Salon: domain.FormatEUR(rep.Report.SalonShare),
-			Effect: clientEffect(rep), Owed: sign(rep.Report.BalanceDelta),
+			Effect: clientEffect(rep), Explain: selfEquation(rep), Owed: sign(rep.Report.BalanceDelta),
 		}
 		if u.SubmitsReports {
 			card.Href = "/reports/day?date=" + rep.Date.String()
@@ -117,19 +123,28 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	a.render(w, r, views.MyPage(a.navFor(u, "/my"), page))
 }
 
-// progressText is «База «Себе» за месяц €500 из €5 000 — до 80% осталось
-// €4 500,01», or what passing the threshold means.
-func progressText(p domain.SelfProgress, handSet bool) string {
+// progressText is «Услуги за месяц €500 из €5 000 — ещё €4 500,01, и «Себе»
+// за весь месяц станет 80%», or what passing the threshold means.
+func progressText(p domain.SelfProgress, label string, handSet bool) string {
+	scope := "за весь месяц"
+	if handSet { // SelfBonusFor: a hand-set day keeps exactly what it was given
+		scope = "за весь месяц (кроме дней, где «Себе» задано вручную)"
+	}
 	if p.Reached {
-		scope := "за весь месяц"
-		if handSet { // SelfBonusFor: a hand-set day keeps exactly what it was given
-			scope = "за весь месяц (кроме дней, где «Себе» задано вручную)"
-		}
-		return "База «Себе» за месяц " + domain.FormatEUR(p.Base) + " — больше " + domain.FormatEUR(p.Threshold) +
+		return label + " " + domain.FormatEUR(p.Base) + " — больше " + domain.FormatEUR(p.Threshold) +
 			": " + scope + " «Себе» " + percent(p.HighPct) + ", разница начислится при закрытии месяца"
 	}
-	return "База «Себе» за месяц " + domain.FormatEUR(p.Base) + " из " + domain.FormatEUR(p.Threshold) +
-		" — до " + percent(p.HighPct) + " осталось " + domain.FormatEUR(p.Remaining)
+	return label + " " + domain.FormatEUR(p.Base) + " из " + domain.FormatEUR(p.Threshold) +
+		" — ещё " + domain.FormatEUR(p.Remaining) + ", и «Себе» " + scope + " станет " + percent(p.HighPct)
+}
+
+// baseLabel names what the «Себе» base adds up: services only for client
+// entries, but legacy days may count other categories too.
+func baseLabel(s domain.Summary) string {
+	if s.SelfBase == s.ByCategory["services"] {
+		return "Услуги за месяц"
+	}
+	return "Услуги и продажи для «Себе» за месяц"
 }
 
 func anyHandSet(rs []store.SavedReport) bool {
