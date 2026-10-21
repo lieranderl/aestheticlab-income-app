@@ -64,7 +64,7 @@ func TestClientZeroCertificatesValidationAdminAndClosedMonth(t *testing.T) {
 	form := url.Values{"date": {"2026-11-20"}, "token": {"certificate-http-token"}, "version": {"0"}, "services": {"100"}, "certificatePaid": {"100"}, "extrasDestination": {"cash"}}
 	res := s.do(request{method: http.MethodPost, path: "/clients", form: form, cookies: z, datastar: true})
 	wantPage(t, "SSE create", res, http.StatusOK, "datastar-patch-signals", "redirectUrl")
-	wantPage(t, "certificate daily", s.get("/?date=2026-11-20", z), http.StatusOK, "По записи: салон должен вам €70", "«Себе» €70 = €0 оставили себе наличными + €70 от салона", "Касса — наличные")
+	wantPage(t, "certificate daily", s.get("/?date=2026-11-20", z), http.StatusOK, "Салон должен вам €70", "Факт: в кассу €0 · у вас €0 · сертификатом €100", "Оплачено сертификатом")
 	form.Set("token", "invalid-http-client-token")
 	form.Set("certificatePaid", "101")
 	wantPage(t, "redemption over service", s.post("/clients", form, z), http.StatusUnprocessableEntity, "использование сертификата не больше услуг")
@@ -231,7 +231,7 @@ func TestClientMonthAndAuditDescribeActualContributionsOnly(t *testing.T) {
 		t.Fatal("client month claims uncollected payment method breakdown")
 	}
 	people := strings.Split(body, `<div class="grid gap-3 lg:grid-cols-2">`)
-	if len(people) != 2 || !strings.Contains(people[1], "Клиенты") || !strings.Contains(people[1], "Касса — карта салона") {
+	if len(people) != 2 || !strings.Contains(people[1], "Клиенты") || !strings.Contains(people[1], "В кассу — карта салона") {
 		t.Fatal("person cards omit client count or actual contribution details")
 	}
 	phone := strings.Split(people[1], `<a class="btn min-h-11"`)[0]
@@ -363,11 +363,11 @@ func TestClientServicesAutofocusAndBackLinkTouchTarget(t *testing.T) {
 	}
 }
 
-func TestPrimaryDaySummaryAlwaysShowsActualKassaTotals(t *testing.T) {
+func TestTheDayAlwaysSeparatesActualMoneyFromExpectedShares(t *testing.T) {
 	s := newSite(t)
 	s.withTerms(s.olga, 7000)
 	admin := s.login("anna", annaPass)
-	primary := func(body string) string {
+	section := func(body, label string) string {
 		t.Helper()
 		tokens := html.NewTokenizer(strings.NewReader(body))
 		active := false
@@ -380,7 +380,7 @@ func TestPrimaryDaySummaryAlwaysShowsActualKassaTotals(t *testing.T) {
 			token := tokens.Token()
 			if kind == html.StartTagToken && token.Data == "section" {
 				for _, a := range token.Attr {
-					if a.Key == "aria-label" && a.Val == "Итоги" {
+					if a.Key == "aria-label" && a.Val == label {
 						active = true
 					}
 				}
@@ -398,33 +398,22 @@ func TestPrimaryDaySummaryAlwaysShowsActualKassaTotals(t *testing.T) {
 	check := func(label, cash string) {
 		t.Helper()
 		body := s.get("/admin/day?date=2026-11-20", admin).Body.String()
-		text := primary(body)
-		for _, old := range []string{"Наличные", "Карта", "Наличными в кассу", "Переводом на карту салона"} {
-			if strings.Contains(text, "\n"+old+"\n") {
-				t.Errorf("%s primary summary still shows obsolete %s", label, old)
+		fact, expected := section(body, "Факт"), section(body, "Ожидается")
+		for _, want := range []string{"В кассу — наличные", cash, "В кассу — карта салона", "Наличными у сотрудников"} {
+			if !strings.Contains(fact, want) {
+				t.Errorf("%s: «Факт» lacks %s", label, want)
 			}
 		}
-		for _, current := range []string{"Выручка", "«Себе»", "«Салону»", "Клиенты"} {
-			if !strings.Contains(text, current) {
-				t.Errorf("%s lacks %s", label, current)
+		for _, want := range []string{"Выручка", "«Салону»", "«Себе» сотрудников"} {
+			if !strings.Contains(expected, want) {
+				t.Errorf("%s: «Ожидается» lacks %s", label, want)
+			}
+			if strings.Contains(fact, want) {
+				t.Errorf("%s: «Факт» mixes in the expected %s", label, want)
 			}
 		}
-		for _, detail := range []string{"Касса — наличные", "Касса — карта салона", "Оплачено сертификатами"} {
-			if strings.Contains(text, detail) {
-				t.Errorf("%s primary totals contain contribution detail %s", label, detail)
-			}
-		}
-		contributions := ""
-		for _, section := range regexp.MustCompile(`(?s)<section\b.*?</section>`).FindAllString(body, -1) {
-			if strings.Contains(section, "Деньги по факту за день") {
-				contributions = section
-				break
-			}
-		}
-		for _, value := range []string{"Касса — наличные", "Касса — карта салона", cash, "€0"} {
-			if !strings.Contains(contributions, value) {
-				t.Errorf("%s contribution section lacks %s", label, value)
-			}
+		if strings.Contains(expected, "В кассу") {
+			t.Errorf("%s: «Ожидается» mixes in kassa contributions", label)
 		}
 		if !strings.Contains(body, ">Сертификаты</summary>") || !strings.Contains(body, "Оплачено сертификатами") {
 			t.Errorf("%s lacks separate certificate activity", label)

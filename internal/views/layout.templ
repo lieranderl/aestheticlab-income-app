@@ -1,10 +1,31 @@
 package views
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+
+	"github.com/lieranderl/aestheticlab-income-app/static"
+)
+
 // DraftScript is draft.js's URL. sw.js serves /static/ cache-first and
 // precaches this exact URL, so bump the version (here and in sw.js) whenever
 // draft.js changes: a worker from an older release then misses and fetches
 // the new script instead of running a stale copy.
 const DraftScript = "/static/draft.js?v=3"
+
+// StyleURL is app.css's URL with a hash of its content. sw.js serves /static/
+// cache-first, so every new stylesheet must arrive under a new URL, or an
+// installed app keeps the old CSS after a deploy.
+var StyleURL = "/static/app.css?v=" + contentVersion("app.css")
+
+func contentVersion(name string) string {
+	b, err := static.Files.ReadFile(name)
+	if err != nil {
+		return "0"
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:6])
+}
 
 // NavItem is one entry of the bottom tab bar (phones) and the sidebar (lg+).
 type NavItem struct {
@@ -54,7 +75,7 @@ templ Layout(title string, nav Nav) {
 			<meta name="apple-mobile-web-app-title" content="Касса"/>
 			<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 			<link rel="preload" href="/static/fonts/onest-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin/>
-			<link href="/static/app.css?v=3" rel="stylesheet"/>
+			<link href={ StyleURL } rel="stylesheet"/>
 			<!-- Datastar client (v1.0.4); modules are deferred and never block rendering -->
 			<script type="module" src="/static/datastar.js"></script>
 		</head>

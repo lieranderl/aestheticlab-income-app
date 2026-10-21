@@ -196,5 +196,8 @@ func TestASummarysCashKeptPlusBalanceAlwaysEqualsSelf(t *testing.T) {
 		if s.CashKept+s.BalanceDelta != s.Self {
 			t.Fatalf("case %d: kept %d + balance %d != «Себе» %d", i, s.CashKept, s.BalanceDelta, s.Self)
 		}
+		if s.KassaCredit-s.SalonShare != s.BalanceDelta {
+			t.Fatalf("case %d: credit %d − «Салону» %d != balance %d", i, s.KassaCredit, s.SalonShare, s.BalanceDelta)
+		}
 	}
 }

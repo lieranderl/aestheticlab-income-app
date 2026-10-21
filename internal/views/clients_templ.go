@@ -1322,7 +1322,7 @@ func InstallBanner() templ.Component {
 	})
 }
 
-func ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, split SelfSplit, notice string) templ.Component {
+func ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, money MoneyView, notice string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1435,7 +1435,11 @@ func ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, s
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = PersonRevenueSummary(totals, "день", split).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = MoneyPanel(money).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = RevenueDetails(totals, "день").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1521,7 +1525,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var82 string
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(f.DayLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 251, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 252, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 			if templ_7745c5c3_Err != nil {
@@ -1534,7 +1538,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var83 string
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(f.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 254, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 255, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
@@ -1547,7 +1551,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var84 string
 			templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(f.Total)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 255, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 256, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 			if templ_7745c5c3_Err != nil {
@@ -1560,7 +1564,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var85 string
 			templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(f.Cash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 256, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 257, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var85))
 			if templ_7745c5c3_Err != nil {
@@ -1573,7 +1577,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var86 string
 			templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinStringErrs(f.Card)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 257, Col: 109}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 258, Col: 109}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
 			if templ_7745c5c3_Err != nil {
@@ -1599,7 +1603,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var87 string
 				templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(f.Locked)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 264, Col: 20}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 265, Col: 20}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 				if templ_7745c5c3_Err != nil {
@@ -1631,7 +1635,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var88 templ.SafeURL
 				templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(f.Action))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 272, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 273, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var88))
 				if templ_7745c5c3_Err != nil {
@@ -1644,7 +1648,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var89 string
 				templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Date)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 273, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var89)
 				if templ_7745c5c3_Err != nil {
@@ -1657,7 +1661,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var90 string
 				templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.FormatInt(f.Version, 10))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 275, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var90)
 				if templ_7745c5c3_Err != nil {
@@ -1697,7 +1701,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 					var templ_7745c5c3_Var93 string
 					templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.ResolveAttributeValue(f.Reason)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 279, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 280, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var93)
 					if templ_7745c5c3_Err != nil {
@@ -1723,7 +1727,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 					var templ_7745c5c3_Var95 string
 					templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.ResolveAttributeValue(boolText(f.BadReason))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 279, Col: 266}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 280, Col: 266}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var95)
 					if templ_7745c5c3_Err != nil {
@@ -1765,7 +1769,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 					var templ_7745c5c3_Var98 string
 					templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(f.Error)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 283, Col: 15}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 284, Col: 15}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 					if templ_7745c5c3_Err != nil {
@@ -1779,7 +1783,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var99 templ.SafeURL
 				templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(f.Cancel))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 287, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 288, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 				if templ_7745c5c3_Err != nil {

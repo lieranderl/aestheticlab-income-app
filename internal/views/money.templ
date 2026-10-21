@@ -1,0 +1,108 @@
+package views
+
+// MoneyLine is one row of a «Факт» or «Ожидается» block.
+type MoneyLine struct {
+	Name, Value string
+	Strong      bool
+}
+
+// MoneyView separates what happened to the money from what the rates
+// expect (system-design §6.1a): the records' result on top, then the money
+// that actually moved, then the calculated shares.
+type MoneyView struct {
+	StatusLabel string // «Итог дня по записям»
+	Status      string // «Салон должен вам €113,50»
+	StatusNote  string
+	Tone        int // +1 the viewer is owed, −1 the viewer owes, 0 settled
+	Fact        []MoneyLine
+	Expected    []MoneyLine
+	Explain     string // how the expected share meets the fact
+}
+
+// MoneyPanel is the full period view: status, «Факт», «Ожидается».
+templ MoneyPanel(v MoneyView) {
+	if v.Status != "" {
+		<section role="status" aria-label={ v.StatusLabel } class={ "alert alert-soft flex flex-col items-start gap-1", templ.KV("alert-success", v.Tone > 0), templ.KV("alert-warning", v.Tone < 0), templ.KV("alert-info", v.Tone == 0) }>
+			<span class="text-sm">{ v.StatusLabel }</span>
+			<strong class="text-xl font-semibold">{ v.Status }</strong>
+			if v.StatusNote != "" {
+				<span class="text-sm">{ v.StatusNote }</span>
+			}
+		</section>
+		@factCard(v.Fact)
+		@expectedCard(v.Expected, v.Explain)
+	}
+}
+
+templ factCard(lines []MoneyLine) {
+	<section class="card bg-base-100 shadow-sm" aria-label="Факт">
+		<div class="card-body gap-2 p-4">
+			<div class="flex items-center justify-between gap-2">
+				<h2 class="flex items-center gap-2 font-semibold">
+					@Icon("wallet", "size-5")
+					Деньги по записям
+				</h2>
+				<span class="badge badge-info badge-soft">Факт</span>
+			</div>
+			@moneyLines(lines, false)
+		</div>
+	</section>
+}
+
+templ expectedCard(lines []MoneyLine, explain string) {
+	<section class="rounded-box border border-dashed border-base-content/30 p-4 text-sm" aria-label="Ожидается">
+		<div class="mb-2 flex items-center justify-between gap-2 text-base-content/70">
+			<h2 class="flex items-center gap-2 text-base font-semibold">
+				@Icon("calculator", "size-5")
+				Доли по ставке
+			</h2>
+			<span class="badge badge-ghost border-dashed border-base-content/30">Ожидается</span>
+		</div>
+		@moneyLines(lines, true)
+		if explain != "" {
+			<p class="mt-2 text-sm text-base-content/60">{ explain }</p>
+		}
+	</section>
+}
+
+templ moneyLines(lines []MoneyLine, muted bool) {
+	<dl class={ "flex flex-col gap-2", templ.KV("text-base-content/70", muted) }>
+		for _, l := range lines {
+			<div class="flex justify-between gap-3">
+				<dt class={ "min-w-0 [overflow-wrap:anywhere]", templ.KV("font-semibold", l.Strong), templ.KV("text-base-content/70", !l.Strong && !muted) }>{ l.Name }</dt>
+				<dd class={ "shrink-0", templ.KV("font-semibold", l.Strong), templ.KV("font-medium", !l.Strong) }>{ l.Value }</dd>
+			</div>
+		}
+	</dl>
+}
+
+// statusChip is a record's or person's result in one coloured badge.
+templ statusChip(text string, tone int) {
+	<span class={ "badge badge-soft h-auto min-h-6 max-w-full whitespace-normal py-1 text-left", templ.KV("badge-success", tone > 0), templ.KV("badge-warning", tone < 0), templ.KV("badge-ghost", tone == 0) }>{ text }</span>
+}
+
+// PersonMoneyCard is one person in an admin period: result, fact, expected.
+templ PersonMoneyCard(name string, v MoneyView, details []MoneyRow, period string) {
+	<article class="card min-w-0 bg-base-100 shadow-sm">
+		<div class="card-body min-w-0 gap-3 p-4">
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<h3 class="min-w-0 font-semibold [overflow-wrap:anywhere]">{ name }</h3>
+				@statusChip(v.Status, v.Tone)
+			</div>
+			<div>
+				<p class="mb-1 flex items-center gap-2 text-sm font-semibold">Факт</p>
+				@moneyLines(v.Fact, false)
+			</div>
+			<div class="border-t border-dashed border-base-content/30 pt-3">
+				<p class="mb-1 text-sm font-semibold text-base-content/70">Ожидается</p>
+				@moneyLines(v.Expected, true)
+			</div>
+			if len(details) > 0 {
+				<details class="collapse collapse-arrow bg-base-200">
+					<summary class="collapse-title min-h-14">Подробнее</summary>
+					<div class="collapse-content flex flex-col gap-3">@RevenueDetails(details, period)</div>
+				</details>
+			}
+		</div>
+	</article>
+}

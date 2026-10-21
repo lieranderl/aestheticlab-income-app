@@ -32,12 +32,7 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	}
 	sum := domain.Summarize(personReports(reports))
 	page := views.MyMonth{
-		Month: monthLabel(m),
-		Total: domain.FormatEUR(sum.Total), Self: domain.FormatEUR(sum.Self), Salon: domain.FormatEUR(sum.SalonShare),
-		WorkingDays: strconv.Itoa(sum.People[u.ID].WorkingDays), Details: summaryFigures(sum, false),
-	}
-	if len(reports) > 0 {
-		page.Split = selfSplit(sum, "месяц")
+		Month: monthLabel(m), Details: summaryFigures(sum, false), Money: moneyView(sum, "месяца", ownMoney),
 	}
 	if prev := m.Prev(); !prev.Before(start) {
 		page.Prev = "/my?m=" + prev.String()
@@ -64,24 +59,21 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	if terms, ok := history(entries).For(m); ok && status != domain.MonthClosed {
 		if p, ok := domain.SelfProgressFor(sum.SelfBase, terms); ok {
 			page.Progress, page.Reached = progressText(p, baseLabel(sum), anyHandSet(reports)), p.Reached
-			if bonus := domain.SelfBonusFor(sum.SelfBase, sum.BonusBase, terms); bonus > 0 && page.Split.Self != "" {
-				page.Split.Note = "Без доплаты " + domain.FormatEUR(bonus) + " за ставку " + percent(p.HighPct) + ": она начислится при закрытии месяца."
+			if bonus := domain.SelfBonusFor(sum.SelfBase, sum.BonusBase, terms); bonus > 0 && page.Money.Status != "" {
+				page.Money.Expected = append(page.Money.Expected, views.MoneyLine{Name: "Доплата «Себе» за ставку " + percent(p.HighPct) + " (при закрытии)", Value: domain.FormatEUR(bonus)})
 			}
 		}
 	}
 	for i := len(reports) - 1; i >= 0; i-- { // newest first
 		rep := reports[i]
-		card := views.MyReport{
-			Day: ru.DayWithWeekday(rep.Date.Time()) + " · " + clientLabel(rep), Total: domain.FormatEUR(rep.Report.Total),
-			Self: domain.FormatEUR(rep.Report.SelfAmount), Salon: domain.FormatEUR(rep.Report.SalonShare),
-			Effect: clientEffect(rep), Explain: selfEquation(rep), Owed: sign(rep.Report.BalanceDelta),
-		}
+		href := ""
 		if u.SubmitsReports {
-			card.Href = "/reports/day?date=" + rep.Date.String()
+			href = "/reports/day?date=" + rep.Date.String()
 			if rep.Client {
-				card.Href = "/clients/" + rep.ID
+				href = "/clients/" + rep.ID
 			}
 		}
+		card := myReportCard(rep, ru.DayWithWeekday(rep.Date.Time())+" · "+clientLabel(rep), href)
 		page.Reports = append(page.Reports, card)
 	}
 	bal, err := a.store.PersonBalance(r.Context(), u.ID)

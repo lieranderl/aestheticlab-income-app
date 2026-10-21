@@ -1,5 +1,15 @@
 # Progress
 
+## Actual vs expected on every period screen (2026-10-21)
+The owner asked to stop leading with «Себе»/«Салону» and to separate what happened from what the rates expect. The employee «Сегодня» and «Мои записи» pages and the admin «День» and «Месяц» pages now share one `views.MoneyPanel`:
+1. a status line: the records' result («Салон должен вам €113,50» / «Вы должны салону …», or for the admin «Сверка … : ожидалось салону €X · поступило €Y → салон должен сотрудникам / сотрудники должны салону»);
+2. a solid «Факт» card: received from clients, into the kassa (cash, card), paid by certificate, cash still with the employee;
+3. a dashed, muted «Ожидается» card: revenue, «Себе», «Салону», the higher-rate bonus due at close, plus how «Себе» meets the money.
+
+Person cards and record cards follow the same order (status chip, «Факт: …», «Ожидается: …»). Owing is amber, not red. `Summary.KassaCredit` was added (property: KassaCredit − SalonShare == BalanceDelta). The headline tiles are gone from these pages, and the categories, certificates and counts stay in collapsible details.
+
+**Stale CSS fix:** `sw.js` serves `/static/` cache-first, and the stylesheet was loaded as a hand-numbered `app.css?v=3`, so installed apps kept the old CSS after the last deploys. Pages now load `views.StyleURL` (`app.css?v=<sha256 of the file>`), the worker no longer precaches a pinned version, and its cache moves to `kassa-v5`, which drops the old copy.
+
 ## Actual money on admin pages (2026-10-21)
 The admin «День» and «Месяц» pages showed only the expected split («Себе»/«Салону»). They now show the money as it moved, for the period and per person: «Деньги по факту» (kassa cash, kassa card, «Внесено в кассу», «Оставили себе наличными»), and per person also «По записям: салон должен / долг перед салоном». Each record shows «В кассу … · себе наличными … · …». `PersonSummary` gains `CashKept`/`BalanceDelta`. The per-person and record tables were replaced by cards at every width: the 736 px content column could not fit them, which is what made «Подробнее» wrap letter by letter. Display only; no stored data touched.
 
