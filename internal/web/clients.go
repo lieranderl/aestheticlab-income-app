@@ -334,7 +334,11 @@ func selfSplit(s domain.Summary, period string) views.SelfSplit {
 	case s.BalanceDelta < 0:
 		settle = views.MoneyRow{Name: "По записям вы должны салону", Value: signedMoney(s.BalanceDelta)}
 	}
-	return views.SelfSplit{Period: period, Self: domain.FormatEUR(s.Self), Owed: sign(s.BalanceDelta),
+	basis := "услуг"
+	if !servicesOnly(s) {
+		basis = "услуг и продаж, которые идут в «Себе»"
+	}
+	return views.SelfSplit{Period: period, Basis: basis, Self: domain.FormatEUR(s.Self), Owed: sign(s.BalanceDelta),
 		Rows: []views.MoneyRow{{Name: "Оставили себе наличными", Value: domain.FormatEUR(s.CashKept)}, settle}}
 }
 

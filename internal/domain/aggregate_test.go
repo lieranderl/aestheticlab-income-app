@@ -141,6 +141,9 @@ func TestASummaryAddsUpTheSelfBase(t *testing.T) {
 		Revenue:  map[string]domain.Cents{"services": 60000, "creams": 5000, "certificates": 10000},
 		Payments: map[string]domain.Cents{"card": 60000, "cash": 15000}, SelfPct: 5000,
 	})})
+	if s.BonusBase != 65000 {
+		t.Errorf("bonus base = %d, want 650 (no hand-set day)", s.BonusBase)
+	}
 	if s.SelfBase != 65000 || s.People["anna"].SelfBase != 65000 {
 		t.Errorf("«Себе» base = %d, anna's %d; want 650 (the certificate sale is not part of it)", s.SelfBase, s.People["anna"].SelfBase)
 	}
