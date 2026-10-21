@@ -106,7 +106,8 @@ type SelfSplit struct {
 	Period string     // «день», «месяц»
 	Rows   []MoneyRow // the cash kept, then the records' settlement
 	Self   string
-	Owed   int // +1 the salon owes the person, −1 the person owes the salon
+	Owed   int    // +1 the salon owes the person, −1 the person owes the salon
+	Note   string // e.g. the higher-rate bonus still to come at close
 }
 
 // PersonRevenueSummary is RevenueSummary for a person's own day or month.
@@ -117,6 +118,7 @@ templ PersonRevenueSummary(rows []MoneyRow, period string, split SelfSplit) {
 }
 
 templ selfSplit(s SelfSplit) {
+	if len(s.Rows) > 0 {
 	<section class="card min-w-0 bg-base-100 shadow-sm" aria-label="Ваши «Себе»">
 		<div class="card-body min-w-0 gap-3 p-4">
 			<h2 class="font-semibold">Ваши «Себе» за { s.Period }</h2>
@@ -133,8 +135,12 @@ templ selfSplit(s SelfSplit) {
 					<dd class="text-lg font-semibold">{ s.Self }</dd>
 				</div>
 			</dl>
+			if s.Note != "" {
+				<p class="text-sm text-base-content/60">{ s.Note }</p>
+			}
 		</div>
 	</section>
+	}
 }
 
 templ RevenueDetails(rows []MoneyRow, period string) {

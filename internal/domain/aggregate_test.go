@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"math/rand/v2"
 	"reflect"
 	"testing"
 
@@ -170,5 +171,27 @@ func TestSelfIsTheCashKeptPlusWhatTheSalonOwes(t *testing.T) {
 	}
 	if s.CashKept+s.BalanceDelta != s.Self {
 		t.Error("kept + delta must equal «Себе»")
+	}
+}
+
+func TestASummarysCashKeptPlusBalanceAlwaysEqualsSelf(t *testing.T) {
+	rng := rand.New(rand.NewPCG(2026, 10)) //nolint:gosec // seeded on purpose: reproducible, not secret
+	for i := range 200 {
+		var reports []domain.PersonReport
+		for d := range 1 + rng.IntN(5) {
+			pr, err := domain.NewPersonReport("olga", domain.Date{Year: 2026, Mon: 11, Day: 1 + d}, randomDay(rng), salon)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reports = append(reports, pr)
+		}
+		pr, err := domain.NewClientReport("olga", domain.Date{Year: 2026, Mon: 11, Day: 20}, domain.ClientInput{Services: domain.Cents(rng.IntN(50000))}, domain.BasisPoints(rng.IntN(10001)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := domain.Summarize(append(reports, pr))
+		if s.CashKept+s.BalanceDelta != s.Self {
+			t.Fatalf("case %d: kept %d + balance %d != «Себе» %d", i, s.CashKept, s.BalanceDelta, s.Self)
+		}
 	}
 }

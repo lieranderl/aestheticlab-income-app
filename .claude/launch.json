@@ -30,15 +30,6 @@
       ],
       "port": 8080,
       "autoPort": true
-    },
-    {
-      "name": "kassa-e2e",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-lc",
-        "cd \"$(git rev-parse --show-toplevel)\" && PORT=8097 go run ./cmd/e2e"
-      ],
-      "port": 8097
     }
   ]
 }
