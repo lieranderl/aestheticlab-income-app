@@ -30,34 +30,40 @@ func (s *Store) PersonBalance(ctx context.Context, uid string) (domain.Cents, er
 	}
 	var out domain.Cents
 	err := s.db.run(ctx, true, func(t tx) error {
-		months, err := readMonths(t)
-		if err != nil {
-			return err
-		}
-		from := s.start
-		start := domain.Balances{Persons: map[string]domain.Cents{}}
-		if newest := newestClosed(months); newest != nil {
-			snap, err := snapshotOf(months, *newest)
-			if err != nil {
-				return err
-			}
-			start.Persons[uid] = snap.Balances.Persons[uid]
-			from = newest.Next()
-		}
-		reports, err := readReports(t, where("userId", "==", uid), where("date", ">=", from.FirstDay().String()), where("date", "<=", s.Today().String()))
-		if err != nil {
-			return err
-		}
-		ledger, err := readLedger(t, where("personId", "==", uid), where("date", ">=", from.FirstDay().String()), where("date", "<=", s.Today().String()))
-		if err != nil {
-			return err
-		}
-		bal, err := domain.Fold(start, personReports(reports), movements(ledger))
-		if err != nil {
-			return err
-		}
-		out = bal.Persons[uid]
-		return nil
+		var err error
+		out, err = s.personBalance(t, uid)
+		return err
 	})
 	return out, err
+}
+
+// personBalance is PersonBalance inside a transaction.
+func (s *Store) personBalance(t tx, uid string) (domain.Cents, error) {
+	months, err := readMonths(t)
+	if err != nil {
+		return 0, err
+	}
+	from := s.start
+	start := domain.Balances{Persons: map[string]domain.Cents{}}
+	if newest := newestClosed(months); newest != nil {
+		snap, err := snapshotOf(months, *newest)
+		if err != nil {
+			return 0, err
+		}
+		start.Persons[uid] = snap.Balances.Persons[uid]
+		from = newest.Next()
+	}
+	reports, err := readReports(t, where("userId", "==", uid), where("date", ">=", from.FirstDay().String()), where("date", "<=", s.Today().String()))
+	if err != nil {
+		return 0, err
+	}
+	ledger, err := readLedger(t, where("personId", "==", uid), where("date", ">=", from.FirstDay().String()), where("date", "<=", s.Today().String()))
+	if err != nil {
+		return 0, err
+	}
+	bal, err := domain.Fold(start, personReports(reports), movements(ledger))
+	if err != nil {
+		return 0, err
+	}
+	return bal.Persons[uid], nil
 }

@@ -1,5 +1,30 @@
 # Progress
 
+## Change a username and remove a person (2026-10-24)
+On a person's page under «Сотрудники» the admin has two new cards:
+- **«Имя пользователя»** (`POST /admin/users/{uid}/username`) changes the login name. The password and sessions stay, and the old name is free again. `Store.RenameUser` writes an empty `usernames/<old>` claim, because the store has no delete.
+- **«Удалить сотрудника»** (`POST /admin/users/{uid}/remove`, with a required tick box; not offered on your own page) is a soft remove. `User.Removed` is set, access is turned off, the person is logged out everywhere and the login name is freed. They leave the staff list, and their page returns 404.
+
+Removal is written to the audit log as `remove` («Удаление»). Reports, movements, terms and audit rows stay, and `Users()` still returns removed people, so settlement, month close and history are unchanged.
+
+Terms have no end date, so `RemoveUser` refuses while a later close could still post money to the person:
+- reports in a month not yet closed, or pending movements (`ErrOpenRecords`);
+- a salary or profit share in force from the first open month on (`ErrTermsInForce`);
+- a non-zero balance (`ErrBalanceOpen`).
+
+New reports for a removed person are refused (`ErrForbidden`) in both report save paths. When someone leaves: set their terms to 0/0 from the first open month, close their last month, pay out their balance, then remove them.
+
+Tests:
+- store contract tests `TestTheAdminChangesALoginNameAndFreesTheOldOne` and `TestRemovedPeopleKeepTheirHistoryAndFreeTheirLoginName`, on memory and the emulator;
+- HTTP test `TestTheAdminChangesALoginNameAndRemovesAPerson`.
+
+The money-auditor found that a removed person's terms kept accruing, and that a zero balance alone wasn't a safe gate; both are fixed by the checks above. Checked at 375 pt in light and dark. `make ci` passes.
+
+Known limits:
+- No restore in the app.
+- Reopening a closed month the person worked in voids their accruals for it until the month is closed again.
+- Movement pickers still list removed people, so they can be paid out.
+
 ## Theme switcher (2026-10-24)
 «Профиль» has an «Оформление» card with three choices: «Светлая», «Тёмная» and «Как в системе». It is a plain form posting to `POST /profile/theme`, which saves the choice for this device in an HttpOnly `kassa_theme` cookie (a year; «Как в системе» deletes it). A middleware puts the choice in the request context (`views.WithTheme`), and `Layout` renders `data-theme` and the matching `color-scheme` meta. No JS was added and the page doesn't flash. Unknown cookie values are ignored, and public paths (`/offline`, which the service worker caches) always follow the system. Test: `TestEachPhoneChoosesLightDarkOrSystemTheme`. Checked at 375 pt: dark is forced while the phone is light, light while the phone is dark, and «Как в системе» goes back to the phone's setting. `make ci` passes.
 

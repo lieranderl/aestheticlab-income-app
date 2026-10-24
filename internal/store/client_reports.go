@@ -66,7 +66,7 @@ func (s *Store) SaveClientReport(ctx context.Context, actor Actor, e ClientEntry
 		if err != nil {
 			return err
 		}
-		if !actor.Admin && !u.SubmitsReports {
+		if u.Removed || (!actor.Admin && !u.SubmitsReports) { // nothing accrues to a removed person
 			return ErrForbidden
 		}
 		var before reportRecord

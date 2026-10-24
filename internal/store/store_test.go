@@ -232,6 +232,93 @@ func TestPeopleChangeOnlyTheirOwnLoginState(t *testing.T) {
 	})
 }
 
+func TestTheAdminChangesALoginNameAndFreesTheOldOne(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		u, err := s.RenameUser(ctx, s.admin, s.olga, " Olga2 ")
+		must(t, err)
+		if u.Username != "olga2" || u.DisplayName != "Ольга" {
+			t.Errorf("renamed = %+v", u)
+		}
+		got, err := s.UserByUsername(ctx, "olga2")
+		must(t, err)
+		if got.ID != s.olga {
+			t.Errorf("olga2 = %s, want %s", got.ID, s.olga)
+		}
+		_, err = s.UserByUsername(ctx, "olga")
+		wantErr(t, "old name", err, store.ErrNotFound)
+
+		_, err = s.RenameUser(ctx, s.admin, s.maria, "olga2")
+		wantErr(t, "taken name", err, store.ErrUsernameTaken)
+		_, err = s.RenameUser(ctx, s.actor(s.olga), s.olga, "olga3")
+		wantErr(t, "employee renames", err, store.ErrForbidden)
+		_, err = s.CreateUser(ctx, s.admin, store.NewUser{Username: "olga", DisplayName: "Новая Ольга", Role: store.RoleEmployee, PasswordHash: "x"})
+		must(t, err)
+
+		if got := s.actions(t, s.olga); !reflect.DeepEqual(got, []string{store.ActionCreate, store.ActionUpdate}) {
+			t.Errorf("audit = %v", got)
+		}
+	})
+}
+
+func TestRemovedPeopleKeepTheirHistoryAndFreeTheirLoginName(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		wantErr(t, "employee removes", s.RemoveUser(ctx, s.actor(s.maria), s.vera), store.ErrForbidden)
+		wantErr(t, "admin removes self", s.RemoveUser(ctx, s.admin, s.anna), store.ErrForbidden)
+
+		// Work in a month not yet closed would still accrue at its close.
+		_, err := s.SaveReport(ctx, s.actor(s.olga), store.ReportEntry{Person: s.olga, Date: date(t, "2026-11-10"), Revenue: map[string]domain.Cents{"services": 20000}, Payments: map[string]domain.Cents{"card": 20000}})
+		must(t, err)
+		wantErr(t, "report in an open month", s.RemoveUser(ctx, s.admin, s.olga), store.ErrOpenRecords)
+
+		// Terms never end on their own: a salary or profit share in force
+		// would keep accruing at every later close.
+		wantErr(t, "profit share in force", s.RemoveUser(ctx, s.admin, s.maria), store.ErrTermsInForce)
+		must(t, s.SetTerms(ctx, s.admin, s.maria, month(t, "2026-11"), domain.Terms{SelfPct: 7000}, "уходит"))
+		must(t, s.RemoveUser(ctx, s.admin, s.maria))
+
+		// Vera has no salary or share; money still waiting or owed blocks removal.
+		dep, err := s.RecordMovement(ctx, s.actor(s.vera), store.NewMovement{Type: domain.Deposit, Amount: 10000, From: domain.Person(s.vera), To: domain.Account("kassa_cash"), Date: date(t, "2026-11-20")})
+		must(t, err)
+		wantErr(t, "pending movement", s.RemoveUser(ctx, s.admin, s.vera), store.ErrOpenRecords)
+		_, err = s.ConfirmMovement(ctx, s.admin, dep.ID, dep.Version)
+		must(t, err)
+		wantErr(t, "salon owes her", s.RemoveUser(ctx, s.admin, s.vera), store.ErrBalanceOpen)
+		_, err = s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Payout, Amount: 10000, From: domain.Account("kassa_cash"), To: domain.Person(s.vera), Date: date(t, "2026-11-20")})
+		must(t, err)
+
+		before, err := s.User(ctx, s.vera)
+		must(t, err)
+		must(t, s.RemoveUser(ctx, s.admin, s.vera))
+		gone, err := s.User(ctx, s.vera)
+		must(t, err)
+		if !gone.Removed || gone.Active || gone.SessionVersion != before.SessionVersion+1 || gone.DisplayName != "Вера" {
+			t.Errorf("removed = %+v", gone)
+		}
+		_, err = s.UserByUsername(ctx, "vera")
+		wantErr(t, "removed login", err, store.ErrNotFound)
+		terms, err := s.Terms(ctx, s.vera)
+		must(t, err)
+		if len(terms) != 1 {
+			t.Errorf("terms kept = %d, want 1", len(terms))
+		}
+
+		_, err = s.UpdateUser(ctx, s.admin, s.vera, func(u *store.User) error { u.Active, u.Removed = true, false; return nil })
+		wantErr(t, "bring back", err, store.ErrInvalid)
+		_, err = s.RenameUser(ctx, s.admin, s.vera, "vera2")
+		wantErr(t, "rename removed", err, store.ErrInvalid)
+		_, err = s.SaveReport(ctx, s.admin, store.ReportEntry{Person: s.vera, Date: date(t, "2026-11-20"), Revenue: map[string]domain.Cents{"services": 100}, Payments: map[string]domain.Cents{"card": 100}})
+		wantErr(t, "report for a removed person", err, store.ErrForbidden)
+		again, err := s.CreateUser(ctx, s.admin, store.NewUser{Username: "vera", DisplayName: "Вера Н.", Role: store.RoleEmployee, PasswordHash: "x"})
+		must(t, err)
+		if again.ID == s.vera {
+			t.Error("a new account must get a new ID")
+		}
+		if got := s.actions(t, s.vera); !reflect.DeepEqual(got, []string{store.ActionCreate, store.ActionRemove}) {
+			t.Errorf("audit = %v", got)
+		}
+	})
+}
+
 func TestTheServerComputesAndFreezesTheReport(t *testing.T) {
 	eachSalon(t, func(t *testing.T, s *salon) {
 		saved, err := s.SaveReport(ctx, s.actor(s.anna), store.ReportEntry{

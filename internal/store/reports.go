@@ -175,8 +175,12 @@ func (s *Store) SaveReport(ctx context.Context, actor Actor, e ReportEntry) (Sav
 		if err := requireOpen(t, m); err != nil {
 			return err
 		}
-		if _, err := readUser(t, e.Person); err != nil {
+		u, err := readUser(t, e.Person)
+		if err != nil {
 			return err
+		}
+		if u.Removed { // nothing accrues to a removed person
+			return ErrForbidden
 		}
 		var before reportRecord
 		existed, err := t.get(reportPath(e.Person, e.Date), &before)
