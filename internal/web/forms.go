@@ -81,6 +81,12 @@ func problemText(r *http.Request, err error) string {
 	switch {
 	case errors.Is(err, store.ErrUsernameTaken):
 		return "Это имя пользователя уже занято"
+	case errors.Is(err, store.ErrBalanceOpen):
+		return "Удалить можно только при нулевом балансе с салоном — сначала рассчитайтесь"
+	case errors.Is(err, store.ErrOpenRecords):
+		return "Есть отчёты в незакрытом месяце или движения, которые ждут подтверждения — сначала закройте месяц и подтвердите или отмените движения"
+	case errors.Is(err, store.ErrTermsInForce):
+		return "Зарплата или доля в прибыли продолжат начисляться — сначала задайте условия с зарплатой 0 и долей 0 с первого открытого месяца"
 	case errors.Is(err, store.ErrFinancialWritesPaused):
 		return "Запись финансовых операций временно приостановлена"
 	case errors.Is(err, store.ErrMonthClosed):

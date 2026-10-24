@@ -126,7 +126,9 @@ type StaffEdit struct {
 	Self     bool // the admin editing their own account
 	Notice   string
 	Account  AccountForm
+	Login    UsernameForm
 	Password ResetForm
+	Remove   RemoveForm
 	Terms    []TermsRow
 	NewTerms TermsForm
 }
@@ -142,6 +144,17 @@ type AccountForm struct {
 
 // ResetForm sets a new temporary password.
 type ResetForm struct {
+	Error string
+}
+
+// UsernameForm changes the login name.
+type UsernameForm struct {
+	Username string
+	Error    string
+}
+
+// RemoveForm takes the person off the staff.
+type RemoveForm struct {
 	Error string
 }
 
@@ -220,10 +233,12 @@ templ StaffEditPage(nav Nav, s StaffEdit) {
 			@Alert("", s.Notice)
 			@TermsSection(s.ID, s.Terms, s.NewTerms)
 			@AccountFormView(s.ID, s.Self, s.Account)
+			@UsernameFormView(s.ID, s.Login)
 			if s.Self {
 				@OwnPasswordCard()
 			} else {
 				@ResetFormView(s.ID, s.Username, s.Password)
+				@RemoveFormView(s.ID, s.Name, s.Remove)
 			}
 		</div>
 	}
@@ -416,6 +431,60 @@ templ ResetFormView(id, username string, f ResetForm) {
 				<button type="submit" class="btn btn-outline btn-error btn-lg btn-block" data-attr:disabled="$_busy">
 					<span class="loading loading-spinner loading-sm" data-show="$_busy"></span>
 					Сбросить пароль
+				</button>
+			</div>
+		</div>
+	</form>
+}
+
+// UsernameFormView changes the person's login name; the password stays.
+templ UsernameFormView(id string, f UsernameForm) {
+	<form
+		id="username-form"
+		method="post"
+		action={ templ.SafeURL("/admin/users/" + id + "/username") }
+		class="card bg-base-100 shadow-sm"
+		data-signals="{ _busy: false }"
+		data-indicator="_busy"
+		data-on:submit={ sendForm("/admin/users/" + id + "/username") }
+	>
+		<div class="card-body gap-2">
+			<h2 class="card-title">Имя пользователя</h2>
+			@Alert(f.Error, "")
+			@Field("Имя пользователя", "Для входа: латиница и цифры, например olga. Пароль останется прежним.") {
+				<input type="text" name="username" value={ f.Username } class="input input-lg w-full text-base" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" required/>
+			}
+			<div class="pt-4">
+				@SubmitButton("Сохранить")
+			</div>
+		</div>
+	</form>
+}
+
+// RemoveFormView takes the person off the staff, after an explicit tick.
+templ RemoveFormView(id, name string, f RemoveForm) {
+	<form
+		id="remove-form"
+		method="post"
+		action={ templ.SafeURL("/admin/users/" + id + "/remove") }
+		class="card bg-base-100 shadow-sm"
+		data-signals="{ _busy: false }"
+		data-indicator="_busy"
+		data-on:submit={ sendForm("/admin/users/" + id + "/remove") }
+	>
+		<div class="card-body gap-2">
+			<h2 class="card-title">Удалить сотрудника</h2>
+			<p class="text-sm text-base-content/60">Сотрудник сразу выйдет на всех устройствах, больше не сможет войти и пропадёт из списка. Имя пользователя освободится. Отчёты, движения и расчёты прошлых месяцев сохранятся.</p>
+			<p class="text-sm text-base-content/60">Удалить можно, когда месяцы с отчётами сотрудника закрыты, движения подтверждены, с первого открытого месяца заданы зарплата 0 и доля 0, а баланс с салоном — €0.</p>
+			@Alert(f.Error, "")
+			<label class="label min-h-12 cursor-pointer justify-between gap-4 whitespace-normal text-base text-base-content">
+				<span>{ "Да, удалить: " + name }</span>
+				<input type="checkbox" name="confirm" value="1" class="checkbox checkbox-error checkbox-lg" required/>
+			</label>
+			<div class="pt-4">
+				<button type="submit" class="btn btn-outline btn-error btn-lg btn-block" data-attr:disabled="$_busy">
+					<span class="loading loading-spinner loading-sm" data-show="$_busy"></span>
+					Удалить сотрудника
 				</button>
 			</div>
 		</div>

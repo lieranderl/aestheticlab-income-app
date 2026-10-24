@@ -427,6 +427,50 @@ func TestTheAdminManagesStaffAndTheirTerms(t *testing.T) {
 	}
 }
 
+func TestTheAdminChangesALoginNameAndRemovesAPerson(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	phone := s.login("olga", olgaPass)
+	page := "/admin/users/" + s.olga.ID
+	wantPage(t, "edit page", s.get(page, admin), http.StatusOK, `id="username-form"`, `name="username" value="olga"`, `id="remove-form"`, "Удалить сотрудника")
+
+	wantPage(t, "bad name", s.post(page+"/username", url.Values{"username": {"ol ga"}}, admin), http.StatusUnprocessableEntity, "латиница")
+	wantPage(t, "taken name", s.post(page+"/username", url.Values{"username": {"maria"}}, admin), http.StatusUnprocessableEntity, "уже занято")
+	wantRedirect(t, "rename", s.post(page+"/username", url.Values{"username": {"Olga-K"}}, admin), page+"?saved=username")
+	wantPage(t, "renamed", s.get(page+"?saved=username", admin), http.StatusOK, "Имя пользователя изменено", `name="username" value="olga-k"`)
+	wantPage(t, "still signed in after a rename", s.get("/", phone), http.StatusOK)
+	s.login("olga-k", olgaPass)
+
+	if err := s.st.SetTerms(ctx, s.anna.Actor(), s.maria.ID, domain.Month{Year: 2026, Mon: time.November}, domain.Terms{SelfPct: 5000}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.st.SaveReport(ctx, s.maria.Actor(), store.ReportEntry{
+		Person: s.maria.ID, Date: domain.Date{Year: 2026, Mon: time.November, Day: 20},
+		Revenue: map[string]domain.Cents{"services": 100}, Payments: map[string]domain.Cents{"card": 100},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	wantPage(t, "not ticked", s.post(page+"/remove", url.Values{}, admin), http.StatusUnprocessableEntity, "Отметьте «Да, удалить»")
+	sure := url.Values{"confirm": {"1"}}
+	wantPage(t, "open balance", s.post("/admin/users/"+s.maria.ID+"/remove", sure, admin), http.StatusUnprocessableEntity, "отчёты в незакрытом месяце")
+	wantPage(t, "self", s.post("/admin/users/"+s.anna.ID+"/remove", sure, admin), http.StatusForbidden)
+	if strings.Contains(s.get("/admin/users/"+s.anna.ID, admin).Body.String(), `id="remove-form"`) {
+		t.Error("own staff page offers removal")
+	}
+
+	wantRedirect(t, "remove", s.post(page+"/remove", sure, admin), "/admin/users?saved=removed")
+	list := s.get("/admin/users?saved=removed", admin)
+	wantPage(t, "list", list, http.StatusOK, "Сотрудник удалён", ">Мария<")
+	if strings.Contains(list.Body.String(), ">Ольга<") {
+		t.Error("a removed person is still on the staff list")
+	}
+	wantRedirect(t, "the removed person's session", s.get("/", phone), "/login")
+	wantPage(t, "the removed person logs in", s.post("/login", url.Values{"username": {"olga-k"}, "password": {olgaPass}}, nil), http.StatusUnprocessableEntity, "Неверное имя")
+	if res := s.get(page, admin); res.Code != http.StatusNotFound {
+		t.Errorf("removed person's page: %d, want 404", res.Code)
+	}
+}
+
 func TestTheTermsFormExplainsTheProfitShare(t *testing.T) {
 	s := newSite(t)
 	admin := s.login("anna", annaPass)

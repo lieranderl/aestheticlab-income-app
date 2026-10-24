@@ -26,7 +26,10 @@ var (
 	ErrMonthClosed           = errors.New("month closed")            // «Месяц закрыт — сначала откройте его заново»
 	ErrForbidden             = errors.New("forbidden")
 	ErrUsernameTaken         = errors.New("username taken")
-	ErrAlreadySetUp          = errors.New("already set up") // cmd/seed runs once
+	ErrBalanceOpen           = errors.New("balance not settled")      // a person is removed only at a zero balance
+	ErrOpenRecords           = errors.New("records in an open month") // reports in an unclosed month or pending movements
+	ErrTermsInForce          = errors.New("salary or share in force") // terms still pay from the first open month on
+	ErrAlreadySetUp          = errors.New("already set up")           // cmd/seed runs once
 	ErrInvalid               = errors.New("invalid input")
 	ErrFinancialWritesPaused = errors.New("financial writes paused") // «Запись финансовых операций временно приостановлена»
 )

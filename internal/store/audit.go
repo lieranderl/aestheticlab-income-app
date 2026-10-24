@@ -37,7 +37,8 @@ const (
 	ActionClose   = "close"
 	ActionReopen  = "reopen"
 	ActionSetUp   = "setup"
-	ActionLock    = "lock" // too many failed logins
+	ActionLock    = "lock"   // too many failed logins
+	ActionRemove  = "remove" // a person removed; their records stay
 )
 
 // AuditEntry is one row of the change log («Журнал изменений»). Before and

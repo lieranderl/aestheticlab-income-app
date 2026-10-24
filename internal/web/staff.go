@@ -29,6 +29,8 @@ var staffNotices = map[string]string{ // #nosec G101 -- notice texts, not creden
 	"account":  "Учётная запись сохранена.",
 	"password": "Пароль сброшен. Передайте временный пароль сотруднику лично.",
 	"terms":    "Условия сохранены.",
+	"username": "Имя пользователя изменено. Пароль прежний.",
+	"removed":  "Сотрудник удалён. Записи и расчёты сохранены.",
 }
 
 func (a *app) handleStaff(w http.ResponseWriter, r *http.Request, admin store.User) {
@@ -40,6 +42,9 @@ func (a *app) handleStaff(w http.ResponseWriter, r *http.Request, admin store.Us
 	month := a.termsMonthNow()
 	rows := make([]views.StaffRow, 0, len(users))
 	for _, u := range users {
+		if u.Removed {
+			continue
+		}
 		entries, err := a.store.Terms(r.Context(), u.ID)
 		if err != nil {
 			a.serverError(w, r, err)
@@ -147,15 +152,17 @@ func (a *app) staffEdit(r *http.Request, admin, u store.User) (views.StaffEdit, 
 	return views.StaffEdit{
 		ID: u.ID, Name: u.DisplayName, Username: u.Username, Self: u.ID == admin.ID,
 		Account:  views.AccountForm{Name: u.DisplayName, Admin: u.Role == store.RoleAdmin, Reporter: u.SubmitsReports, Active: u.Active},
+		Login:    views.UsernameForm{Username: u.Username},
 		Terms:    rows,
 		NewTerms: form,
 	}, nil
 }
 
-// staffTarget reads the person a /admin/users/{uid} route names.
+// staffTarget reads the person a /admin/users/{uid} route names; a removed
+// person is not found.
 func (a *app) staffTarget(w http.ResponseWriter, r *http.Request) (store.User, bool) {
 	u, err := a.store.User(r.Context(), r.PathValue("uid"))
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) || (err == nil && u.Removed) {
 		http.NotFound(w, r)
 		return store.User{}, false
 	}
@@ -269,6 +276,61 @@ func (a *app) handleResetPassword(w http.ResponseWriter, r *http.Request, admin 
 		return
 	}
 	a.navigate(w, r, "/admin/users/"+u.ID+"?saved=password")
+}
+
+// handleRenameStaff changes the login name; sessions and the password stay.
+func (a *app) handleRenameStaff(w http.ResponseWriter, r *http.Request, admin store.User) {
+	u, ok := a.staffTarget(w, r)
+	if !ok {
+		return
+	}
+	if err := readForm(w, r); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	f := views.UsernameForm{Username: strings.ToLower(strings.TrimSpace(r.PostFormValue("username")))}
+	fail := func(msg string) {
+		f.Error = msg
+		a.staffFormFailed(w, r, admin, u, views.UsernameFormView(u.ID, f), func(s *views.StaffEdit) { s.Login = f })
+	}
+	if !usernamePattern.MatchString(f.Username) {
+		fail("Имя пользователя: 2–32 символа, латиница в нижнем регистре, цифры, «-» или «_»")
+		return
+	}
+	if _, err := a.store.RenameUser(r.Context(), admin.Actor(), u.ID, f.Username); err != nil {
+		fail(problemText(r, err))
+		return
+	}
+	a.navigate(w, r, "/admin/users/"+u.ID+"?saved=username")
+}
+
+// handleRemoveStaff takes a person off the staff; their records stay.
+func (a *app) handleRemoveStaff(w http.ResponseWriter, r *http.Request, admin store.User) {
+	u, ok := a.staffTarget(w, r)
+	if !ok {
+		return
+	}
+	if err := readForm(w, r); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	fail := func(msg string) {
+		f := views.RemoveForm{Error: msg}
+		a.staffFormFailed(w, r, admin, u, views.RemoveFormView(u.ID, u.DisplayName, f), func(s *views.StaffEdit) { s.Remove = f })
+	}
+	if u.ID == admin.ID { // the screen never offers it
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	if r.PostFormValue("confirm") != "1" {
+		fail("Отметьте «Да, удалить», чтобы подтвердить")
+		return
+	}
+	if err := a.store.RemoveUser(r.Context(), admin.Actor(), u.ID); err != nil {
+		fail(problemText(r, err))
+		return
+	}
+	a.navigate(w, r, "/admin/users?saved=removed")
 }
 
 func (a *app) handleSetTerms(w http.ResponseWriter, r *http.Request, admin store.User) {

@@ -144,6 +144,8 @@ func New(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /admin/users/{uid}", a.adminOnly(a.handleStaffEdit))
 	mux.HandleFunc("POST /admin/users/{uid}", a.adminOnly(a.handleUpdateStaff))
 	mux.HandleFunc("POST /admin/users/{uid}/password", a.adminOnly(a.handleResetPassword))
+	mux.HandleFunc("POST /admin/users/{uid}/username", a.adminOnly(a.handleRenameStaff))
+	mux.HandleFunc("POST /admin/users/{uid}/remove", a.adminOnly(a.handleRemoveStaff))
 	mux.HandleFunc("POST /admin/users/{uid}/terms", a.adminOnly(a.handleSetTerms))
 	mux.HandleFunc("GET /admin/categories", a.adminOnly(a.handleCategories))
 	mux.HandleFunc("GET /admin/categories/new", a.adminOnly(a.handleNewCategory))

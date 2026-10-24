@@ -27,6 +27,7 @@ type User struct {
 	Role               Role
 	SubmitsReports     bool
 	Active             bool // may log in
+	Removed            bool // gone from the staff list; their records stay
 	PasswordHash       string
 	MustChangePassword bool
 	SessionVersion     int64
@@ -54,6 +55,7 @@ type userRecord struct {
 	Role               string    `firestore:"role"               json:"role"`
 	SubmitsReports     bool      `firestore:"submitsReports"     json:"submitsReports"`
 	Active             bool      `firestore:"active"             json:"active"`
+	Removed            bool      `firestore:"removed"            json:"removed"`
 	PasswordHash       string    `firestore:"passwordHash"       json:"passwordHash"`
 	MustChangePassword bool      `firestore:"mustChangePassword" json:"mustChangePassword"`
 	SessionVersion     int64     `firestore:"sessionVersion"     json:"sessionVersion"`
@@ -63,14 +65,25 @@ type userRecord struct {
 	UpdatedAt          time.Time `firestore:"updatedAt"          json:"updatedAt"`
 }
 
+// usernameRecord claims a login name for one account. A changed or
+// removed account's old claim is kept with no UID: the name is free again.
 type usernameRecord struct {
 	UID string `firestore:"uid" json:"uid"`
+}
+
+// claimed reads who holds a login name; "" when nobody does.
+func claimed(t tx, name string) (string, error) {
+	var claim usernameRecord
+	if _, err := t.get(usernamePath(name), &claim); err != nil {
+		return "", err
+	}
+	return claim.UID, nil
 }
 
 func (r userRecord) user(id string) User {
 	return User{
 		ID: id, Username: r.Username, DisplayName: r.DisplayName, Role: Role(r.Role),
-		SubmitsReports: r.SubmitsReports, Active: r.Active, PasswordHash: r.PasswordHash,
+		SubmitsReports: r.SubmitsReports, Active: r.Active, Removed: r.Removed, PasswordHash: r.PasswordHash,
 		MustChangePassword: r.MustChangePassword, SessionVersion: r.SessionVersion,
 		FailedLogins: r.FailedLogins, LockedUntil: r.LockedUntil.UTC(),
 		CreatedAt: r.CreatedAt.UTC(), UpdatedAt: r.UpdatedAt.UTC(),
@@ -80,7 +93,7 @@ func (r userRecord) user(id string) User {
 func recordOf(u User) userRecord {
 	return userRecord{
 		Username: u.Username, DisplayName: u.DisplayName, Role: string(u.Role),
-		SubmitsReports: u.SubmitsReports, Active: u.Active, PasswordHash: u.PasswordHash,
+		SubmitsReports: u.SubmitsReports, Active: u.Active, Removed: u.Removed, PasswordHash: u.PasswordHash,
 		MustChangePassword: u.MustChangePassword, SessionVersion: u.SessionVersion,
 		FailedLogins: u.FailedLogins, LockedUntil: u.LockedUntil.UTC(),
 		CreatedAt: u.CreatedAt.UTC(), UpdatedAt: u.UpdatedAt.UTC(),
@@ -115,11 +128,11 @@ func (n NewUser) check() (NewUser, error) {
 
 // createUser writes the user and its username claim; reads come first.
 func (s *Store) createUser(t tx, actorID string, n NewUser) (User, error) {
-	found, err := t.get(usernamePath(n.Username), &usernameRecord{})
+	holder, err := claimed(t, n.Username)
 	if err != nil {
 		return User{}, err
 	}
-	if found {
+	if holder != "" {
 		return User{}, ErrUsernameTaken
 	}
 	now := s.stamp()
@@ -190,15 +203,14 @@ func (s *Store) UserByUsername(ctx context.Context, username string) (User, erro
 	}
 	var u User
 	err = s.db.run(ctx, true, func(t tx) error {
-		var claim usernameRecord
-		found, err := t.get(usernamePath(name), &claim)
+		uid, err := claimed(t, name)
 		if err != nil {
 			return err
 		}
-		if !found {
+		if uid == "" {
 			return ErrNotFound
 		}
-		u, err = readUser(t, claim.UID)
+		u, err = readUser(t, uid)
 		return err
 	})
 	return u, err
@@ -230,8 +242,9 @@ func readUsers(t tx) ([]User, error) {
 }
 
 // UpdateUser changes an account through change (admin, or the person
-// themselves for their own password and login state). The username and ID
-// never change.
+// themselves for their own password and login state). The username, the ID
+// and removal change only through RenameUser and RemoveUser; a removed
+// person never gets access back.
 func (s *Store) UpdateUser(ctx context.Context, actor Actor, uid string, change func(*User) error) (User, error) {
 	if !actor.Admin && actor.UID != uid {
 		return User{}, ErrForbidden
@@ -249,7 +262,10 @@ func (s *Store) UpdateUser(ctx context.Context, actor Actor, uid string, change 
 		if !actor.Admin && (u.Role != before.Role || u.Active != before.Active || u.SubmitsReports != before.SubmitsReports) {
 			return ErrForbidden
 		}
-		u.ID, u.Username, u.CreatedAt, u.UpdatedAt = before.ID, before.Username, before.CreatedAt, s.stamp()
+		if before.Removed && u.Active {
+			return fmt.Errorf("%w: removed user", ErrInvalid)
+		}
+		u.ID, u.Username, u.Removed, u.CreatedAt, u.UpdatedAt = before.ID, before.Username, before.Removed, before.CreatedAt, s.stamp()
 		rec := recordOf(u)
 		if err := t.set(userPath(uid), rec); err != nil {
 			return err
@@ -257,6 +273,140 @@ func (s *Store) UpdateUser(ctx context.Context, actor Actor, uid string, change 
 		return s.audit(t, EntityUser, uid, ActionUpdate, actor.UID, recordOf(before).audited(), rec.audited())
 	})
 	return u, err
+}
+
+// RenameUser changes a person's login name (admin only) and frees the old
+// one. Sessions stay: they name the account, not the login.
+func (s *Store) RenameUser(ctx context.Context, actor Actor, uid, username string) (User, error) {
+	if !actor.Admin {
+		return User{}, ErrForbidden
+	}
+	name, err := normalizeUsername(username)
+	if err != nil {
+		return User{}, err
+	}
+	var u User
+	err = s.db.run(ctx, false, func(t tx) error {
+		before, err := readUser(t, uid)
+		if err != nil {
+			return err
+		}
+		if before.Removed {
+			return fmt.Errorf("%w: removed user", ErrInvalid)
+		}
+		u = before
+		if name == before.Username {
+			return nil
+		}
+		holder, err := claimed(t, name)
+		if err != nil {
+			return err
+		}
+		if holder != "" {
+			return ErrUsernameTaken
+		}
+		u.Username, u.UpdatedAt = name, s.stamp()
+		rec := recordOf(u)
+		if err := t.set(userPath(uid), rec); err != nil {
+			return err
+		}
+		if err := t.set(usernamePath(before.Username), usernameRecord{}); err != nil {
+			return err
+		}
+		if err := t.set(usernamePath(name), usernameRecord{UID: uid}); err != nil {
+			return err
+		}
+		return s.audit(t, EntityUser, uid, ActionUpdate, actor.UID, recordOf(before).audited(), rec.audited())
+	})
+	return u, err
+}
+
+// RemoveUser takes a person off the staff (admin only, never the admin
+// themselves): they are logged out everywhere, can't log in again, and their
+// login name is free. Their reports, movements, terms and audit rows stay,
+// so past months still add up. Nothing may accrue to them afterwards, so it
+// needs: no reports in a month not yet closed and no pending movements
+// (ErrOpenRecords), no salary or profit share in force from the first open
+// month on — terms never end on their own (ErrTermsInForce) — and a zero
+// balance with the salon (ErrBalanceOpen).
+func (s *Store) RemoveUser(ctx context.Context, actor Actor, uid string) error {
+	if !actor.Admin || actor.UID == uid {
+		return ErrForbidden
+	}
+	if err := checkID("user", uid); err != nil {
+		return ErrNotFound
+	}
+	return s.db.run(ctx, false, func(t tx) error {
+		before, err := readUser(t, uid)
+		if err != nil {
+			return err
+		}
+		if before.Removed {
+			return nil
+		}
+		if err := s.checkNothingAccrues(t, uid); err != nil {
+			return err
+		}
+		balance, err := s.personBalance(t, uid)
+		if err != nil {
+			return err
+		}
+		if balance != 0 {
+			return ErrBalanceOpen
+		}
+		u := before
+		u.Removed, u.Active, u.UpdatedAt = true, false, s.stamp()
+		u.SessionVersion++ // out on every device at once
+		rec := recordOf(u)
+		if err := t.set(userPath(uid), rec); err != nil {
+			return err
+		}
+		if err := t.set(usernamePath(before.Username), usernameRecord{}); err != nil {
+			return err
+		}
+		return s.audit(t, EntityUser, uid, ActionRemove, actor.UID, recordOf(before).audited(), rec.audited())
+	})
+}
+
+// checkNothingAccrues refuses while a month close could still post money to
+// the person: work or pending movements in open months, or terms that pay.
+func (s *Store) checkNothingAccrues(t tx, uid string) error {
+	months, err := readMonths(t)
+	if err != nil {
+		return err
+	}
+	firstOpen := s.start
+	if newest := newestClosed(months); newest != nil {
+		firstOpen = newest.Next()
+	}
+	reports, err := readReports(t, where("userId", "==", uid), where("month", ">=", firstOpen.String()))
+	if err != nil {
+		return err
+	}
+	if len(reports) > 0 {
+		return ErrOpenRecords
+	}
+	pending, err := readLedger(t, where("personId", "==", uid), where("status", "==", string(domain.Pending)))
+	if err != nil {
+		return err
+	}
+	if len(pending) > 0 {
+		return ErrOpenRecords
+	}
+	history, err := readTermsHistory(t, uid)
+	if err != nil {
+		return err
+	}
+	pays := func(x domain.Terms) bool { return x.SalaryCents != 0 || x.DividendWeight != 0 }
+	if current, ok := history.For(firstOpen); ok && pays(current) {
+		return ErrTermsInForce
+	}
+	for from, x := range history {
+		if firstOpen.Before(from) && pays(x) {
+			return ErrTermsInForce
+		}
+	}
+	return nil
 }
 
 // RecordLoginFailure counts a wrong password. At limit failures the account
@@ -356,8 +506,12 @@ func (s *Store) SetTerms(ctx context.Context, actor Actor, uid string, m domain.
 		return &domain.ValidationError{Field: "month", Problem: domain.ProblemBeforeStartMonth}
 	}
 	return s.db.run(ctx, false, func(t tx) error {
-		if _, err := readUser(t, uid); err != nil {
+		u, err := readUser(t, uid)
+		if err != nil {
 			return err
+		}
+		if u.Removed { // RemoveUser made sure nothing pays them; keep it so
+			return ErrForbidden
 		}
 		status, err := readMonthStatus(t, m)
 		if err != nil {

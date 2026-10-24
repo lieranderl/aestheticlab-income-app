@@ -113,6 +113,7 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 		store.ActionReopen:  "Открытие заново",
 		store.ActionSetUp:   "Первоначальная настройка",
 		store.ActionLock:    "Блокировка входа",
+		store.ActionRemove:  "Удаление",
 	}[row.Action]
 	if p.Action == "" {
 		p.Action = "Изменение"
