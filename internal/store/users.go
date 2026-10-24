@@ -506,8 +506,12 @@ func (s *Store) SetTerms(ctx context.Context, actor Actor, uid string, m domain.
 		return &domain.ValidationError{Field: "month", Problem: domain.ProblemBeforeStartMonth}
 	}
 	return s.db.run(ctx, false, func(t tx) error {
-		if _, err := readUser(t, uid); err != nil {
+		u, err := readUser(t, uid)
+		if err != nil {
 			return err
+		}
+		if u.Removed { // RemoveUser made sure nothing pays them; keep it so
+			return ErrForbidden
 		}
 		status, err := readMonthStatus(t, m)
 		if err != nil {

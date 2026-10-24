@@ -308,6 +308,7 @@ func TestRemovedPeopleKeepTheirHistoryAndFreeTheirLoginName(t *testing.T) {
 		wantErr(t, "rename removed", err, store.ErrInvalid)
 		_, err = s.SaveReport(ctx, s.admin, store.ReportEntry{Person: s.vera, Date: date(t, "2026-11-20"), Revenue: map[string]domain.Cents{"services": 100}, Payments: map[string]domain.Cents{"card": 100}})
 		wantErr(t, "report for a removed person", err, store.ErrForbidden)
+		wantErr(t, "terms for a removed person", s.SetTerms(ctx, s.admin, s.vera, month(t, "2026-12"), domain.Terms{SelfPct: 5000, SalaryCents: 50000, DividendWeight: 1}, ""), store.ErrForbidden)
 		again, err := s.CreateUser(ctx, s.admin, store.NewUser{Username: "vera", DisplayName: "Вера Н.", Role: store.RoleEmployee, PasswordHash: "x"})
 		must(t, err)
 		if again.ID == s.vera {
