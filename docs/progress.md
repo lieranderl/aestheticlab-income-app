@@ -1,5 +1,8 @@
 # Progress
 
+## Theme switcher (2026-10-24)
+«Профиль» has an «Оформление» card with three choices: «Светлая», «Тёмная» and «Как в системе». It is a plain form posting to `POST /profile/theme`, which saves the choice for this device in an HttpOnly `kassa_theme` cookie (a year; «Как в системе» deletes it). A middleware puts the choice in the request context (`views.WithTheme`), and `Layout` renders `data-theme` and the matching `color-scheme` meta. No JS was added and the page doesn't flash. Unknown cookie values are ignored, and public paths (`/offline`, which the service worker caches) always follow the system. Test: `TestEachPhoneChoosesLightDarkOrSystemTheme`. Checked at 375 pt: dark is forced while the phone is light, light while the phone is dark, and «Как в системе» goes back to the phone's setting. `make ci` passes.
+
 ## Actual vs expected on every period screen (2026-10-21)
 The owner asked to stop leading with «Себе»/«Салону» and to separate what happened from what the rates expect. The employee «Сегодня» and «Мои записи» pages and the admin «День» and «Месяц» pages now share one `views.MoneyPanel`:
 1. a status line: the records' result («Салон должен вам €113,50» / «Вы должны салону …», or for the admin «Сверка … : ожидалось салону €X · поступило €Y → салон должен сотрудникам / сотрудники должны салону»);
