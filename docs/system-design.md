@@ -227,7 +227,7 @@ The phone is the main device for **everyone**, the admin included. Every screen 
 - **Text size:** inputs use at least 16 px text, so iOS doesn't zoom in. Pinch-zoom stays on.
 - **Safe areas:** `viewport-fit=cover` and `env(safe-area-inset-bottom)` padding.
 - **No drag and drop:** reordering uses ↑ ↓ buttons, and editing opens a bottom sheet (native `<dialog>`).
-- **Themes:** light and dark brand themes, following the phone's system setting.
+- **Themes:** light and dark brand themes. By default they follow the phone's system setting; «Профиль → Оформление» can force «Светлая» or «Тёмная» on this device (cookie `kassa_theme`, a year; «Как в системе» deletes it). The server renders `data-theme` on `<html>`, so there is no script and no flash. The cached `/offline` page always follows the system.
 - **Orientation:** portrait first; landscape must not break.
 
 ### 6.1a Information clarity contract (2026-10-13)

@@ -56,14 +56,21 @@ const redirectEffect = `if ($redirectUrl) { window.location.assign($redirectUrl)
 const swInit = `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js') }`
 
 // Layout is the document shell: phone first, bottom tab bar below lg and a
-// sidebar from lg. The theme follows the phone's light/dark setting.
+// sidebar from lg. The theme follows the phone's light/dark setting unless
+// the person chose one in the profile (WithTheme).
 templ Layout(title string, nav Nav) {
+	{{ theme := themeFrom(ctx) }}
 	<!DOCTYPE html>
-	<html lang="ru">
+	<html
+		lang="ru"
+		if daisyTheme(theme) != "" {
+			data-theme={ daisyTheme(theme) }
+		}
+	>
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-			<meta name="color-scheme" content="light dark"/>
+			<meta name="color-scheme" content={ colorScheme(theme) }/>
 			<meta name="theme-color" content="#8b9687"/>
 			<title>{ title } · Касса</title>
 			<link rel="icon" type="image/svg+xml" href="/static/icons/favicon.svg"/>

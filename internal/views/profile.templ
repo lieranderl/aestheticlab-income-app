@@ -17,6 +17,26 @@ type Profile struct {
 	Password PasswordForm
 }
 
+type themeChoice struct {
+	Value Theme
+	Form  string
+	Label string
+	Icon  string
+}
+
+var themeChoices = []themeChoice{
+	{ThemeLight, "light", "Светлая", "sun"},
+	{ThemeDark, "dark", "Тёмная", "moon"},
+	{ThemeSystem, "system", "Как в системе", "smartphone"},
+}
+
+func pressed(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
 // ProfilePage shows the person's account, the password change and «Выйти».
 templ ProfilePage(nav Nav, p Profile) {
 	@Layout("Профиль", nav) {
@@ -42,6 +62,7 @@ templ ProfilePage(nav Nav, p Profile) {
 				</div>
 			}
 			@PasswordFormView(p.Password)
+			@ThemeCard()
 			@InstallCard()
 			<form method="post" action="/logout">
 				<button type="submit" class="btn btn-ghost btn-lg btn-block text-error">
@@ -51,6 +72,33 @@ templ ProfilePage(nav Nav, p Profile) {
 			</form>
 		</div>
 	}
+}
+
+// ThemeCard lets the person pick light, dark or the phone's own setting for
+// this phone. A plain form: the choice is a cookie, so the next page load
+// renders in it without any script.
+templ ThemeCard() {
+	{{ current := themeFrom(ctx) }}
+	<form method="post" action="/profile/theme" class="card bg-base-100 shadow-sm">
+		<div class="card-body gap-2">
+			<h2 class="card-title">Оформление</h2>
+			<p class="text-sm text-base-content/70">Только на этом устройстве.</p>
+			<div class="join w-full" role="group" aria-label="Тема">
+				for _, c := range themeChoices {
+					<button
+						type="submit"
+						name="theme"
+						value={ c.Form }
+						aria-pressed={ pressed(c.Value == current) }
+						class={ "btn join-item flex-1 min-h-11 h-auto py-2 flex-col gap-1 text-xs sm:flex-row sm:text-sm", templ.KV("btn-primary", c.Value == current) }
+					>
+						@Icon(c.Icon, "size-5")
+						{ c.Label }
+					</button>
+				}
+			</div>
+		</div>
+	</form>
 }
 
 // InstallCard explains how to put the app on the Home Screen; the installed

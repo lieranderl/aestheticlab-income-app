@@ -113,6 +113,7 @@ func New(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /reports/{date}", a.signedIn(a.handleSaveReport))
 	mux.HandleFunc("GET /profile", a.signedIn(a.handleProfile))
 	mux.HandleFunc("POST /profile/password", a.signedIn(a.handleChangePassword))
+	mux.HandleFunc("POST /profile/theme", a.signedIn(a.handleSetTheme))
 	mux.HandleFunc("GET /my", a.signedIn(a.handleMy))
 	mux.HandleFunc("GET /admin/kassa", a.adminOnly(a.handleKassa))
 	mux.HandleFunc("GET /admin/movements/new", a.adminOnly(a.handleMovementPage))
@@ -157,7 +158,7 @@ func New(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("/admin/", a.adminOnly(func(w http.ResponseWriter, r *http.Request, _ store.User) { http.NotFound(w, r) }))
 
 	secure := strings.HasPrefix(cfg.BaseURL, "https://")
-	protected := http.NewCrossOriginProtection().Handler(mux)
+	protected := http.NewCrossOriginProtection().Handler(withTheme(mux))
 	return recovery(securityHeaders(secure, logging(noStore(protected)))), nil
 }
 
