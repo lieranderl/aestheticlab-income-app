@@ -1,5 +1,9 @@
 # Progress
 
+## Frontend dependency refresh (2026-10-26)
+
+PR #31 updates Playwright to 1.64.1, daisyUI to 5.7.50 and Lucide to 1.59.0. Regenerated `static/app.css` to fix the generated-assets CI failure; icon output is unchanged. Validation is recorded by the PR’s final CI checks.
+
 ## Scale to zero without traffic (2026-10-26)
 
 Owner requested scale to 0 when there is no traffic. Production minimum instances already effectively 0; the three-region, five-minute «Kassa production readyz» probes kept sending requests. With owner approval, removed the uptime check and its associated «Kassa production readyz failing» alert. Verified the check was absent and the passive «Kassa production 5xx responses» alert remained enabled. Actual scale-down was not observed during the change. Shared agent instructions and the operations runbook now prohibit recreating periodic keep-alive monitoring without owner approval; see [Scale to zero](MAINTAINING.md#scale-to-zero).
