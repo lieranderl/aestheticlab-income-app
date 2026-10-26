@@ -9,7 +9,7 @@ require (
 	github.com/xuri/excelize/v2 v2.11.1-0.20260915055537-22f76f9acb94
 	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.61.0
-	google.golang.org/api v0.303.0
+	google.golang.org/api v0.304.0
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
