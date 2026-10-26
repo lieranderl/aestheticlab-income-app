@@ -9,6 +9,8 @@ Use [Bounded agent work](agent-workflow.md) for task intake, ownership, reviewer
 ## Instructions
 - `AGENTS.md` holds the instructions. `CLAUDE.md` and `GEMINI.md` are symlinks to it. Codex reads `AGENTS.md` directly.
 - `.gemini/settings.json` also points Gemini at `AGENTS.md`.
+- **Production scale to zero:** when there is no traffic, `aestheticlab-income` must be allowed to scale to 0. Keep minimum instances at 0 and do not recreate the removed uptime check or add periodic keep-alive traffic without explicit owner approval. Passive 5xx alerts remain enabled. The decision and executed commands are recorded in [MAINTAINING.md → Scale to zero](MAINTAINING.md#scale-to-zero).
+- Show the exact commands that change cloud resources in the conversation, with secrets redacted, and report the verified result; terminal output may be hidden by the agent UI.
 - Read `docs/progress.md` for current work and `docs/plans/client-entries.md` for the reporting model introduced in PR #24. Older daily-form descriptions are legacy; new entries split services only, with extras fully credited to the selected kassa account.
 - Shared signed-in identity lives in `views.Nav.User`, populated by `navFor` from the authenticated user. Use it in the phone header and desktop sidebar, including when an admin edits someone else's entry; `/login` has no user badge.
 - Mobile information architecture follows `system-design.md` §6.1a: separate entry, help and results; group analytical metrics; distinguish contributions, current balances and settlement estimates. The [mobile audit](reviews/2026-10-13-mobile-ui/REVIEW.md) records the implementation, before/after screenshots and verification limits; deployment status is in `progress.md`.

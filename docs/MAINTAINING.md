@@ -19,8 +19,25 @@ Operations runbook. Project **`<project>`** (number `<project-number>`), region 
 | Backups bucket | `gs://<project>-income-backups` | Uniform access, public access prevention, objects deleted after 1,095 days, label `app=kassa`. **90-day retention policy (unlocked)**: no one can delete or overwrite an export younger than 90 days; 7-day soft delete on top. The Firestore service agent can write to it. Locking the retention policy would make it permanent and can't be undone; it's left unlocked on purpose. |
 | Monthly export | Cloud Scheduler job `income-firestore-export` | `0 3 1 * *` Europe/Brussels. POSTs to `…/databases/aestheticlab-income:exportDocuments` with an **OAuth** token (scope `datastore`) as the backup account. The output goes to a timestamped folder in the bucket. |
 | Alert | «Kassa production 5xx responses» | Any 5xx in 5 minutes → the existing channel «Aesthetic Lab production alerts» (<owner-email>). |
-| Uptime check and alert | «Kassa production readyz» / «Kassa production readyz failing» | `https://<app-host>/readyz` every 5 minutes from Europe, the USA and Asia-Pacific; it must answer 200 with `ready`. Alert when 2+ regions fail. Policy template in `scripts/infra/monitoring/kassa-uptime.json` (`${CHECK_ID}` is filled in by `create-uptime-alert.sh`, because Monitoring assigns the ID on creation). |
+| Uptime check and alert (removed 2026-10-26) | «Kassa production readyz» / «Kassa production readyz failing» | Removed with owner approval to allow scale to zero without traffic. Do not recreate them; see Scale to zero below. The old template and helper are historical only. |
 | Budget | «Kassa (app=kassa)» | €5/month on the billing account, filtered by label `app=kassa`. Alerts at 50, 90 and 100 %, plus a forecast alert. Firestore can't carry labels, so its few cents aren't counted. |
+
+### Scale to zero
+
+**Owner decision, 2026-10-26:** `aestheticlab-income` must be allowed to scale to **0 instances when there is no traffic**. Keep minimum instances at 0 at both service and revision levels. Do not introduce periodic uptime checks, keep-alive requests or synthetic monitoring that prevents idle scale-down without explicit owner approval.
+
+Live inspection found no configured minimum above zero and request-based billing (`cpu-throttling=true`). The «Kassa production readyz» uptime check sent `/readyz` requests every 300 seconds from Europe, Oregon and Asia-Pacific. Request logs confirmed continuous probes during otherwise idle periods. These probes interrupted the idle period. Cloud Run may retain idle instances for up to 15 minutes ([container contract](https://docs.cloud.google.com/run/docs/container-contract#idle)); scale-down is not immediate, and real traffic can keep instances running or wake the service again.
+
+Google Cloud offers no pause setting for this check, so the following resources were deleted with owner approval:
+
+```sh
+gcloud alpha monitoring policies delete 16739582540266447850 \
+  --project <project> --quiet
+gcloud monitoring uptime delete kassa-production-readyz-tqSNNJ253DM \
+  --project <project> --quiet
+```
+
+Verification: the uptime-check list was empty and «Kassa production 5xx responses» remained enabled (policy `3379322412629931554`). Actual scale-down to zero was not observed during this change. Configuration snapshots were saved locally in `/private/tmp/kassa-uptime-check-20261026.json` and `/private/tmp/kassa-uptime-alert-20261026.json`; these are temporary files, not durable backups. The `/readyz` endpoint and deployment candidate readiness check remain available; passive error alerts generate no application requests. Removing active probes means outages while nobody uses the app are no longer proactively detected.
 
 ### Cloud Run service settings
 These live on the service. The deploy workflow only changes the image.
@@ -198,11 +215,8 @@ gcloud scheduler jobs create http income-firestore-export --project $P --locatio
 export PROJECT=$P CHANNEL_ID=<channel-id> APP_HOST=<app-host>
 envsubst '${PROJECT} ${CHANNEL_ID}' < scripts/infra/monitoring/kassa-5xx.json > /tmp/kassa-5xx.json
 gcloud alpha monitoring policies create --project $P --policy-from-file=/tmp/kassa-5xx.json
-gcloud monitoring uptime create "Kassa production readyz" --project $P --resource-type=uptime-url \
-  --resource-labels=host=$APP_HOST,project_id=$P --protocol=https --port=443 --path=/readyz \
-  --validate-ssl=true --status-codes=200 --matcher-content=ready --matcher-type=contains-string \
-  --period=5 --timeout=10 --regions=europe,usa-oregon,asia-pacific --user-labels=app=kassa
-scripts/infra/monitoring/create-uptime-alert.sh   # uses PROJECT, CHANNEL_ID and APP_HOST; looks up the new check ID and fills kassa-uptime.json
+# No periodic uptime check: owner requires scale to zero without traffic (2026-10-26).
+# Do not run create-uptime-alert.sh; its template is historical only.
 
 # 9. Budget
 gcloud services enable billingbudgets.googleapis.com --project $P

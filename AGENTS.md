@@ -13,6 +13,7 @@ It replaces the «Aesthetic Lab Finance» Google Sheet.
 - **October 2026 is the first real month (decision 2026-10-14).** It runs in parallel with the sheet, which stays the record until October reconciles. Openings are dated 2026-10-01, and 1–14 October is backfilled from the sheet.
 - Treat all October production data as real: no test entries, and never delete October records. The earlier practice entries were voided in the app and stay.
 - Trial resources were retired; do not recreate them. See `docs/MAINTAINING.md`.
+- **Scale to zero (2026-10-26):** Cloud Run must be allowed to scale to 0 when there is no traffic. Keep minimum instances at 0; do not add periodic uptime checks, keep-alive requests or synthetic monitoring that keeps it awake without explicit owner approval. The `Kassa production readyz` check and its associated alert were removed for this reason; the passive 5xx alert remains enabled. See `docs/MAINTAINING.md` → Scale to zero.
 
 `CLAUDE.md` and `GEMINI.md` are symlinks to this file. Skills live in `.agents/skills/` (`.claude/skills` is a symlink to it).
 
