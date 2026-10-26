@@ -1,5 +1,9 @@
 # Progress
 
+## Scale to zero without traffic (2026-10-26)
+
+Owner requested scale to 0 when there is no traffic. Production minimum instances already effectively 0; the three-region, five-minute «Kassa production readyz» probes kept sending requests. With owner approval, removed the uptime check and its associated «Kassa production readyz failing» alert. Verified the check was absent and the passive «Kassa production 5xx responses» alert remained enabled. Actual scale-down was not observed during the change. Shared agent instructions and the operations runbook now prohibit recreating periodic keep-alive monitoring without owner approval; see [Scale to zero](MAINTAINING.md#scale-to-zero).
+
 ## Change a username and remove a person (2026-10-24)
 On a person's page under «Сотрудники» the admin has two new cards:
 - **«Имя пользователя»** (`POST /admin/users/{uid}/username`) changes the login name. The password and sessions stay, and the old name is free again. `Store.RenameUser` writes an empty `usernames/<old>` claim, because the store has no delete.
