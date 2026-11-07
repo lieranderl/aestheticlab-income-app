@@ -115,4 +115,5 @@ Python service that already reads these calendars with `calendar.readonly` via i
 ## Open questions
 Resolved 2026-11-07: status is only `Confirmed`; same GCP project as the bot (the kassa still uses its own service account); booked counts live-only for v1.
 
-1. Outside this plan: the bot forwards the full description (client phone and email) into a Telegram chat — owner to decide if that is intended.
+1. Do any Timely service names contain ` - ` (e.g. "Laser - Full Legs")? Owner doesn't know (2026-11-07). Kept safe: such bookings are Unreadable, so no client text can leak, but they would show a daily warning and not be counted. Check at go-live (step 6): if the unreadable count is above 0 for real bookings, switch to a list of the salon's service names.
+2. Outside this plan: the bot forwards the full description (client phone and email) into a Telegram chat — owner to decide if that is intended.
