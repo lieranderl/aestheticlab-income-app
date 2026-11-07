@@ -137,3 +137,10 @@ func parseTimelyPrice(s string) (Cents, bool) {
 	}
 	return Cents(e*100 + c), true
 }
+
+// BookingRef names one Timely booking: the Google calendar it is in and the
+// event's ID there. It holds nothing personal.
+type BookingRef struct {
+	Calendar string `firestore:"calendar" json:"calendar"`
+	Event    string `firestore:"event" json:"event"`
+}

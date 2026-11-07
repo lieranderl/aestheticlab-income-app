@@ -9,6 +9,9 @@ type ClientInput struct {
 	ServiceCash       Cents            `firestore:"serviceCash" json:"serviceCash"`
 	ServiceCard       Cents            `firestore:"serviceCard" json:"serviceCard"`
 	CertificatePaid   Cents            `firestore:"certificatePaid" json:"certificatePaid"`
+	// Booking is the Timely booking this client came from, if linked. It
+	// never affects money.
+	Booking *BookingRef `firestore:"booking,omitempty" json:"booking,omitempty"`
 }
 
 // NewClientReport reuses the report/balance rules. Every extra sale goes to

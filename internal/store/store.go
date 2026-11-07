@@ -31,6 +31,7 @@ var (
 	ErrTermsInForce          = errors.New("salary or share in force") // terms still pay from the first open month on
 	ErrAlreadySetUp          = errors.New("already set up")           // cmd/seed runs once
 	ErrInvalid               = errors.New("invalid input")
+	ErrBookingTaken          = errors.New("booking already entered") // «Эта запись уже внесена»
 	ErrFinancialWritesPaused = errors.New("financial writes paused") // «Запись финансовых операций временно приостановлена»
 )
 
