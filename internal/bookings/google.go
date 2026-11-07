@@ -10,6 +10,8 @@ import (
 	calendar "google.golang.org/api/calendar/v3"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
+
+	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 )
 
 // Google reads calendars through the Calendar API with read-only scope. In
@@ -66,6 +68,10 @@ func eventOf(it *calendar.Event) Event {
 	if it.Start != nil && it.Start.DateTime != "" {
 		if t, err := time.Parse(time.RFC3339, it.Start.DateTime); err == nil {
 			ev.Start = t
+		}
+	} else if it.Start != nil && it.Start.Date != "" {
+		if d, err := domain.ParseDate(it.Start.Date); err == nil {
+			ev.AllDay = d
 		}
 	}
 	return ev

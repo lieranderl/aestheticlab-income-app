@@ -98,17 +98,15 @@ func (s *Store) readLinkable(t tx, actor Actor, id string) (reportRecord, error)
 	if !found || rec.ClientInput == nil || rec.Voided {
 		return rec, ErrNotFound
 	}
-	if !actor.Admin {
-		if actor.UID != rec.UserID {
-			return rec, ErrForbidden
-		}
-		u, err := readUser(t, rec.UserID)
-		if err != nil {
-			return rec, err
-		}
-		if !u.SubmitsReports {
-			return rec, ErrForbidden
-		}
+	if !actor.Admin && actor.UID != rec.UserID {
+		return rec, ErrForbidden
+	}
+	u, err := readUser(t, rec.UserID)
+	if err != nil {
+		return rec, err
+	}
+	if u.Removed || (!actor.Admin && !u.SubmitsReports) { // as SaveClientReport
+		return rec, ErrForbidden
 	}
 	return rec, nil
 }
@@ -245,7 +243,7 @@ func (s *Store) BookingLinks(ctx context.Context, refs []domain.BookingRef) (map
 			}
 			d, err := domain.ParseDate(lock.Date)
 			if err != nil {
-				return err
+				continue // a malformed lock never hides the others
 			}
 			out[ref] = BookingLink{ReportID: lock.ReportID, Person: lock.Person, Date: d}
 		}

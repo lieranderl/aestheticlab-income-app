@@ -33,7 +33,8 @@ type Event struct {
 	ID          string
 	Summary     string
 	Description string
-	Start       time.Time // zero for all-day events
+	Start       time.Time   // zero for all-day events
+	AllDay      domain.Date // the date of an all-day event
 	Cancelled   bool
 }
 
@@ -124,10 +125,20 @@ func (r *Reader) Day(ctx context.Context, uid string, day domain.Date) (Day, err
 	}
 	var out Day
 	for _, ev := range events {
-		if ev.Cancelled || ev.Start.IsZero() || domain.Today(ev.Start, r.loc) != day {
+		if ev.Cancelled {
 			continue
 		}
-		switch c := domain.ClassifyEvent(ev.Summary, ev.Description); c.Kind {
+		c := domain.ClassifyEvent(ev.Summary, ev.Description)
+		if ev.Start.IsZero() { // all day, or a time that didn't parse
+			if c.Kind != domain.EventUnrelated && (ev.AllDay == day || ev.AllDay == domain.Date{}) {
+				out.Unreadable++ // a Timely booking always has a time
+			}
+			continue
+		}
+		if domain.Today(ev.Start, r.loc) != day {
+			continue
+		}
+		switch c.Kind {
 		case domain.EventBooking:
 			out.Bookings = append(out.Bookings, Item{Ref: domain.BookingRef{Calendar: cal, Event: ev.ID}, Start: ev.Start, Booking: c.Booking})
 		case domain.EventUnreadable:
@@ -192,12 +203,31 @@ func (r *Reader) Statuses(ctx context.Context, day domain.Date, refs []domain.Bo
 	ctx, cancel := context.WithTimeout(ctx, Timeout)
 	defer cancel()
 	out := make(map[domain.BookingRef]LinkStatus, len(refs))
+	// A 404 means deleted only on a calendar we can still read: a lost share
+	// or a remapped calendar is an outage, never a deletion.
+	readable := map[string]bool{}
+	from, to := day.Window(r.loc)
+	for _, ref := range refs {
+		if _, probed := readable[ref.Calendar]; !probed {
+			readable[ref.Calendar] = false
+			if r.mapped(ref.Calendar) {
+				_, err := r.src.List(ctx, ref.Calendar, from, to)
+				readable[ref.Calendar] = err == nil
+			}
+		}
+	}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for i, ref := range refs {
 		if i >= MaxLinkChecks {
 			mu.Lock()
 			out[ref] = LinkStatus{State: LinkUnchecked}
+			mu.Unlock()
+			continue
+		}
+		if !readable[ref.Calendar] {
+			mu.Lock()
+			out[ref] = LinkStatus{State: LinkUnknown}
 			mu.Unlock()
 			continue
 		}
@@ -210,6 +240,15 @@ func (r *Reader) Statuses(ctx context.Context, day domain.Date, refs []domain.Bo
 	}
 	wg.Wait()
 	return out
+}
+
+func (r *Reader) mapped(cal string) bool {
+	for _, c := range r.byPerson {
+		if c == cal {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Reader) status(ctx context.Context, day domain.Date, ref domain.BookingRef) LinkStatus {

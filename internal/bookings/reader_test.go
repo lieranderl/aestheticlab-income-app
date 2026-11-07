@@ -192,3 +192,37 @@ func TestLinkChecksAreBounded(t *testing.T) {
 		t.Fatalf("unchecked = %d, gets = %d; want 5 and %d", unchecked, src.Gets(), bookings.MaxLinkChecks)
 	}
 }
+
+func TestALostShareOrRemappedCalendarIsNeverShownAsDeleted(t *testing.T) {
+	src := bookings.NewMemory()
+	src.Put(mariaCal, booking("here", at("2026-11-07", "10:00"), "Wax Price: €10.00 with Maria Test (Confirmed)"))
+	r := newReader(t, src)
+	day := mustDate(t, "2026-11-07")
+	old := domain.BookingRef{Calendar: "old-cal@group.calendar.google.com", Event: "e1"}
+	got := r.Statuses(context.Background(), day, []domain.BookingRef{old})
+	if got[old].State != bookings.LinkUnknown {
+		t.Fatalf("unmapped calendar: state = %v, want unknown", got[old].State)
+	}
+
+	src.FailLists(errors.New("forbidden")) // the share is gone: listing fails, gets say 404
+	gone := domain.BookingRef{Calendar: mariaCal, Event: "missing"}
+	got = r.Statuses(context.Background(), day, []domain.BookingRef{gone})
+	if got[gone].State != bookings.LinkUnknown {
+		t.Fatalf("unreadable calendar: state = %v, want unknown", got[gone].State)
+	}
+}
+
+func TestATimelyEventWithoutATimeCountsAsUnreadable(t *testing.T) {
+	src := bookings.NewMemory()
+	ev := booking("allday", at("2026-11-07", "00:00"), "Wax Price: €10.00 with Maria Test (Confirmed)")
+	ev.Start, ev.AllDay = time.Time{}, mustDate(t, "2026-11-07")
+	src.Put(mariaCal, ev)
+	src.Put(mariaCal, bookings.Event{ID: "holiday", Summary: "Выходной", AllDay: mustDate(t, "2026-11-07")})
+	day, err := newReader(t, src).Day(context.Background(), "maria", mustDate(t, "2026-11-07"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(day.Bookings) != 0 || day.Unreadable != 1 {
+		t.Fatalf("day = %+v, want one unreadable", day)
+	}
+}

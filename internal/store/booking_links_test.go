@@ -3,6 +3,8 @@ package store_test
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -88,6 +90,15 @@ func TestRemovingAClientReleasesItsBooking(t *testing.T) {
 		saved, err := s.SaveClientReport(ctx, s.actor(s.olga), bookedClient(s, t, "booked-to-remove", ref("b1")))
 		must(t, err)
 		must(t, s.VoidClientReport(ctx, s.actor(s.olga), saved.ID, saved.Version, "ошибка"))
+		audits, err := s.Audit(ctx, saved.ID)
+		must(t, err)
+		kept := false
+		for _, a := range audits {
+			kept = kept || (a.Action == store.ActionVoid && strings.Contains(a.After, `"event":"b1"`))
+		}
+		if !kept {
+			t.Fatal("voided record lost its booking")
+		}
 		links, err := s.BookingLinks(ctx, []domain.BookingRef{*ref("b1")})
 		must(t, err)
 		if len(links) != 0 {
@@ -145,7 +156,7 @@ func TestAManualClientIsLinkedAndUnlinkedWithAudit(t *testing.T) {
 		must(t, s.UnlinkClientBooking(ctx, olga, manual.ID, linked.Version)) // a repeated tap
 		unlinked, err := s.ClientReport(ctx, olga, manual.ID)
 		must(t, err)
-		if unlinked.Version != 3 || unlinked.ClientInput.Booking != nil || unlinked.Report.Total != manual.Report.Total {
+		if unlinked.Version != 3 || unlinked.ClientInput.Booking != nil || !reflect.DeepEqual(unlinked.PersonReport, manual.PersonReport) || !reflect.DeepEqual(linked.PersonReport, manual.PersonReport) {
 			t.Fatalf("unlinked %+v", unlinked)
 		}
 		must(t, s.LinkClientBooking(ctx, s.admin, other.ID, other.Version, *ref("b1"))) // free again; the admin may link
@@ -181,5 +192,21 @@ func TestLinksInAClosedMonthAreRefusedButRepeatsAreAcknowledged(t *testing.T) {
 		if exists {
 			t.Fatal("unsaved client found")
 		}
+	})
+}
+
+func TestTheAdminCannotLinkARemovedPersonsClient(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		nov := month(t, "2026-11")
+		must(t, s.SetTerms(ctx, s.admin, s.olga, nov, domain.Terms{SelfPct: 7000}, "")) // no dividends: a zero balance at close
+		saved, err := s.SaveClientReport(ctx, s.actor(s.olga), bookedClient(s, t, "removed-person-client", ref("b1")))
+		must(t, err)
+		s.at("2026-12-01")
+		_, err = s.CloseMonth(ctx, s.admin, nov)
+		must(t, err)
+		must(t, s.SetTerms(ctx, s.admin, s.olga, month(t, "2026-12"), domain.Terms{}, ""))
+		must(t, s.RemoveUser(ctx, s.admin, s.olga))
+		wantErr(t, "link", s.LinkClientBooking(ctx, s.admin, saved.ID, saved.Version, *ref("b2")), store.ErrForbidden)
+		wantErr(t, "unlink", s.UnlinkClientBooking(ctx, s.admin, saved.ID, saved.Version), store.ErrForbidden)
 	})
 }

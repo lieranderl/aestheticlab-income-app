@@ -11,6 +11,7 @@ type Memory struct {
 	mu     sync.Mutex
 	events map[string]map[string]Event // calendar → id → event
 	fail   error
+	failL  error
 	gets   int
 	lists  int
 }
@@ -42,6 +43,13 @@ func (m *Memory) Fail(err error) {
 	m.fail = err
 }
 
+// FailLists makes only List fail, as when a calendar is no longer shared.
+func (m *Memory) FailLists(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failL = err
+}
+
 // Gets and Lists count calls, so tests can assert Calendar wasn't asked.
 func (m *Memory) Gets() int  { m.mu.Lock(); defer m.mu.Unlock(); return m.gets }
 func (m *Memory) Lists() int { m.mu.Lock(); defer m.mu.Unlock(); return m.lists }
@@ -55,12 +63,15 @@ func (m *Memory) List(_ context.Context, calendar string, from, to time.Time) ([
 	if m.fail != nil {
 		return nil, m.fail
 	}
+	if m.failL != nil {
+		return nil, m.failL
+	}
 	var out []Event
 	for _, ev := range m.events[calendar] {
-		if ev.Cancelled || ev.Start.IsZero() {
+		if ev.Cancelled {
 			continue
 		}
-		if ev.Start.Before(to) && ev.Start.Add(time.Hour).After(from) {
+		if ev.Start.IsZero() || (ev.Start.Before(to) && ev.Start.Add(time.Hour).After(from)) {
 			out = append(out, ev)
 		}
 	}
