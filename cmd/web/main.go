@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/lieranderl/aestheticlab-income-app/internal/bookings"
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
 	"github.com/lieranderl/aestheticlab-income-app/internal/web"
@@ -50,6 +51,11 @@ func main() {
 		slog.Error("INCOME_SESSION_KEY is required with Firestore")
 		os.Exit(1)
 	}
+	reader, err := openBookings(os.Getenv, st)
+	if err != nil {
+		slog.Error("booking calendars", "error", err)
+		os.Exit(1)
+	}
 	cfg := web.Config{
 		BaseURL: strings.TrimRight(cmp.Or(os.Getenv("INCOME_BASE_URL"), "http://localhost:8080"), "/"),
 		Ready: func(r *http.Request) error {
@@ -59,6 +65,7 @@ func main() {
 		},
 		Store:      st,
 		SessionKey: sessionKey,
+		Bookings:   reader,
 	}
 	handler, err := web.New(cfg)
 	if err != nil {
@@ -179,6 +186,50 @@ func storeOptions() ([]store.Option, error) {
 // setUpLocal gives the in-memory store the default data and an admin to
 // sign in with: anna, with a random password printed to the log. Only
 // ever for local runs; production is set up once by cmd/seed.
+// openBookings reads BOOKING_CALENDARS ("<calendarId>|<uid>;…"): the staff
+// calendars Timely syncs to, shared read-only with the runtime service
+// account. Unset turns the feature off. Locally, INCOME_DEV_BOOKINGS=1 on
+// the in-memory store gives anna a made-up calendar for today.
+func openBookings(getenv func(string) string, st *store.Store) (*bookings.Reader, error) {
+	if config := getenv("BOOKING_CALENDARS"); config != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		g, err := bookings.NewGoogle(ctx)
+		if err != nil {
+			return nil, err
+		}
+		r, err := bookings.NewReader(g, config, st.Location())
+		if err == nil {
+			slog.Info("booking calendars on", "calendars", strings.Count(config, "|"))
+		}
+		return r, err
+	}
+	if getenv("INCOME_DEV_BOOKINGS") != "1" || getenv("INCOME_FIRESTORE_PROJECT") != "" || getenv("K_SERVICE") != "" {
+		return nil, nil
+	}
+	users, err := st.Users(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	admin := ""
+	for _, u := range users {
+		if u.Role == store.RoleAdmin {
+			admin = u.ID
+		}
+	}
+	if admin == "" {
+		return nil, nil
+	}
+	src := bookings.NewMemory()
+	today := st.Today()
+	for i, line := range []string{"Lashes Coloring + Brows Coloring Price: €30.00", "Upper Lip Wax Price: €10.00", "Consultation", "Brows Price: €20,00"} {
+		start := time.Date(today.Year, today.Mon, today.Day, 10+2*i, 30, 0, 0, st.Location())
+		src.Put("demo", bookings.Event{ID: fmt.Sprintf("demo%d", i), Summary: "Demo Client", Description: "Demo Client - " + line + " with Demo Staff (Confirmed)\nTel: +32000000000", Start: start})
+	}
+	slog.Warn("made-up booking calendar for anna (INCOME_DEV_BOOKINGS)")
+	return bookings.NewReader(src, "demo|"+admin, st.Location())
+}
+
 func setUpLocal(st *store.Store) error {
 	password := strings.ToLower(rand.Text()[:12])
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

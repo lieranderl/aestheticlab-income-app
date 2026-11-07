@@ -21,6 +21,9 @@ Numbering is per employee/day, server creation time immutable, token replay idem
 
 Acceptance: services10000,cream2000 cash,serviceCash3000 at7000bps => Total12000,Self7000,Salon5000,Income5000,cashDeposit5000,delta0,held7000. Certificate sale10000 tocard =>card10000,outstanding+10000,Income0,Self0. Redeem service10000 with certificatePaid10000 at7000bps =>cash/card0,outstanding−10000,delta+7000,Income3000. Property: serviceValue−prepaid−serviceCash−serviceCard+balanceDelta=Self.
 
+## Timely bookings (2026-11-07)
+A client may carry `clientInput.booking` (calendar + event ID). It never enters any formula: the booked price (`domain.Booking.Price`, Timely's list price) only pre-fills the services field as a suggestion, and the server computes the entry from what the person enters. Ledger, balances, settlement and snapshots never read bookings. One active client per booking (`bookingLinks` lock in the same transaction); voids release it; edits never change it.
+
 ## Legacy daily report
 ```
 total            = Σ revenue[c]

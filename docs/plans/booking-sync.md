@@ -1,6 +1,6 @@
 # Booking sync from Google Calendar — proposal, 2026-11-07
 
-Status: **proposal, not started.** Revised after four Codex reviews (2026-11-07); ready for implementation. Owner review needed before any code.
+Status: **implemented 2026-11-07** (steps 1–5 in code; step 6 needs the owner to share the calendars and approve setting `BOOKING_CALENDARS`, see MAINTAINING.md → Booking calendars). Revised after four Codex reviews (2026-11-07); ready for implementation. Owner review needed before any code.
 
 ## Why
 Bookings live in Timely, which has no usable API (Zapier is not enabled: too expensive). Timely two-way syncs every booking into Google Calendar, one calendar per staff member, owned by the salon Google account and shared with each person. The kassa can read those calendars to:

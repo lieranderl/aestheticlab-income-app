@@ -222,6 +222,7 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 			p.Missing = append(p.Missing, personName(users, id))
 		}
 	}
+	p.Bookings = a.adminBookings(r.Context(), u, users, day, reports, dayForm.Locked != "")
 	a.render(w, r, views.AdminDayPage(a.navFor(u, "/admin/day"), p))
 }
 

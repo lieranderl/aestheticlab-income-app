@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/lieranderl/aestheticlab-income-app/internal/bookings"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 	"github.com/lieranderl/aestheticlab-income-app/static"
@@ -39,6 +40,9 @@ type Config struct {
 	Now func() time.Time
 	// PasswordCost is the bcrypt cost; 0 means 12. Tests use bcrypt.MinCost.
 	PasswordCost int
+	// Bookings reads Timely bookings from the staff calendars; nil or with
+	// no calendars mapped turns the feature off.
+	Bookings *bookings.Reader
 }
 
 type app struct {
@@ -109,6 +113,8 @@ func New(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /clients/{id}", a.signedIn(a.handleSaveClient))
 	mux.HandleFunc("GET /clients/{id}/remove", a.signedIn(a.handleRemoveClientPage))
 	mux.HandleFunc("POST /clients/{id}/remove", a.signedIn(a.handleRemoveClient))
+	mux.HandleFunc("POST /clients/{id}/link", a.signedIn(a.handleLinkClient))
+	mux.HandleFunc("POST /clients/{id}/unlink", a.signedIn(a.handleUnlinkClient))
 	mux.HandleFunc("GET /reports/day", a.signedIn(a.handleDaily))
 	mux.HandleFunc("POST /reports/{date}", a.signedIn(a.handleSaveReport))
 	mux.HandleFunc("GET /profile", a.signedIn(a.handleProfile))

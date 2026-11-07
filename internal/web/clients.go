@@ -5,10 +5,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/lieranderl/aestheticlab-income-app/internal/bookings"
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/ru"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
@@ -64,7 +66,8 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 	if r.URL.Query().Get("removed") == "1" {
 		notice = "Клиент удалён"
 	}
-	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, dayMoney, notice))
+	booked := a.bookingsView(r.Context(), u, u.ID, day, selected, picker.Locked != "", false)
+	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, dayMoney, notice, booked))
 }
 
 func clientSummary(s domain.Summary) []views.MoneyRow {
@@ -78,7 +81,11 @@ func (a *app) handleClient(w http.ResponseWriter, r *http.Request, u store.User)
 		return
 	}
 	if r.PathValue("id") == "" && r.URL.Query().Get("token") == "" {
-		a.navigate(w, r, "/clients/new?date="+f.Date+"&token="+f.Token)
+		next := "/clients/new?date=" + f.Date + "&token=" + f.Token
+		if event := r.URL.Query().Get("booking"); event != "" {
+			next += "&booking=" + url.QueryEscape(event) // checked on the page it leads to
+		}
+		a.navigate(w, r, next)
 		return
 	}
 	a.render(w, r, views.ClientPage(a.navFor(u, "/"), f))
@@ -131,6 +138,7 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 			f.Done = "Сохранено ✓"
 			f.Acknowledged = f.Token
 		}
+		f.Linked = in.Booking != nil
 	} else {
 		if !u.SubmitsReports {
 			return f, store.ErrForbidden
@@ -155,6 +163,9 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		f.Title = "Клиент " + strconv.FormatInt(f.Number, 10)
 		f.Entry = "new"
 		f.Values["extrasDestination"] = "cash"
+		if r.Method == http.MethodGet && r.URL.Query().Get("token") != "" {
+			a.bookingPrefill(r, u, day, &f)
+		}
 	}
 	dc, err := a.loadDay(r.Context(), owner, day)
 	if err != nil {
@@ -249,8 +260,19 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 		}
 	}
 	e.Input.ExtrasDestination = domain.Destination(f.Values["extrasDestination"])
+	var bookingProblem string
+	if r.PathValue("id") == "" {
+		if r.PostFormValue("nobooking") != "1" {
+			f.Booking = r.PostFormValue("booking") // survives an amount error; checked before saving
+		}
+		if !bad {
+			bookingProblem, f.OfferNoBooking = a.clientBooking(r, u, &e, &f)
+		}
+	}
 	if bad {
 		f.Error = "Проверьте суммы: введите число, например 600 или 600,50"
+	} else if bookingProblem != "" {
+		f.Error = bookingProblem
 	} else {
 		saved, err := a.store.SaveClientReport(r.Context(), u.Actor(), e)
 		if err == nil {
@@ -272,6 +294,8 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 			f.Error = "Запись финансовых операций временно приостановлена"
 		case errors.Is(err, store.ErrMonthClosed):
 			f.Error = "Месяц закрыт — изменения недоступны"
+		case errors.Is(err, store.ErrBookingTaken):
+			f.Error = "Эта запись уже связана с другим клиентом — откройте его в «Записях в календаре» на этот день"
 		default:
 			f.Error = clientProblem(r, err)
 			var ve *domain.ValidationError
@@ -296,6 +320,68 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 		}
 	}
 	a.formFailed(w, r, views.ClientFormView(f), views.ClientPage(a.navFor(u, "/"), f))
+}
+
+// bookingPrefill starts a new client from a booking on the GET: the booked
+// services and list price as a suggestion, and the event kept in the form.
+// The booking is checked again on save.
+func (a *app) bookingPrefill(r *http.Request, u store.User, day domain.Date, f *views.ClientForm) {
+	event := r.URL.Query().Get("booking")
+	if event == "" {
+		return
+	}
+	if _, ok := a.cfg.Bookings.CalendarFor(u.ID); !ok {
+		return
+	}
+	f.Booking = event // kept even when the check fails: saving checks it again or asks to save without it
+	item, err := a.cfg.Bookings.Check(r.Context(), u.ID, day, event)
+	if err != nil {
+		f.BookingNotice = "Запись не найдена в календаре. При сохранении можно будет сохранить клиента без привязки."
+		if errors.Is(err, bookings.ErrUnavailable) {
+			f.BookingNotice = "Календарь не ответил — запись проверим при сохранении."
+		}
+		return
+	}
+	f.BookingLabel = "По записи " + item.Start.In(a.store.Location()).Format("15:04") + " · " + strings.Join(item.Booking.Services, " + ")
+	if item.Booking.PriceKnown {
+		f.BookingPriced = true
+		f.BookingLabel += " · " + domain.FormatEUR(item.Booking.Price)
+		f.Values["services"] = amountText(item.Booking.Price)
+	}
+}
+
+// clientBooking attaches the posted booking to a new client. A retry of a
+// saved client goes straight to the store, which compares it; only a new
+// client asks the calendar. A problem is shown on the form, with offer set
+// when «Сохранить без привязки» is the way forward.
+func (a *app) clientBooking(r *http.Request, u store.User, e *store.ClientEntry, f *views.ClientForm) (problem string, offer bool) {
+	event := r.PostFormValue("booking")
+	if event == "" || r.PostFormValue("nobooking") == "1" {
+		f.Booking = ""
+		return "", false
+	}
+	f.Booking = event
+	cal, ok := a.cfg.Bookings.CalendarFor(e.Person)
+	if !ok { // the mapping changed since the form was opened
+		return "Запись не найдена в календаре на этот день. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить».", true
+	}
+	e.Input.Booking = &domain.BookingRef{Calendar: cal, Event: event}
+	saved, err := a.store.ClientSaved(r.Context(), u.Actor(), e.Person, e.Date, e.Token)
+	switch {
+	case err == nil && saved:
+		return "", false // a retry: the store answers it without Calendar
+	case errors.Is(err, store.ErrForbidden), errors.Is(err, store.ErrInvalid):
+		return "", false // the store refuses it the same way
+	case err != nil: // fail closed: an unchecked booking never reaches the store
+		return "Записи недоступны. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить» — или попробуйте позже.", true
+	}
+	if _, err := a.cfg.Bookings.Check(r.Context(), e.Person, e.Date, event); err != nil {
+		if errors.Is(err, bookings.ErrUnavailable) {
+			return "Записи недоступны. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить» — или попробуйте позже.", true
+		}
+		return "Запись не найдена в календаре на этот день. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить».", true
+	}
+	return "", false
 }
 
 // myReportCard is one of the person's own records: its result, the money
