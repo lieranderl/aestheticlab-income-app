@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"fmt"
+	"html"
 	"regexp"
 	"slices"
 	"strings"
@@ -198,6 +199,7 @@ func FuzzClassifyEvent(f *testing.F) {
 	f.Add("x", " -  with  ()")
 	f.Add("a", "a - + Price: €1,0,0.00 with b (Confirmed)<br>")
 	f.Add("a", "a - Wax Price: €  with b (Confirmed)")
+	f.Add("Olga Example", "Olga Example - Upper Lip Wax Price: &#8364;10.00 with Maria Test (Confirmed)")
 	f.Fuzz(func(t *testing.T, summary, description string) {
 		got := domain.ClassifyEvent(summary, description)
 		if got.Kind != domain.EventBooking {
@@ -218,17 +220,30 @@ func FuzzClassifyEvent(f *testing.F) {
 	})
 }
 
-// writtenAs says the description holds c as "Price: €1,250.00", "€1250.00"
-// or, for whole euros, "€1250".
+// writtenAs says the description's first line, read as plain text the way
+// Timely's HTML is decoded, holds c as "Price: €1,250.00", "€1250.00" or, for
+// whole euros, "€1250".
 func writtenAs(description string, c domain.Cents) bool {
-	plain := fmt.Sprintf("%d.%02d", c/100, c%100)
-	for _, a := range []string{timelyAmount(c), plain, fmt.Sprint(c / 100)} {
-		if strings.Contains(description, "Price: €"+a+" ") && (a != fmt.Sprint(c/100) || c%100 == 0) {
+	line := ""
+	for l := range strings.SplitSeq(html.UnescapeString(htmlBreak.ReplaceAllString(description, "\n")), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			line = l
+			break
+		}
+	}
+	forms := []string{timelyAmount(c), fmt.Sprintf("%d.%02d", c/100, c%100)}
+	if c%100 == 0 {
+		forms = append(forms, fmt.Sprint(c/100))
+	}
+	for _, a := range forms {
+		if strings.Contains(line, "Price: €"+a+" ") {
 			return true
 		}
 	}
 	return false
 }
+
+var htmlBreak = regexp.MustCompile(`(?i)<br\s*/?>`)
 
 // priceLabel is a price label left in a service name: "Price:" or "price €".
 var priceLabel = regexp.MustCompile(`(?i)\bprice\b\s*(?::|€)`)
