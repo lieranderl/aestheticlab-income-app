@@ -222,3 +222,52 @@ func TestTheAdminDayReconcilesBookingsWithClients(t *testing.T) {
 		t.Fatal("an outage shown as a deletion")
 	}
 }
+
+func TestLinkRulesAreCheckedBeforeAskingTheCalendar(t *testing.T) {
+	s, src := bookedSite(t)
+	src.Put(olgaCal, timely("b1", "2026-11-20", "10:00", "Wax Price: €30.00 with Olga Test (Confirmed)"))
+	src.Put(olgaCal, timely("b2", "2026-11-20", "11:00", "Brows Price: €20.00 with Olga Test (Confirmed)"))
+	src.Put(mariaCal, timely("m1", "2026-11-20", "12:00", "Massage Price: €50.00 with Maria Test (Confirmed)"))
+	z := s.login("olga", olgaPass)
+	res := s.post("/clients", clientForm("link-rules-client-1", "30"), z)
+	entry := strings.Split(res.Header().Get("Location"), "?")[0]
+
+	maria := s.login("maria", mariaPass)
+	wantPage(t, "another person's entry with their event", s.post(entry+"/link", url.Values{"booking": {"m1"}, "version": {"1"}}, maria), http.StatusForbidden)
+	wantPage(t, "own entry, another person's event", s.post(entry+"/link", url.Values{"booking": {"m1"}, "version": {"1"}}, z), http.StatusUnprocessableEntity, "Запись не найдена")
+
+	admin := s.login("anna", annaPass)
+	if res := s.post(entry+"/link", url.Values{"booking": {"b1"}, "version": {"1"}}, admin); res.Code != http.StatusSeeOther || res.Header().Get("Location") != "/admin/day?date=2026-11-20" {
+		t.Fatalf("admin link %d %s", res.Code, res.Header().Get("Location"))
+	}
+	gets := src.Gets()
+	if res := s.post(entry+"/link", url.Values{"booking": {"b1"}, "version": {"1"}}, z); res.Code != http.StatusSeeOther {
+		t.Fatalf("repeat %d", res.Code)
+	}
+	wantPage(t, "other booking on a linked entry", s.post(entry+"/link", url.Values{"booking": {"b2"}, "version": {"2"}}, z), http.StatusUnprocessableEntity, "сначала отвяжите")
+	wantPage(t, "stale version", s.post(entry+"/link", url.Values{"booking": {"b1"}, "version": {"1"}}, admin), http.StatusSeeOther)
+	if src.Gets() != gets {
+		t.Fatal("the calendar was asked for a repeat, a second booking or a stale link")
+	}
+
+	second := s.post("/clients", clientForm("link-rules-client-2", "20"), z)
+	other := strings.Split(second.Header().Get("Location"), "?")[0]
+	*s.clock = time.Date(2026, 12, 1, 10, 0, 0, 0, time.UTC)
+	if _, err := s.st.CloseMonth(ctx, s.anna.Actor(), domain.Month{Year: 2026, Mon: time.November}); err != nil {
+		t.Fatal(err)
+	}
+	src.Fail(errors.New("calendar down"))
+	wantPage(t, "closed month link", s.post(other+"/link", url.Values{"booking": {"b2"}, "version": {"1"}}, z), http.StatusUnprocessableEntity, "Месяц закрыт")
+	wantPage(t, "closed month unlink", s.post(entry+"/unlink", url.Values{"version": {"2"}}, admin), http.StatusUnprocessableEntity, "Месяц закрыт")
+}
+
+func TestStartingFromABookingAsksTheCalendarOnce(t *testing.T) {
+	s, src := bookedSite(t)
+	src.Put(olgaCal, timely("b1", "2026-11-20", "10:00", "Wax Price: €30.00 with Olga Test (Confirmed)"))
+	z := s.login("olga", olgaPass)
+	before := src.Gets()
+	wantPage(t, "form", s.get("/clients/new?date=2026-11-20&booking=b1", z), http.StatusOK, `name="booking" value="b1"`)
+	if src.Gets()-before != 1 {
+		t.Fatalf("calendar asked %d times", src.Gets()-before)
+	}
+}

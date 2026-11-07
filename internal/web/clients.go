@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -81,8 +82,8 @@ func (a *app) handleClient(w http.ResponseWriter, r *http.Request, u store.User)
 	}
 	if r.PathValue("id") == "" && r.URL.Query().Get("token") == "" {
 		next := "/clients/new?date=" + f.Date + "&token=" + f.Token
-		if f.Booking != "" {
-			next += "&booking=" + f.Booking
+		if event := r.URL.Query().Get("booking"); event != "" {
+			next += "&booking=" + url.QueryEscape(event) // checked on the page it leads to
 		}
 		a.navigate(w, r, next)
 		return
@@ -162,7 +163,7 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		f.Title = "Клиент " + strconv.FormatInt(f.Number, 10)
 		f.Entry = "new"
 		f.Values["extrasDestination"] = "cash"
-		if r.Method == http.MethodGet {
+		if r.Method == http.MethodGet && r.URL.Query().Get("token") != "" {
 			a.bookingPrefill(r, u, day, &f)
 		}
 	}
@@ -353,16 +354,20 @@ func (a *app) clientBooking(r *http.Request, u store.User, e *store.ClientEntry,
 		f.Booking = ""
 		return "", false
 	}
-	cal, ok := a.cfg.Bookings.CalendarFor(e.Person)
-	if !ok {
-		f.Booking = ""
-		return "", false
-	}
 	f.Booking = event
+	cal, ok := a.cfg.Bookings.CalendarFor(e.Person)
+	if !ok { // the mapping changed since the form was opened
+		return "Запись не найдена в календаре на этот день. Сохраните без привязки.", true
+	}
 	e.Input.Booking = &domain.BookingRef{Calendar: cal, Event: event}
 	saved, err := a.store.ClientSaved(r.Context(), u.Actor(), e.Person, e.Date, e.Token)
-	if err != nil || saved {
-		return "", false // the store answers the retry, or refuses it
+	switch {
+	case err == nil && saved:
+		return "", false // a retry: the store answers it without Calendar
+	case errors.Is(err, store.ErrForbidden), errors.Is(err, store.ErrInvalid):
+		return "", false // the store refuses it the same way
+	case err != nil: // fail closed: an unchecked booking never reaches the store
+		return "Записи недоступны. Сохраните без привязки или попробуйте позже.", true
 	}
 	if _, err := a.cfg.Bookings.Check(r.Context(), e.Person, e.Date, event); err != nil {
 		if errors.Is(err, bookings.ErrUnavailable) {

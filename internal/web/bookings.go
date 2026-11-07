@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -88,7 +89,7 @@ func (a *app) bookingsView(ctx context.Context, actor store.User, uid string, da
 		} else {
 			notLinked++
 			if actor.ID == uid && actor.SubmitsReports {
-				c.NewHref = "/clients/new?date=" + day.String() + "&booking=" + b.Ref.Event
+				c.NewHref = "/clients/new?date=" + day.String() + "&booking=" + url.QueryEscape(b.Ref.Event)
 			}
 			for _, e := range unlinked {
 				c.Candidates = append(c.Candidates, views.LinkCandidate{Action: "/clients/" + e.ID + "/link", Label: clientLabel(e), Version: e.Version})
@@ -188,6 +189,12 @@ func (a *app) handleLinkClient(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	ref := domain.BookingRef{Calendar: cal, Event: event}
 	if b := rep.ClientInput.Booking; b == nil || *b != ref {
+		// Fast refusals before asking Calendar; the store checks them all
+		// again inside its transaction.
+		if err := a.linkPrecheck(r.Context(), rep, version); err != nil {
+			a.linkFailed(w, r, u, rep, err)
+			return
+		}
 		if _, err := a.cfg.Bookings.Check(r.Context(), rep.Person, rep.Date, event); err != nil {
 			a.linkFailed(w, r, u, rep, err)
 			return
@@ -220,6 +227,19 @@ func (a *app) handleUnlinkClient(w http.ResponseWriter, r *http.Request, u store
 		return
 	}
 	a.navigate(w, r, "/clients/"+rep.ID)
+}
+
+func (a *app) linkPrecheck(ctx context.Context, rep store.SavedReport, version int64) error {
+	if rep.ClientInput.Booking != nil {
+		return store.ErrInvalid // unlink the other booking first
+	}
+	if m, err := a.store.Month(ctx, rep.Date.Month()); err == nil && m.Status == domain.MonthClosed {
+		return store.ErrMonthClosed
+	}
+	if rep.Version != version {
+		return store.ErrVersionConflict
+	}
+	return nil
 }
 
 func dayURL(u store.User, rep store.SavedReport) string {
