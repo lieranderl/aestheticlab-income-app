@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -101,6 +102,13 @@ func TestTimelyEventsAreBookingsUnrelatedOrUnreadable(t *testing.T) {
 		{"lowercase price", client, client + " - Wax price: €30.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
 		{"euro amount in a service", client, client + " - Wax €30 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
 
+		// Only a price label is a warning sign, not the letters "price".
+		{"personal event mentioning price", "Встреча", "Обсудить price list", domain.EventUnrelated, nil, 0, false},
+		{"personal event with an amount", "Купить крем", "Крем €20", domain.EventUnrelated, nil, 0, false},
+		{"service containing price letters", client, client + " - Caprice Massage Price: €40.00 with Maria Test (Confirmed)",
+			domain.EventBooking, []string{"Caprice Massage"}, 4000, true},
+		{"price label off the Timely line", "Заметка", "Price: €10.00", domain.EventUnreadable, nil, 0, false},
+
 		// The client is exactly the title; nothing of it may reach a service.
 		{"client name with a dash", "Olga - VIP", "Olga - VIP - Lashes Price: €30.00 with Maria Test (Confirmed)",
 			domain.EventBooking, []string{"Lashes"}, 3000, true},
@@ -180,7 +188,7 @@ func TestABookingBelongsToTheDayItStartsOnInBrussels(t *testing.T) {
 }
 
 // Whatever a calendar holds, reading it never panics; a booking always has
-// services, none of them carrying a " - " (a client name) or a price label,
+// services, none of them carrying a " - " (a client name), a price label or €,
 // and a known price is exactly the amount written after "Price: €".
 func FuzzClassifyEvent(f *testing.F) {
 	f.Add("Olga Example", "Olga Example - Upper Lip Wax Price: €10.00 with Maria Test (Confirmed)")
@@ -200,7 +208,7 @@ func FuzzClassifyEvent(f *testing.F) {
 			t.Fatalf("booking %+v", b)
 		}
 		for _, s := range b.Services {
-			if s == "" || strings.Contains(s, " - ") || strings.Contains(strings.ToLower(s), "price") {
+			if s == "" || strings.Contains(s, " - ") || priceLabel.MatchString(s) || strings.Contains(s, "€") {
 				t.Fatalf("service %q in %q", s, b.Services)
 			}
 		}
@@ -221,6 +229,9 @@ func writtenAs(description string, c domain.Cents) bool {
 	}
 	return false
 }
+
+// priceLabel is a price label left in a service name: "Price:" or "price €".
+var priceLabel = regexp.MustCompile(`(?i)\bprice\b\s*(?::|€)`)
 
 // timelyAmount writes cents with comma thousands: 1,250.00.
 func timelyAmount(c domain.Cents) string {

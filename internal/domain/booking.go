@@ -48,6 +48,8 @@ var (
 	// thousands only with cents, so "€1,250" is not guessed).
 	timelyAmount = regexp.MustCompile(`^€(?:(0|[1-9]\d*)(?:\.(\d{2}))?|([1-9]\d{0,2}(?:,\d{3})+)\.(\d{2}))$`)
 	htmlBreak    = regexp.MustCompile(`(?i)<br\s*/?>`)
+	// A price label in any case: "Price:", "price:" or "Price €".
+	priceLabel = regexp.MustCompile(`(?i)\bprice\b\s*(?::|€)`)
 )
 
 // ClassifyEvent reads a synced Timely event. Only the description's first
@@ -63,7 +65,7 @@ func ClassifyEvent(summary, description string) EventClass {
 	afterClient, isClient := strings.CutPrefix(line, summary+" - ")
 	m := timelyRest.FindStringSubmatch(afterClient)
 	if summary == "" || !isClient || m == nil {
-		if timelyLike.MatchString(line) || strings.Contains(strings.ToLower(line), "price") {
+		if timelyLike.MatchString(line) || priceLabel.MatchString(line) {
 			return EventClass{Kind: EventUnreadable}
 		}
 		return EventClass{Kind: EventUnrelated}
@@ -80,7 +82,7 @@ func ClassifyEvent(summary, description string) EventClass {
 		}
 		rest, b.Price, b.PriceKnown = p[1], price, true
 	}
-	if strings.Contains(strings.ToLower(rest), "price") || strings.Contains(rest, "€") {
+	if priceLabel.MatchString(rest) || strings.Contains(rest, "€") {
 		return EventClass{Kind: EventUnreadable} // a changed price label, not a service
 	}
 	if strings.Contains(rest, " - ") {
