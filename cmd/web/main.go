@@ -199,10 +199,16 @@ func openBookings(getenv func(string) string, st *store.Store) (*bookings.Reader
 			return nil, err
 		}
 		r, err := bookings.NewReader(g, config, st.Location())
-		if err == nil {
-			slog.Info("booking calendars on", "calendars", strings.Count(config, "|"))
+		if err != nil {
+			return nil, err
 		}
-		return r, err
+		// Before listening: a cold start would otherwise spend the first
+		// screen's calendar budget on the token and the connection.
+		if err := g.Warm(ctx); err != nil {
+			slog.Warn("booking calendars warm-up failed", "error", err)
+		}
+		slog.Info("booking calendars on", "calendars", strings.Count(config, "|"))
+		return r, nil
 	}
 	if getenv("INCOME_DEV_BOOKINGS") != "1" || getenv("INCOME_FIRESTORE_PROJECT") != "" || getenv("K_SERVICE") != "" {
 		return nil, nil

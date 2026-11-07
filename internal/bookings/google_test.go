@@ -107,3 +107,17 @@ func TestGoogleTellsGoneEventsFromFailures(t *testing.T) {
 		t.Error("503 must be an error, not a deletion")
 	}
 }
+
+func TestGoogleWarmsUpItsConnectionBeforeTheFirstScreen(t *testing.T) {
+	var asked []string
+	g := fakeCalendarAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Path)
+		writeJSON(w, map[string]any{"items": []any{}})
+	})
+	if err := g.Warm(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(asked) != 1 || !strings.HasSuffix(asked[0], "/users/me/calendarList") {
+		t.Fatalf("asked %v", asked)
+	}
+}
