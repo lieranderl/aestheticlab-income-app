@@ -88,8 +88,11 @@ func TestPersonalPagesExplainHowCashKeptMakesUpSelf(t *testing.T) {
 			t.Fatalf("save %s: %d %s", token, res.Code, res.Body.String())
 		}
 	}
-	wantPage(t, "day", s.get("/?date=2026-11-19", olga), http.StatusOK,
-		"Итог дня по записям", "Салон должен вам €113,50", "Осталось у вас наличными", "€100", "Ваши «Себе»", "€213,50",
+	day := s.get("/?date=2026-11-19", olga)
+	if strings.Contains(day.Body.String(), "Салон должен вам") {
+		t.Fatal("daily page repeats the salon debt")
+	}
+	wantPage(t, "day", day, http.StatusOK, "Осталось у вас наличными", "€100", "Ваши «Себе»", "€213,50",
 		"«Себе» €213,50 = €100 у вас + €113,50 от салона",
 		"Факт: в кассу €427 · у вас €100", "Ожидается: «Себе» €213,50 · «Салону» €313,50")
 	page := s.get("/my", olga)

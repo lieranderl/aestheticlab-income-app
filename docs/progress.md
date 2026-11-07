@@ -1,5 +1,10 @@
 # Progress
 
+## Daily screen simplification (2026-11-07)
+- Staff day totals and client cards omit settlement/debt banners and badges. The money breakdown and monthly balance/settlement remain available; calculations and stored records are unchanged.
+- «Записи в календаре» starts collapsed on staff and admin day pages; tap the heading to expand it.
+- Verified: `make ci`; HTTP checks for absent daily debt text and collapsed calendar markup; money/mobile review; iPhone SE day, monthly records and admin day checks in both themes; expanded fictional calendar at 375 px in light and dark.
+
 ## Booking sync from Google Calendar (2026-11-07)
 Implements [docs/plans/booking-sync.md](plans/booking-sync.md) steps 1–5 (step 1 in #39; steps 2–3 in #40; screens here):
 - **Staff home:** «Записи в календаре» lists the day's Timely bookings (time, services, «по записи €30», no client names) with «Внести» (pre-fills the booked price as a suggestion) and «Связать с внесённым клиентом»; linked bookings show «✓ внесено». Unreadable events and calendar outages show warnings; entering clients always works.

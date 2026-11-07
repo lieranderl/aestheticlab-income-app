@@ -35,43 +35,52 @@ type BookingsView struct {
 
 templ BookingsSection(v BookingsView) {
 	if v.Enabled {
-		<section class="card bg-base-100 shadow-sm" aria-label="Записи в календаре">
-			<div class="card-body gap-3 p-4">
-				if v.Name != "" {
+		if v.Name == "" {
+			<details class="collapse collapse-arrow bg-base-100 shadow-sm" aria-label="Записи в календаре">
+				<summary class="collapse-title min-h-14 font-semibold">Записи в календаре</summary>
+				<div class="collapse-content flex flex-col gap-3">
+					@bookingContents(v)
+				</div>
+			</details>
+		} else {
+			<section class="card bg-base-100 shadow-sm" aria-label={ v.Name }>
+				<div class="card-body gap-3 p-4">
 					<h3 class="font-semibold [overflow-wrap:anywhere]">{ v.Name }</h3>
-				} else {
-					<h2 class="font-semibold">Записи в календаре</h2>
-				}
-				if v.Counts != "" {
-					<p class="text-base-content/70">{ v.Counts }</p>
-				}
-				if v.Unavailable {
-					<div role="status" class="alert alert-warning alert-soft">
-						@Icon("calendar-x", "size-5")
-						<span>Записи недоступны — календарь не ответил. Клиентов можно вносить как обычно.</span>
-					</div>
-				}
-				if v.Unreadable > 0 {
-					<div role="status" class="alert alert-warning alert-soft">
-						@Icon("circle-alert", "size-5")
-						<span>Не удалось прочитать записей в календаре: { strconv.Itoa(v.Unreadable) }. Проверьте их в календаре.</span>
-					</div>
-				}
-				for _, note := range v.Notes {
-					<p class="rounded-box bg-base-200 p-3 text-sm">{ note }</p>
-				}
-				if !v.Unavailable && len(v.Cards) == 0 {
-					<p class="text-base-content/60">Записей на этот день нет.</p>
-				}
-				if len(v.Cards) > 0 {
-					<ul class="flex flex-col gap-3">
-						for _, c := range v.Cards {
-							@bookingCard(c, v.Locked)
-						}
-					</ul>
-				}
-			</div>
-		</section>
+					@bookingContents(v)
+				</div>
+			</section>
+		}
+	}
+}
+
+templ bookingContents(v BookingsView) {
+	if v.Counts != "" {
+		<p class="text-base-content/70">{ v.Counts }</p>
+	}
+	if v.Unavailable {
+		<div role="status" class="alert alert-warning alert-soft">
+			@Icon("calendar-x", "size-5")
+			<span>Записи недоступны — календарь не ответил. Клиентов можно вносить как обычно.</span>
+		</div>
+	}
+	if v.Unreadable > 0 {
+		<div role="status" class="alert alert-warning alert-soft">
+			@Icon("circle-alert", "size-5")
+			<span>Не удалось прочитать записей в календаре: { strconv.Itoa(v.Unreadable) }. Проверьте их в календаре.</span>
+		</div>
+	}
+	for _, note := range v.Notes {
+		<p class="rounded-box bg-base-200 p-3 text-sm">{ note }</p>
+	}
+	if !v.Unavailable && len(v.Cards) == 0 {
+		<p class="text-base-content/60">Записей на этот день нет.</p>
+	}
+	if len(v.Cards) > 0 {
+		<ul class="flex flex-col gap-3">
+			for _, c := range v.Cards {
+				@bookingCard(c, v.Locked)
+			}
+		</ul>
 	}
 }
 

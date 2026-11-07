@@ -1670,7 +1670,7 @@ func ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, m
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = MoneyPanel(money).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = MoneyBreakdown(money).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1701,7 +1701,7 @@ func ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, m
 				return templ_7745c5c3_Err
 			}
 			for _, r := range cards {
-				templ_7745c5c3_Err = myReportCard(r).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = myReportCard(r, false).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

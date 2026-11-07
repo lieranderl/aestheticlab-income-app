@@ -30,6 +30,13 @@ templ MoneyPanel(v MoneyView) {
 				<span class="text-sm">{ v.StatusNote }</span>
 			}
 		</section>
+		@MoneyBreakdown(v)
+	}
+}
+
+// MoneyBreakdown shows the money and shares without a settlement banner.
+templ MoneyBreakdown(v MoneyView) {
+	if v.Status != "" {
 		@factCard(v.Fact)
 		if len(v.Expected) > 0 {
 			@expectedCard(v.Expected, v.Explain, v.Frozen)

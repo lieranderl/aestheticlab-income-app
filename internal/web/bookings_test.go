@@ -76,7 +76,7 @@ func TestStaffEnterAClientFromTheirBookingOnce(t *testing.T) {
 	z := s.login("olga", olgaPass)
 
 	home := s.get("/?date=2026-11-20", z)
-	wantPage(t, "home", home, http.StatusOK, "Записи в календаре", "10:00", "Lashes Coloring + Brows Coloring", "по записи €30", "15:30", "Не связано", "/clients/new?date=2026-11-20&amp;booking=b1")
+	wantPage(t, "home", home, http.StatusOK, `<details class="collapse collapse-arrow bg-base-100 shadow-sm" aria-label="Записи в календаре">`, `<summary class="collapse-title min-h-14 font-semibold">Записи в календаре</summary>`, "10:00", "Lashes Coloring + Brows Coloring", "по записи €30", "15:30", "Не связано", "/clients/new?date=2026-11-20&amp;booking=b1")
 	noClientData(t, "home", home.Body.String())
 	if strings.Contains(home.Body.String(), "Massage") {
 		t.Fatal("another person's booking shown")
@@ -206,7 +206,7 @@ func TestTheAdminDayReconcilesBookingsWithClients(t *testing.T) {
 	}
 	admin := s.login("anna", annaPass)
 	page := s.get("/admin/day?date=2026-11-20", admin)
-	wantPage(t, "admin day", page, http.StatusOK, ">Ольга</h3>", "Записей: 2 · Клиентов: 1 · Записей без клиента: 1 · Клиентов без записи: 0", ">Мария</h3>", "Записей: 1 · Клиентов: 0 · Записей без клиента: 1", "Не удалось прочитать записей в календаре: 1")
+	wantPage(t, "admin day", page, http.StatusOK, `<details class="collapse collapse-arrow bg-base-100 shadow-sm" aria-label="Записи в календаре">`, ">Ольга</h3>", "Записей: 2 · Клиентов: 1 · Записей без клиента: 1 · Клиентов без записи: 0", ">Мария</h3>", "Записей: 1 · Клиентов: 0 · Записей без клиента: 1", "Не удалось прочитать записей в календаре: 1")
 	noClientData(t, "admin day", page.Body.String())
 
 	src.Put(olgaCal, timely("b1", "2026-11-19", "10:00", "Wax Price: €30.00 with Olga Test (Confirmed)")) // moved to the day before

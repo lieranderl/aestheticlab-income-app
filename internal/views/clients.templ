@@ -274,7 +274,7 @@ templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, 
 		}
 		<div class="my-4 flex flex-col gap-4">
 			<h2 class="font-semibold">Итоги дня</h2>
-			@MoneyPanel(money)
+			@MoneyBreakdown(money)
 			@RevenueDetails(totals, "день")
 		</div>
 		if booked.Enabled {
@@ -284,7 +284,7 @@ templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, 
 		}
 		<section class="flex flex-col gap-3">
 			for _, r := range cards {
-				@myReportCard(r)
+				@myReportCard(r, false)
 			}
 			if len(cards) == 0 {
 				<p class="p-4 text-base-content/60">Клиентов за этот день нет.</p>

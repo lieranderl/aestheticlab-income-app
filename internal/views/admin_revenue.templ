@@ -57,12 +57,14 @@ templ AdminDayPage(nav Nav, p AdminDay) {
 				</section>
 			}
 			if len(p.Bookings) > 0 {
-				<h2 class="text-lg font-semibold">Записи в календаре</h2>
-				<div class="grid gap-3 lg:grid-cols-2">
-					for _, b := range p.Bookings {
-						@BookingsSection(b)
-					}
-				</div>
+				<details class="collapse collapse-arrow bg-base-100 shadow-sm" aria-label="Записи в календаре">
+					<summary class="collapse-title min-h-14 font-semibold">Записи в календаре</summary>
+					<div class="collapse-content grid gap-3 lg:grid-cols-2">
+						for _, b := range p.Bookings {
+							@BookingsSection(b)
+						}
+					</div>
+				</details>
 			}
 			if len(p.Reports) == 0 {
 				<p class="rounded-box bg-base-100 p-4 text-base-content/60">Отчётов за этот день нет.</p>
