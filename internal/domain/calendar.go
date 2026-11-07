@@ -54,6 +54,12 @@ func (d Date) Month() Month { return Month{d.Year, d.Mon} }
 // Time is the date at midnight UTC, for formatting and weekdays.
 func (d Date) Time() time.Time { return time.Date(d.Year, d.Mon, d.Day, 0, 0, 0, 0, time.UTC) }
 
+// Window is the day from local midnight to the next local midnight in loc
+// (Europe/Brussels): 23 or 25 hours long when the clocks change.
+func (d Date) Window(loc *time.Location) (start, end time.Time) {
+	return time.Date(d.Year, d.Mon, d.Day, 0, 0, 0, 0, loc), time.Date(d.Year, d.Mon, d.Day+1, 0, 0, 0, 0, loc)
+}
+
 // AddDays is the date n days later (earlier for n < 0).
 func (d Date) AddDays(n int) Date {
 	t := d.Time().AddDate(0, 0, n)
