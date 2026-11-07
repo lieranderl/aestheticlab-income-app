@@ -3,6 +3,7 @@ package domain
 import (
 	"html"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -37,24 +38,32 @@ type EventClass struct {
 const bookingStatus = "Confirmed"
 
 var (
-	// <client> - <services> with <staff> (<Status>). The client is the text
-	// before the first " - "; the staff after the last " with ".
-	timelyLine  = regexp.MustCompile(`^.+? - (.+) with .+ \(([^()]+)\)$`)
-	timelyPrice = regexp.MustCompile(`^(.*?)\s*Price:\s*(.*)$`)
-	htmlBreak   = regexp.MustCompile(`(?i)<br\s*/?>`)
+	// <services> with <staff> (<Status>), after the "<client> - " prefix. The
+	// staff name is after the last " with ".
+	timelyRest = regexp.MustCompile(`^(.+) with .+ \(([^()]+)\)$`)
+	// A line that looks like Timely's even if the client doesn't match.
+	timelyLike  = regexp.MustCompile(`^.+ - .+ with .+ \([^()]+\)$`)
+	timelyPrice = regexp.MustCompile(`^(.*?) Price: (.*)$`)
+	// Timely's English amount: €30.00, whole euros €45, or €1,250.00 (comma
+	// thousands only with cents, so "€1,250" is not guessed).
+	timelyAmount = regexp.MustCompile(`^€(?:(0|[1-9]\d*)(?:\.(\d{2}))?|([1-9]\d{0,2}(?:,\d{3})+)\.(\d{2}))$`)
+	htmlBreak    = regexp.MustCompile(`(?i)<br\s*/?>`)
 )
 
 // ClassifyEvent reads a synced Timely event. Only the description's first
-// line is read; the title is used only to recognise «Busy Time» blocks, and
-// the contact lines after the first are never looked at.
+// line is read. The title is compared, never returned: Timely sets it to the
+// client's name, so the line must start with "<title> - " and exactly that
+// prefix is cut off. Contact lines after the first are never looked at.
 func ClassifyEvent(summary, description string) EventClass {
-	if strings.HasPrefix(strings.TrimSpace(summary), "Busy Time with ") {
+	summary = strings.TrimSpace(summary)
+	if strings.HasPrefix(summary, "Busy Time with ") {
 		return EventClass{Kind: EventUnrelated}
 	}
 	line := firstLine(description)
-	m := timelyLine.FindStringSubmatch(line)
-	if m == nil {
-		if strings.Contains(line, "Price:") {
+	afterClient, isClient := strings.CutPrefix(line, summary+" - ")
+	m := timelyRest.FindStringSubmatch(afterClient)
+	if summary == "" || !isClient || m == nil {
+		if timelyLike.MatchString(line) || strings.Contains(strings.ToLower(line), "price") {
 			return EventClass{Kind: EventUnreadable}
 		}
 		return EventClass{Kind: EventUnrelated}
@@ -70,6 +79,12 @@ func ClassifyEvent(summary, description string) EventClass {
 			return EventClass{Kind: EventUnreadable}
 		}
 		rest, b.Price, b.PriceKnown = p[1], price, true
+	}
+	if strings.Contains(strings.ToLower(rest), "price") || strings.Contains(rest, "€") {
+		return EventClass{Kind: EventUnreadable} // a changed price label, not a service
+	}
+	if strings.Contains(rest, " - ") {
+		return EventClass{Kind: EventUnreadable} // may be the rest of a client name
 	}
 	rest = strings.TrimSpace(rest)
 	if strings.HasPrefix(rest, "+") || strings.HasSuffix(rest, "+") {
@@ -96,21 +111,27 @@ func firstLine(description string) string {
 	return ""
 }
 
-// timelyThousands is Timely's English amount with comma thousands: €1,250.00.
-var timelyThousands = regexp.MustCompile(`^\d{1,3}(,\d{3})+\.\d{2}$`)
-
-// parseTimelyPrice reads "€30.00" or "€1,250.00". Anything else is unreadable
-// rather than guessed.
+// parseTimelyPrice reads exactly Timely's format. Anything else is unreadable
+// rather than guessed; ParseAmount is for phone input and accepts more.
 func parseTimelyPrice(s string) (Cents, bool) {
-	s, ok := strings.CutPrefix(s, "€")
-	if !ok || s == "" {
+	m := timelyAmount.FindStringSubmatch(s)
+	if m == nil {
 		return 0, false
 	}
-	if timelyThousands.MatchString(s) {
-		s = strings.ReplaceAll(s, ",", "")
-	} else if strings.Contains(s, ",") {
-		return 0, false // "30,00" or "1,250": ambiguous in Timely's format
+	euros, cents := m[1], m[2]
+	if m[3] != "" {
+		euros, cents = strings.ReplaceAll(m[3], ",", ""), m[4]
 	}
-	c, err := ParseAmount(s)
-	return c, err == nil
+	if len(euros) > maxIntegerDigits {
+		return 0, false
+	}
+	e, err := strconv.ParseInt(euros, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	var c int64
+	if cents != "" {
+		c, _ = strconv.ParseInt(cents, 10, 64) // two checked digits
+	}
+	return Cents(e*100 + c), true
 }

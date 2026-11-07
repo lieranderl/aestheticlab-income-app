@@ -1,7 +1,9 @@
 package domain_test
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,6 +78,40 @@ func TestTimelyEventsAreBookingsUnrelatedOrUnreadable(t *testing.T) {
 			domain.EventUnreadable, nil, 0, false},
 		{"price but not the Timely line", client, "Price: €10.00",
 			domain.EventUnreadable, nil, 0, false},
+
+		// Prices are read in Timely's one format or not at all, never guessed.
+		{"blank price after euro", client, client + " - Wax Price: €  with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"double euro", client, client + " - Wax Price: €€ with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"spaced euros", client, client + " - Wax Price: € € with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"no-break space after euro", client, client + " - Wax Price: €  with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"cents without euros", client, client + " - Wax Price: €.50 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"one decimal", client, client + " - Wax Price: €30.5 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"space thousands", client, client + " - Wax Price: €1 250.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"leading zero group", client, client + " - Wax Price: €0,250.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"space after euro", client, client + " - Wax Price: € 30.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"trailing euro", client, client + " - Wax Price: €30.00€ with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"European decimals", client, client + " - Wax Price: €1.250,00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"European thousands", client, client + " - Wax Price: €1.250 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"comma thousands without cents", client, client + " - Wax Price: €1,250 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"negative", client, client + " - Wax Price: €-5.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"too large", client, client + " - Wax Price: €12345678.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+
+		// A changed price label is warned about, not absorbed into a service name.
+		{"price without colon", client, client + " - Wax Price €30.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"lowercase price", client, client + " - Wax price: €30.00 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+		{"euro amount in a service", client, client + " - Wax €30 with Maria Test (Confirmed)", domain.EventUnreadable, nil, 0, false},
+
+		// The client is exactly the title; nothing of it may reach a service.
+		{"client name with a dash", "Olga - VIP", "Olga - VIP - Lashes Price: €30.00 with Maria Test (Confirmed)",
+			domain.EventBooking, []string{"Lashes"}, 3000, true},
+		{"title is not the client", "Olga", "Olga - VIP - Lashes Price: €30.00 with Maria Test (Confirmed)",
+			domain.EventUnreadable, nil, 0, false},
+		{"title differs from the line", "Someone Else", client + " - Wax Price: €10.00 with Maria Test (Confirmed)",
+			domain.EventUnreadable, nil, 0, false},
+		{"empty title", "", client + " - Wax Price: €10.00 with Maria Test (Confirmed)",
+			domain.EventUnreadable, nil, 0, false},
+		{"title with spaces around", "  " + client + " ", client + " - Wax Price: €10.00 with Maria Test (Confirmed)",
+			domain.EventBooking, []string{"Wax"}, 1000, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -143,25 +179,54 @@ func TestABookingBelongsToTheDayItStartsOnInBrussels(t *testing.T) {
 	}
 }
 
-// Whatever a calendar holds, reading it never panics, and a booking always
-// has services and a non-negative price.
+// Whatever a calendar holds, reading it never panics; a booking always has
+// services, none of them carrying a " - " (a client name) or a price label,
+// and a known price is exactly the amount written after "Price: €".
 func FuzzClassifyEvent(f *testing.F) {
 	f.Add("Olga Example", "Olga Example - Upper Lip Wax Price: €10.00 with Maria Test (Confirmed)")
+	f.Add("Olga Example", "Olga Example - Full Course Price: €1,250.00 with Maria Test (Confirmed)")
+	f.Add("Olga", "Olga - Wax Price: €45 with Maria Test (Confirmed)")
 	f.Add("Busy Time with Maria Test", "")
 	f.Add("x", " -  with  ()")
-	f.Add("x", "a - + Price: €1,0,0.00 with b (Confirmed)<br>")
+	f.Add("a", "a - + Price: €1,0,0.00 with b (Confirmed)<br>")
+	f.Add("a", "a - Wax Price: €  with b (Confirmed)")
 	f.Fuzz(func(t *testing.T, summary, description string) {
 		got := domain.ClassifyEvent(summary, description)
 		if got.Kind != domain.EventBooking {
 			return
 		}
-		if len(got.Booking.Services) == 0 || got.Booking.Price < 0 {
-			t.Fatalf("booking %+v", got.Booking)
+		b := got.Booking
+		if len(b.Services) == 0 || b.Price < 0 {
+			t.Fatalf("booking %+v", b)
 		}
-		for _, s := range got.Booking.Services {
-			if s == "" {
-				t.Fatalf("empty service in %q", got.Booking.Services)
+		for _, s := range b.Services {
+			if s == "" || strings.Contains(s, " - ") || strings.Contains(strings.ToLower(s), "price") {
+				t.Fatalf("service %q in %q", s, b.Services)
 			}
 		}
+		if b.PriceKnown && !writtenAs(description, b.Price) {
+			t.Fatalf("price %d not written as such in %q", b.Price, description)
+		}
 	})
+}
+
+// writtenAs says the description holds c as "Price: €1,250.00", "€1250.00"
+// or, for whole euros, "€1250".
+func writtenAs(description string, c domain.Cents) bool {
+	plain := fmt.Sprintf("%d.%02d", c/100, c%100)
+	for _, a := range []string{timelyAmount(c), plain, fmt.Sprint(c / 100)} {
+		if strings.Contains(description, "Price: €"+a+" ") && (a != fmt.Sprint(c/100) || c%100 == 0) {
+			return true
+		}
+	}
+	return false
+}
+
+// timelyAmount writes cents with comma thousands: 1,250.00.
+func timelyAmount(c domain.Cents) string {
+	e := fmt.Sprint(c / 100)
+	for i := len(e) - 3; i > 0; i -= 3 {
+		e = e[:i] + "," + e[i:]
+	}
+	return fmt.Sprintf("%s.%02d", e, c%100)
 }
