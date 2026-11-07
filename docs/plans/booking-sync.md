@@ -19,7 +19,7 @@ Per-staff calendars (in fixtures: «Maria Aesthetic», «Olga Aesthetic», «Ver
 - No hidden fields: no booking ID in extended properties. The Google event ID (unique per calendar) is the only stable key.
 
 ## Event classification (pure domain function)
-`ClassifyEvent(summary, description string) Outcome` reads only line 1 of the description; never the title or later lines.
+`ClassifyEvent(summary, description string) EventClass` (in `internal/domain/booking.go`) reads only line 1 of the description, never later lines. The title is **compared, never returned**: line 1 must start with `<title> - `, exactly that prefix is cut, and a leftover ` - ` is Unreadable, so no part of a client name reaches a service. A title edited in Google Calendar therefore makes the booking Unreadable (a visible warning). Prices are read only in Timely's format (`€30.00`, `€45`, `€1,250.00`); anything else is Unreadable.
 
 | Outcome | Rule | Effect |
 |---|---|---|
