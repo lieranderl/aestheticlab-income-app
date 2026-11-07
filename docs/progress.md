@@ -1,5 +1,9 @@
 # Progress
 
+## Booking sync plan (2026-11-07)
+
+Owner asked whether to replace Timely (no API; Zapier too expensive) with our own booking system. Assessed and declined for now: customer-facing, client personal data under GDPR, roughly doubles the codebase. Instead, [docs/plans/booking-sync.md](plans/booking-sync.md) reads Timely's two-way-synced Google Calendar (one calendar per staff member) read-only, on demand, storing no client data, to show «Записи сегодня», pre-fill client entries from bookings and reconcile booked vs linked clients. Booked prices are suggestions only and never reach money. Design approved after four Codex review rounds (duplicate protection, manual linking, pagination and Brussels day boundaries, unreadable-event warnings, replay before Calendar, unlink without Calendar, all write rules re-checked inside the transaction). Implementation not started.
+
 ## Frontend dependency refresh (2026-10-26)
 
 PR #31 updates Playwright to 1.64.1, daisyUI to 5.7.50 and Lucide to 1.59.0. Regenerated `static/app.css` to fix the generated-assets CI failure; icon output is unchanged. Validation is recorded by the PR’s final CI checks.
