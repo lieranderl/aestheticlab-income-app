@@ -76,3 +76,11 @@ func eventOf(it *calendar.Event) Event {
 	}
 	return ev
 }
+
+// Warm makes one cheap call so the credentials token and the connection to
+// Google exist before the first screen asks for bookings. After a scale-to-
+// zero start, the first real read otherwise spends most of Timeout on them.
+func (g *Google) Warm(ctx context.Context) error {
+	_, err := g.svc.CalendarList.List().Context(ctx).MaxResults(1).Fields("items(id)").Do()
+	return err
+}
