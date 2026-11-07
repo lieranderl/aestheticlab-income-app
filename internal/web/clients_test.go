@@ -64,7 +64,7 @@ func TestClientZeroCertificatesValidationAdminAndClosedMonth(t *testing.T) {
 	form := url.Values{"date": {"2026-11-20"}, "token": {"certificate-http-token"}, "version": {"0"}, "services": {"100"}, "certificatePaid": {"100"}, "extrasDestination": {"cash"}}
 	res := s.do(request{method: http.MethodPost, path: "/clients", form: form, cookies: z, datastar: true})
 	wantPage(t, "SSE create", res, http.StatusOK, "datastar-patch-signals", "redirectUrl")
-	wantPage(t, "certificate daily", s.get("/?date=2026-11-20", z), http.StatusOK, "Салон должен вам €70", "Факт: в кассу €0 · у вас €0 · сертификатом €100", "Оплачено сертификатом")
+	wantPage(t, "certificate daily", s.get("/?date=2026-11-20", z), http.StatusOK, "Ваши «Себе»", "Факт: в кассу €0 · у вас €0 · сертификатом €100", "Оплачено сертификатом")
 	form.Set("token", "invalid-http-client-token")
 	form.Set("certificatePaid", "101")
 	wantPage(t, "redemption over service", s.post("/clients", form, z), http.StatusUnprocessableEntity, "использование сертификата не больше услуг")

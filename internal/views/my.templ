@@ -57,7 +57,7 @@ templ MyPage(nav Nav, m MyMonth) {
 					<p class="rounded-box bg-base-100 p-4 text-base-content/60">Отчётов за этот месяц нет.</p>
 				}
 				for _, r := range m.Reports {
-					@myReportCard(r)
+					@myReportCard(r, true)
 				}
 			</section>
 		</div>
@@ -80,16 +80,18 @@ templ figure(label, value string) {
 	</div>
 }
 
-templ myReportCard(r MyReport) {
+templ myReportCard(r MyReport, showStatus bool) {
 	<article class="card bg-base-100 shadow-sm">
 		<div class="card-body gap-2 p-4">
 			<div class="flex items-baseline justify-between gap-3">
 				<h3 class="font-semibold">{ r.Day }</h3>
 				<p class="text-lg font-semibold">{ r.Total }</p>
 			</div>
-			<div>
-				@statusChip(r.Status, r.Owed)
-			</div>
+			if showStatus {
+				<div>
+					@statusChip(r.Status, r.Owed)
+				</div>
+			}
 			<p class="text-sm">{ r.Fact }</p>
 			<p class="text-sm text-base-content/70">{ r.Expected }</p>
 			if r.Href != "" {
