@@ -290,7 +290,7 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 		case errors.Is(err, store.ErrMonthClosed):
 			f.Error = "Месяц закрыт — изменения недоступны"
 		case errors.Is(err, store.ErrBookingTaken):
-			f.Error = "Эта запись уже внесена — откройте её в «Записях в календаре» на этот день"
+			f.Error = "Эта запись уже связана с другим клиентом — откройте его в «Записях в календаре» на этот день"
 		default:
 			f.Error = clientProblem(r, err)
 			var ve *domain.ValidationError
@@ -339,6 +339,7 @@ func (a *app) bookingPrefill(r *http.Request, u store.User, day domain.Date, f *
 	f.Booking = event
 	f.BookingLabel = "По записи " + item.Start.In(a.store.Location()).Format("15:04") + " · " + strings.Join(item.Booking.Services, " + ")
 	if item.Booking.PriceKnown {
+		f.BookingPriced = true
 		f.BookingLabel += " · " + domain.FormatEUR(item.Booking.Price)
 		f.Values["services"] = amountText(item.Booking.Price)
 	}
@@ -357,7 +358,7 @@ func (a *app) clientBooking(r *http.Request, u store.User, e *store.ClientEntry,
 	f.Booking = event
 	cal, ok := a.cfg.Bookings.CalendarFor(e.Person)
 	if !ok { // the mapping changed since the form was opened
-		return "Запись не найдена в календаре на этот день. Сохраните без привязки.", true
+		return "Запись не найдена в календаре на этот день. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить».", true
 	}
 	e.Input.Booking = &domain.BookingRef{Calendar: cal, Event: event}
 	saved, err := a.store.ClientSaved(r.Context(), u.Actor(), e.Person, e.Date, e.Token)
@@ -367,13 +368,13 @@ func (a *app) clientBooking(r *http.Request, u store.User, e *store.ClientEntry,
 	case errors.Is(err, store.ErrForbidden), errors.Is(err, store.ErrInvalid):
 		return "", false // the store refuses it the same way
 	case err != nil: // fail closed: an unchecked booking never reaches the store
-		return "Записи недоступны. Сохраните без привязки или попробуйте позже.", true
+		return "Записи недоступны. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить» — или попробуйте позже.", true
 	}
 	if _, err := a.cfg.Bookings.Check(r.Context(), e.Person, e.Date, event); err != nil {
 		if errors.Is(err, bookings.ErrUnavailable) {
-			return "Записи недоступны. Сохраните без привязки или попробуйте позже.", true
+			return "Записи недоступны. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить» — или попробуйте позже.", true
 		}
-		return "Запись не найдена в календаре на этот день. Сохраните без привязки.", true
+		return "Запись не найдена в календаре на этот день. Отметьте «Сохранить без привязки к записи» и нажмите «Сохранить».", true
 	}
 	return "", false
 }

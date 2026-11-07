@@ -93,12 +93,12 @@ func TestStaffEnterAClientFromTheirBookingOnce(t *testing.T) {
 		t.Fatalf("save %d %s", res.Code, res.Body.String())
 	}
 	entry := strings.Split(res.Header().Get("Location"), "?")[0]
-	wantPage(t, "linked home", s.get("/?date=2026-11-20", z), http.StatusOK, "✓ внесено", `href="`+entry+`"`)
+	wantPage(t, "linked home", s.get("/?date=2026-11-20", z), http.StatusOK, "Связано</span>", `href="`+entry+`"`)
 	wantPage(t, "entry", s.get(entry, z), http.StatusOK, "Клиент связан с записью в календаре", "Отвязать от записи")
 
 	twice := clientForm("booked-http-client-2", "30")
 	twice.Set("booking", "b1")
-	wantPage(t, "second entry", s.post("/clients", twice, z), http.StatusUnprocessableEntity, "Эта запись уже внесена")
+	wantPage(t, "second entry", s.post("/clients", twice, z), http.StatusUnprocessableEntity, "уже связана с другим клиентом")
 }
 
 func TestARetryIsAnsweredWithoutAskingTheCalendar(t *testing.T) {
@@ -146,7 +146,7 @@ func TestABookingThatCantBeCheckedIsNeverDroppedSilently(t *testing.T) {
 	src.Fail(errors.New("calendar down"))
 	in := clientForm("booking-outage-client", "30")
 	in.Set("booking", "b1")
-	wantPage(t, "outage", s.post("/clients", in, z), http.StatusUnprocessableEntity, "Записи недоступны. Сохраните без привязки", `name="nobooking"`)
+	wantPage(t, "outage", s.post("/clients", in, z), http.StatusUnprocessableEntity, "Записи недоступны. Отметьте «Сохранить без привязки к записи»", `name="nobooking"`)
 	in.Set("nobooking", "1")
 	saved := s.post("/clients", in, z)
 	if saved.Code != http.StatusSeeOther {
@@ -176,7 +176,7 @@ func TestAClientEnteredByHandIsLinkedAndUnlinked(t *testing.T) {
 	if res := s.post(entry+"/link", url.Values{"booking": {"b1"}, "version": {"1"}}, z); res.Code != http.StatusSeeOther {
 		t.Fatalf("link %d %s", res.Code, res.Body.String())
 	}
-	wantPage(t, "linked", s.get("/?date=2026-11-20", z), http.StatusOK, "✓ внесено")
+	wantPage(t, "linked", s.get("/?date=2026-11-20", z), http.StatusOK, "Связано</span>")
 
 	src.Delete(olgaCal, "b1")
 	src.Fail(errors.New("calendar down"))
@@ -206,12 +206,12 @@ func TestTheAdminDayReconcilesBookingsWithClients(t *testing.T) {
 	}
 	admin := s.login("anna", annaPass)
 	page := s.get("/admin/day?date=2026-11-20", admin)
-	wantPage(t, "admin day", page, http.StatusOK, "Ольга · записи в календаре", "Записей: 2 · Клиентов: 1 · Не связано: 1", "Мария · записи в календаре", "Записей: 1 · Клиентов: 0 · Не связано: 1", "Не удалось прочитать событий: 1")
+	wantPage(t, "admin day", page, http.StatusOK, ">Ольга</h3>", "Записей: 2 · Клиентов: 1 · Записей без клиента: 1 · Клиентов без записи: 0", ">Мария</h3>", "Записей: 1 · Клиентов: 0 · Записей без клиента: 1", "Не удалось прочитать записей в календаре: 1")
 	noClientData(t, "admin day", page.Body.String())
 
 	src.Put(olgaCal, timely("b1", "2026-11-19", "10:00", "Wax Price: €30.00 with Olga Test (Confirmed)")) // moved to the day before
 	wantPage(t, "moved", s.get("/admin/day?date=2026-11-20", admin), http.StatusOK, "Связанная запись перенесена на")
-	wantPage(t, "destination", s.get("/admin/day?date=2026-11-19", admin), http.StatusOK, "Связано с клиентом от", "Не связано: 0")
+	wantPage(t, "destination", s.get("/admin/day?date=2026-11-19", admin), http.StatusOK, "Связано с клиентом от", "Записей без клиента: 0")
 
 	src.Delete(olgaCal, "b1")
 	wantPage(t, "deleted", s.get("/admin/day?date=2026-11-20", admin), http.StatusOK, "Связанная запись удалена в календаре")

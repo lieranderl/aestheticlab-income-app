@@ -92,13 +92,13 @@ func (a *app) bookingsView(ctx context.Context, actor store.User, uid string, da
 				c.NewHref = "/clients/new?date=" + day.String() + "&booking=" + url.QueryEscape(b.Ref.Event)
 			}
 			for _, e := range unlinked {
-				c.Candidates = append(c.Candidates, views.LinkCandidate{Action: "/clients/" + e.ID + "/link", Label: clientLabel(e), Version: e.Version})
+				c.Candidates = append(c.Candidates, views.LinkCandidate{Action: "/clients/" + e.ID + "/link", Label: "Клиент " + strconv.FormatInt(e.ClientNumber, 10) + " · " + domain.FormatEUR(e.Report.Total), Version: e.Version})
 			}
 		}
 		v.Cards = append(v.Cards, c)
 	}
 	if admin {
-		v.Counts = "Записей: " + strconv.Itoa(len(pb.day.Bookings)) + " · Клиентов: " + strconv.Itoa(countClients(entries)) + " · Не связано: " + strconv.Itoa(notLinked)
+		v.Counts = "Записей: " + strconv.Itoa(len(pb.day.Bookings)) + " · Клиентов: " + strconv.Itoa(countClients(entries)) + " · Записей без клиента: " + strconv.Itoa(notLinked) + " · Клиентов без записи: " + strconv.Itoa(len(unlinked))
 	}
 	if len(missing) > 0 {
 		statuses := a.cfg.Bookings.Statuses(ctx, day, missing)
@@ -118,7 +118,7 @@ func (a *app) bookingsView(ctx context.Context, actor store.User, uid string, da
 			}
 		}
 		if unchecked > 0 {
-			v.Notes = append(v.Notes, "Ещё "+strconv.Itoa(unchecked)+" "+ru.Plural(unchecked, "запись", "записи", "записей")+" не проверено")
+			v.Notes = append(v.Notes, "Не проверено связанных записей: "+strconv.Itoa(unchecked))
 		}
 	}
 	return v
@@ -260,11 +260,11 @@ func (a *app) linkFailed(w http.ResponseWriter, r *http.Request, u store.User, r
 	case errors.Is(err, bookings.ErrNotABooking), errors.Is(err, bookings.ErrNoCalendar):
 		msg = "Запись не найдена в календаре на этот день."
 	case errors.Is(err, store.ErrBookingTaken):
-		msg = "Эта запись уже внесена другим клиентом."
+		msg = "Эта запись уже связана с другим клиентом."
 	case errors.Is(err, store.ErrInvalid):
 		msg = "Клиент уже связан с другой записью — сначала отвяжите её."
 	case errors.Is(err, store.ErrVersionConflict):
-		msg = "Запись изменена — обновите страницу и повторите."
+		msg = "Клиент изменён — обновите страницу и повторите."
 	case errors.Is(err, store.ErrMonthClosed):
 		msg = "Месяц закрыт — изменения недоступны"
 	case errors.Is(err, store.ErrFinancialWritesPaused):

@@ -650,7 +650,7 @@ func TestClientEnteredByMistakeCanBeRemovedWithAReason(t *testing.T) {
 		t.Fatalf("remove %d %q %s", removed.Code, removed.Header().Get("Location"), removed.Body.String())
 	}
 	day := s.get("/?date=2026-11-20&removed=1", z)
-	wantPage(t, "day after removal", day, http.StatusOK, "Клиент удалён", "За этот день записей нет.")
+	wantPage(t, "day after removal", day, http.StatusOK, "Клиент удалён", "Клиентов за этот день нет.")
 	if strings.Contains(day.Body.String(), "€120") {
 		t.Fatal("removed client still counted in the day")
 	}

@@ -17,6 +17,8 @@ func iconPath(name string) string {
 		return "<path d=\"M8 2v3\"/><path d=\"M16 2v3\"/><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 9h18\"/><path d=\"m14 13-4 4\"/><path d=\"m10 13 4 4\"/>"
 	case "chart-line":
 		return "<path d=\"M3 3v16a2 2 0 0 0 2 2h16\"/><path d=\"m19 9-5 5-4-4-3 3\"/>"
+	case "check":
+		return "<path d=\"M20 6 9 17l-5-5\"/>"
 	case "chevron-left":
 		return "<path d=\"m15 18-6-6 6-6\"/>"
 	case "chevron-right":

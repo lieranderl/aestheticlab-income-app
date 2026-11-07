@@ -19,6 +19,7 @@ type ClientForm struct {
 	// describes it, BookingNotice says why it couldn't be used.
 	Booking, BookingLabel, BookingNotice string
 	OfferNoBooking                       bool // «Сохранить без привязки»
+	BookingPriced                        bool // the booking carries a price
 	Linked                               bool // a saved client linked to a booking
 }
 
@@ -81,9 +82,16 @@ templ ClientFormView(f ClientForm) {
 			<input type="hidden" name="booking" value={ f.Booking }/>
 		}
 		if f.BookingLabel != "" {
-			<div class="rounded-box bg-base-200 p-3">
-				<p>{ f.BookingLabel }</p>
-				<p class="text-sm text-base-content/70">Цена из записи — проверьте и укажите, сколько получено на самом деле.</p>
+			<div role="status" class="alert alert-info alert-soft">
+				@Icon("calendar-check", "size-5")
+				<div>
+					<p>{ f.BookingLabel }</p>
+					if f.BookingPriced {
+						<p class="text-sm">Цена из записи — проверьте и укажите, сколько получено на самом деле.</p>
+					} else {
+						<p class="text-sm">Цены в записи нет — укажите, сколько получено.</p>
+					}
+				</div>
 			</div>
 		}
 		if f.BookingNotice != "" {
@@ -195,7 +203,7 @@ templ ClientFormView(f ClientForm) {
 			<div class="sticky bottom-dock z-10 bg-base-100 p-3 rounded-box shadow-lg lg:bottom-4">
 				@FinancialResponseNoticeWithAdvice("Клиент мог сохраниться. Проверьте список или повторите эту же форму.")
 				if f.OfferNoBooking {
-					<label class="label min-h-11 mb-2 whitespace-normal">
+					<label class="flex items-center gap-3 min-h-11 mb-2 cursor-pointer">
 						<input type="checkbox" name="nobooking" value="1" class="checkbox"/>
 						<span>Сохранить без привязки к записи</span>
 					</label>
@@ -264,22 +272,22 @@ templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, 
 		if f.Locked == "" {
 			<a class="btn btn-primary btn-lg w-full" href={ templ.SafeURL("/clients/new?date=" + f.Date) }>Добавить клиента</a>
 		}
-		if booked.Enabled {
-			<div class="mt-4">
-				@BookingsSection(booked)
-			</div>
-		}
 		<div class="my-4 flex flex-col gap-4">
 			<h2 class="font-semibold">Итоги дня</h2>
 			@MoneyPanel(money)
 			@RevenueDetails(totals, "день")
 		</div>
+		if booked.Enabled {
+			<div class="mb-4">
+				@BookingsSection(booked)
+			</div>
+		}
 		<section class="flex flex-col gap-3">
 			for _, r := range cards {
 				@myReportCard(r)
 			}
 			if len(cards) == 0 {
-				<p class="p-4 text-base-content/60">За этот день записей нет.</p>
+				<p class="p-4 text-base-content/60">Клиентов за этот день нет.</p>
 			}
 		</section>
 	}
