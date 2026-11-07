@@ -35,7 +35,7 @@ func clientID(uid string, d domain.Date, token string) string {
 }
 
 func sameClient(a, b domain.ClientInput) bool {
-	return a.Services == b.Services && a.ServiceCash == b.ServiceCash && a.ServiceCard == b.ServiceCard && a.CertificatePaid == b.CertificatePaid && a.ExtrasDestination == b.ExtrasDestination && maps.Equal(a.Extras, b.Extras)
+	return sameBooking(a.Booking, b.Booking) && a.Services == b.Services && a.ServiceCash == b.ServiceCash && a.ServiceCard == b.ServiceCard && a.CertificatePaid == b.CertificatePaid && a.ExtrasDestination == b.ExtrasDestination && maps.Equal(a.Extras, b.Extras)
 }
 
 // SaveClientReport creates or edits one client. A repeated unchanged create
@@ -87,6 +87,16 @@ func (s *Store) SaveClientReport(ctx context.Context, actor Actor, e ClientEntry
 		if before.Version != e.Version || (!found && e.Version != 0) {
 			return ErrVersionConflict
 		}
+		booking := e.Input.Booking
+		if found {
+			booking = before.ClientInput.Booking // only link/unlink change it
+		}
+		var lockPath string
+		if !found && booking != nil {
+			if lockPath, err = readFreeLock(t, *booking, id); err != nil {
+				return err
+			}
+		}
 		h, err := readTermsHistory(t, e.Person)
 		if err != nil {
 			return err
@@ -113,6 +123,7 @@ func (s *Store) SaveClientReport(ctx context.Context, actor Actor, e ClientEntry
 		now := s.stamp()
 		input := e.Input
 		input.Extras = maps.Clone(e.Input.Extras)
+		input.Booking = cloneBooking(booking)
 		out = SavedReport{ID: id, ClientNumber: before.ClientNumber, ClientInput: &input, PersonReport: pr, Version: before.Version + 1, CreatedAt: now, UpdatedAt: now, UpdatedBy: actor.UID}
 		if found {
 			out.CreatedAt = before.CreatedAt.UTC()
@@ -157,6 +168,11 @@ func (s *Store) SaveClientReport(ctx context.Context, actor Actor, e ClientEntry
 		rec.ClientToken = e.Token
 		if err := t.set("reports/"+id, rec); err != nil {
 			return err
+		}
+		if lockPath != "" {
+			if err := t.set(lockPath, bookingLinkRecord{ReportID: id, Person: e.Person, Date: e.Date.String(), Active: true}); err != nil {
+				return err
+			}
 		}
 		action, prev := ActionCreate, any(nil)
 		if found {
@@ -243,12 +259,21 @@ func (s *Store) VoidClientReport(ctx context.Context, actor Actor, id string, ve
 		if err := requireOpen(t, day.Month()); err != nil {
 			return err
 		}
+		release, err := readOwnLock(t, before.ClientInput.Booking, id)
+		if err != nil {
+			return err
+		}
 		after := before
 		after.Voided, after.VoidReason = true, reason
 		after.Version = before.Version + 1
 		after.UpdatedAt, after.UpdatedBy = s.stamp(), actor.UID
 		if err := t.set("reports/"+id, after); err != nil {
 			return err
+		}
+		if release != "" { // the voided record keeps its booking for history
+			if err := t.set(release, bookingLinkRecord{ReportID: id, Person: before.UserID, Date: before.Date, Active: false}); err != nil {
+				return err
+			}
 		}
 		return s.audit(t, EntityReport, id, ActionVoid, actor.UID, before, after)
 	})
