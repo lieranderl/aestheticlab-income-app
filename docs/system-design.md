@@ -33,6 +33,9 @@ New web records are per client rather than per day. Existing daily reports and o
 - New-client drafts are scoped by person/date/new entry and retain the creation token through reload/lost response. Saved-entry drafts use the stable report ID/version. Success clears only the matching create token. Financial requests never auto-retry.
 - Oil is added as an audited revenue category on its first client sale if absent, with first use recorded in the same transaction. Existing category settings and saved flags are not rewritten.
 
+## Booking sync (2026-11-07)
+Timely bookings are read from the staff Google calendars, read-only and on demand ([plan](plans/booking-sync.md); `internal/bookings`, `domain.ClassifyEvent`). Nothing about bookings is stored except, on a client linked to one, `clientInput.booking` (`{calendar, event}`, not personal) and the lock `bookingLinks/{sha256(calendar|event)}` = `{reportId, person, date, active}`, written in the same transaction. One active client per booking; removing a client releases it; edits never change it; replays compare it. The booked price only pre-fills the new-client form and never reaches money. Screens: «Записи в календаре» on the staff home (with «Внести» and «Связать с внесённым клиентом») and per person on the admin day («Записей · Клиентов · Не связано», moved/deleted notes, unreadable-event warning). `GET /clients/new?booking=<event>` starts a client from a booking; a new create with a booking is checked against Calendar only when its token has no saved record. Calendar failures show «Записи недоступны» and never block entering clients. Config: `BOOKING_CALENDARS` (see MAINTAINING.md).
+
 ## 2. Data model (Firestore)
 
 All amounts are `int64` cents. Percentages are basis points (5000 = 50%).
@@ -194,6 +197,8 @@ Each request reads categories, accounts and users once and keeps them in memory 
 | `GET /` | people with `submitsReports` | **Daily form** (§6.3). |
 | `POST /reports/{date}` | owner | Save a report. |
 | `GET` / `POST /clients/{id}/remove` | owner, admin | Remove a client entered by mistake (voided with a reason, open month only). |
+| `POST /clients/{id}/link` | owner, admin | Link a client to a booking from the person's own calendar (checked with Calendar first, then the store re-checks access, month, version and the one-client-per-booking lock). A repeat is acknowledged. |
+| `POST /clients/{id}/unlink` | owner, admin | Remove the link; never asks Calendar. |
 | `GET /my?m=` | all | «Мои записи»: balance card, month earnings, reports, movements. |
 | `GET /movements/new`, `POST /movements`, `GET` / `POST /movements/{id}/void` | all | Own deposit/expense (pending for staff); staff can cancel only their own pending movement. Admin can cancel non-accrual movements in open months. |
 | `GET /profile`, `POST /profile/password` | all | Change own password. Forced at first login. Logs out every other device. |

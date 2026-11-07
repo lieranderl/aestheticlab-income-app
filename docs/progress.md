@@ -1,5 +1,14 @@
 # Progress
 
+## Booking sync from Google Calendar (2026-11-07)
+Implements [docs/plans/booking-sync.md](plans/booking-sync.md) steps 1–5 (step 1 in #39; steps 2–3 in #40; screens here):
+- **Staff home:** «Записи в календаре» lists the day's Timely bookings (time, services, «по записи €30», no client names) with «Внести» (pre-fills the booked price as a suggestion) and «Связать с внесённым клиентом»; linked bookings show «✓ внесено». Unreadable events and calendar outages show warnings; entering clients always works.
+- **Admin day:** per person «Записей · Клиентов · Не связано», notes when a linked booking moved («перенесена на 12.11»), was deleted, changed or couldn't be checked, and «Связано с клиентом от …» on a booking's new day.
+- **Entry page:** «Отвязать от записи».
+- **Safety:** a retry of a saved client never asks Calendar (lost response after deletion, outage or month close is acknowledged); a new booking is checked against the person's own calendar (forged, foreign and other-day events refused); a calendar that can't be checked offers «Сохранить без привязки», never dropping the link silently; one active client per booking; the booked price never reaches money.
+- Tests: domain, reader (memory + Google over httptest), store contract (memory + emulator), HTTP. Checked at 375 pt in light and dark with a made-up calendar (`INCOME_DEV_BOOKINGS=1`).
+- **Not yet on:** production needs the four staff calendars shared with the runtime account and `BOOKING_CALENDARS` set (MAINTAINING.md → Booking calendars). Open: service names containing " - " are unreadable; check at go-live.
+
 ## Booking sync plan (2026-11-07)
 
 Owner asked whether to replace Timely (no API; Zapier too expensive) with our own booking system. Assessed and declined for now: customer-facing, client personal data under GDPR, roughly doubles the codebase. Instead, [docs/plans/booking-sync.md](plans/booking-sync.md) reads Timely's two-way-synced Google Calendar (one calendar per staff member) read-only, on demand, storing no client data, to show «Записи сегодня», pre-fill client entries from bookings and reconcile booked vs linked clients. Booked prices are suggestions only and never reach money. Design approved after four Codex review rounds (duplicate protection, manual linking, pagination and Brussels day boundaries, unreadable-event warnings, replay before Calendar, unlink without Calendar, all write rules re-checked inside the transaction). Implementation not started.

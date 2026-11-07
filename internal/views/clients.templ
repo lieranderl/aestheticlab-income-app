@@ -15,6 +15,11 @@ type ClientForm struct {
 	Version, Number, Pct                                                             int64
 	Values                                                                           map[string]string
 	Self, Salon, Cash, Card, Held, Effect, DayLabel, SharePct                        string
+	// Booking is the Timely event a new client is entered from; BookingLabel
+	// describes it, BookingNotice says why it couldn't be used.
+	Booking, BookingLabel, BookingNotice string
+	OfferNoBooking                       bool // «Сохранить без привязки»
+	Linked                               bool // a saved client linked to a booking
 }
 
 func clientSignals(f ClientForm) string {
@@ -26,8 +31,10 @@ const clientExtrasOpen = `if ([$_client.creams, $_client.oil, $_client.certifica
 const clientCertificateOpen = `if ([$_client.certificatePaid].some(v => String(v ?? '').trim() !== '')) { el.open = true }`
 
 var clientCents = `Object.fromEntries(Object.entries($_client).filter(([k]) => k !== 'extrasDestination').map(([k,v]) => [k, ((s) => s === '' ? 0 : /^(?=[.,]?\d)(\d{1,3}( \d{3})+|\d{0,7})([.,]\d{1,2})?$/.test(s) && s.split(/[.,]/)[0].replace(/ /g, '').length <= 7 ? Math.round(Number(s.replace(/ /g, '').replace(',', '.')) * 100) : NaN)(String(v ?? '').trim().replace(/^€/, '').replace(/€$/, '').trim().replace(/[ \u00a0\u202f]+/g, ' '))]))`
+
 const clientErrors = `(() => { const errors = Object.fromEntries(Object.entries($_cc).filter(([k,v]) => !Number.isFinite(v) || v < 0 || v > 999999999).map(([k]) => [k, 'Введите сумму от €0 до €9 999 999,99, например 600,50.'])); if (!errors.services && !errors.certificatePaid && $_cc.certificatePaid > $_cc.services) { errors.certificatePaid = 'Использование сертификата не больше стоимости услуг.' } if (!errors.services && !errors.certificatePaid && !errors.serviceCash && !errors.serviceCard && $_cc.serviceCash + $_cc.serviceCard > $_cc.services - $_cc.certificatePaid) { errors.serviceCash = errors.serviceCard = 'Сумма взносов не больше стоимости услуг за вычетом сертификата.' } if (!['cash', 'kassa_card'].includes($_client.extrasDestination) && ($_ce > 0 || $_client.extrasDestination !== '')) { errors.extrasDestination = 'Выберите, куда внесены дополнительные продажи.' } return errors })()`
 const clientFocusInvalid = `const field = [...el.elements].find(field => $_clientErrors[field.name]); if (field) { field.closest('details')?.setAttribute('open', ''); field.focus({preventScroll: true}); field.scrollIntoView({block: 'center'}) }`
+
 var clientSelf = `Math.floor((($_cc.services) * $_clientPct + 5000) / 10000)`
 var clientExtras = `($_cc.creams) + ($_cc.oil) + ($_cc.certificates)`
 var clientCash = `($_cc.serviceCash) + ($_client.extrasDestination === 'cash' ? $_ce : 0)`
@@ -39,6 +46,19 @@ templ ClientPage(nav Nav, f ClientForm) {
 		@PageHeader(f.Title, f.Back)
 		<p class="mb-3 text-base-content/70">{ f.DayLabel }</p>
 		@ClientFormView(f)
+		if f.Linked {
+			<section class="card bg-base-100 mt-4">
+				<div class="card-body p-4 gap-2">
+					<p>Клиент связан с записью в календаре.</p>
+					if f.Locked == "" {
+						<form method="post" action={ templ.SafeURL(f.Action + "/unlink") }>
+							<input type="hidden" name="version" value={ strconv.FormatInt(f.Version, 10) }/>
+							<button type="submit" class="btn btn-lg w-full">Отвязать от записи</button>
+						</form>
+					}
+				</div>
+			</section>
+		}
 		if f.Version > 0 && f.CanNext && f.Locked == "" {
 			<a class="btn btn-lg w-full mt-4" href={ templ.SafeURL("/clients/new?date=" + f.Date) }>Следующий клиент</a>
 		}
@@ -57,6 +77,21 @@ templ ClientFormView(f ClientForm) {
 		<input type="hidden" name="date" value={ f.Date }/>
 		<input type="hidden" name="token" value={ f.Token }/>
 		<input type="hidden" name="version" value={ strconv.FormatInt(f.Version, 10) }/>
+		if f.Booking != "" {
+			<input type="hidden" name="booking" value={ f.Booking }/>
+		}
+		if f.BookingLabel != "" {
+			<div class="rounded-box bg-base-200 p-3">
+				<p>{ f.BookingLabel }</p>
+				<p class="text-sm text-base-content/70">Цена из записи — проверьте и укажите, сколько получено на самом деле.</p>
+			</div>
+		}
+		if f.BookingNotice != "" {
+			<div role="status" class="alert alert-warning alert-soft">
+				@Icon("calendar-x", "size-5")
+				<span>{ f.BookingNotice }</span>
+			</div>
+		}
 		if f.Incomplete {
 			<div id="client-validation-summary" role="alert" class="alert alert-error alert-soft" data-class:hidden="$_clientReady">
 				@Icon("circle-alert", "size-5")
@@ -95,11 +130,12 @@ templ ClientFormView(f ClientForm) {
 					@clientField(f, "creams", "Кремы, € (необязательно)", "")
 					@clientField(f, "oil", "Масло, € (необязательно)", "")
 					@clientField(f, "certificates", "Продажа сертификатов, € (необязательно)", "")
-					<label class="flex flex-col gap-2 py-2">Куда внесены продажи (обязательно при продаже)
+					<label class="flex flex-col gap-2 py-2">
+						Куда внесены продажи (обязательно при продаже)
 						<select name="extrasDestination" class={ "select select-lg w-full text-base",templ.KV("select-error",f.Bad["extrasDestination"]) } data-class:select-error="Boolean($_clientErrors[el.name])" aria-invalid={ boolText(f.Bad["extrasDestination"]) } aria-describedby="client-extrasDestination-error" data-attr:aria-invalid="$_clientErrors[el.name] ? 'true' : 'false'" data-bind="_client.extrasDestination">
 							if f.Values["extrasDestination"]!="cash" && f.Values["extrasDestination"]!="kassa_card" {
 								<option value={ f.Values["extrasDestination"] } selected>Выберите кассу</option>
-								}
+							}
 							<option value="cash" selected?={ f.Values["extrasDestination"]=="cash" }>Касса — наличные</option>
 							<option value="kassa_card" selected?={ f.Values["extrasDestination"]=="kassa_card" }>Касса — карта салона</option>
 						</select>
@@ -120,28 +156,28 @@ templ ClientFormView(f ClientForm) {
 					if f.SharePct == "" {
 						<p class="text-base-content/70">Условия на этот месяц не настроены.</p>
 					} else {
-					if f.OtherEmployee {
-						<h2 class="font-semibold">Распределение по условиям сотрудника</h2>
-						<p class="text-sm text-base-content/70">Доля сотрудника от услуг — { f.SharePct }.</p>
-					} else {
-						<h2 class="font-semibold">Распределение по вашим условиям</h2>
-						<p class="text-sm text-base-content/70">Ваша доля от услуг — { f.SharePct }.</p>
-					}
-					<p class={ "text-base-content/70", templ.KV("hidden", !f.Incomplete) } data-class:hidden="$_clientReady" role="status">Расчёт не завершён — проверьте выделенные поля.</p>
-					<div id="client-result-values" class={ templ.KV("hidden", f.Incomplete), "flex flex-col gap-2" } data-class:hidden="!$_clientReady">
-					<p>«Себе» <strong data-text={ jsEUR("$_clientSelf") }>{ f.Self }</strong></p>
-					<p>«Салону» <strong data-text={ jsEUR("($_cc.services) + $_ce - $_clientSelf") }>{ f.Salon }</strong></p>
-					<h2 class="font-semibold mt-2">По введённым данным</h2>
-					<p class="font-medium">Итого внесено в кассу</p>
-					<p class="text-sm text-base-content/70">Взносы за услуги и дополнительные продажи.</p>
-					<p>Касса — наличные <strong data-text={ jsEUR("$_cashDeposit") }>{ f.Cash }</strong></p>
-					<p>Касса — карта салона <strong data-text={ jsEUR("$_cardDeposit") }>{ f.Card }</strong></p>
-					<p>Остаётся у вас <strong data-text={ jsEUR("($_cc.services) - ($_cc.certificatePaid) - ($_cc.serviceCash) - ($_cc.serviceCard)") }>{ f.Held }</strong></p>
-					<div class="rounded-box bg-base-200 p-3 mt-2">
-						<p class="font-semibold" data-text={ `$_clientDelta > 0 ? 'По этой записи салон должен вам ' + ` + jsEUR("$_clientDelta") + ` : $_clientDelta < 0 ? 'Оставьте в кассе ' + ` + jsEUR("-$_clientDelta") + ` : 'По этой записи расчёт с салоном — €0'` }>{ f.Effect }</p>
-						<p class="text-sm text-base-content/70 mt-1">Только по этой записи, без учёта общего баланса.</p>
-					</div>
-					</div>
+						if f.OtherEmployee {
+							<h2 class="font-semibold">Распределение по условиям сотрудника</h2>
+							<p class="text-sm text-base-content/70">Доля сотрудника от услуг — { f.SharePct }.</p>
+						} else {
+							<h2 class="font-semibold">Распределение по вашим условиям</h2>
+							<p class="text-sm text-base-content/70">Ваша доля от услуг — { f.SharePct }.</p>
+						}
+						<p class={ "text-base-content/70", templ.KV("hidden", !f.Incomplete) } data-class:hidden="$_clientReady" role="status">Расчёт не завершён — проверьте выделенные поля.</p>
+						<div id="client-result-values" class={ templ.KV("hidden", f.Incomplete), "flex flex-col gap-2" } data-class:hidden="!$_clientReady">
+							<p>«Себе» <strong data-text={ jsEUR("$_clientSelf") }>{ f.Self }</strong></p>
+							<p>«Салону» <strong data-text={ jsEUR("($_cc.services) + $_ce - $_clientSelf") }>{ f.Salon }</strong></p>
+							<h2 class="font-semibold mt-2">По введённым данным</h2>
+							<p class="font-medium">Итого внесено в кассу</p>
+							<p class="text-sm text-base-content/70">Взносы за услуги и дополнительные продажи.</p>
+							<p>Касса — наличные <strong data-text={ jsEUR("$_cashDeposit") }>{ f.Cash }</strong></p>
+							<p>Касса — карта салона <strong data-text={ jsEUR("$_cardDeposit") }>{ f.Card }</strong></p>
+							<p>Остаётся у вас <strong data-text={ jsEUR("($_cc.services) - ($_cc.certificatePaid) - ($_cc.serviceCash) - ($_cc.serviceCard)") }>{ f.Held }</strong></p>
+							<div class="rounded-box bg-base-200 p-3 mt-2">
+								<p class="font-semibold" data-text={ `$_clientDelta > 0 ? 'По этой записи салон должен вам ' + ` + jsEUR("$_clientDelta") + ` : $_clientDelta < 0 ? 'Оставьте в кассе ' + ` + jsEUR("-$_clientDelta") + ` : 'По этой записи расчёт с салоном — €0'` }>{ f.Effect }</p>
+								<p class="text-sm text-base-content/70 mt-1">Только по этой записи, без учёта общего баланса.</p>
+							</div>
+						</div>
 					}
 				</div>
 			</section>
@@ -158,6 +194,12 @@ templ ClientFormView(f ClientForm) {
 		if f.Locked == "" {
 			<div class="sticky bottom-dock z-10 bg-base-100 p-3 rounded-box shadow-lg lg:bottom-4">
 				@FinancialResponseNoticeWithAdvice("Клиент мог сохраниться. Проверьте список или повторите эту же форму.")
+				if f.OfferNoBooking {
+					<label class="label min-h-11 mb-2 whitespace-normal">
+						<input type="checkbox" name="nobooking" value="1" class="checkbox"/>
+						<span>Сохранить без привязки к записи</span>
+					</label>
+				}
 				<button type="submit" class="btn btn-primary btn-lg w-full" data-attr:disabled="$_busy">Сохранить</button>
 			</div>
 		}
@@ -204,7 +246,7 @@ templ InstallBanner() {
 	</section>
 }
 
-templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, money MoneyView, notice string) {
+templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, money MoneyView, notice string, booked BookingsView) {
 	@Layout("Клиенты", nav) {
 		@InstallBanner()
 		if notice != "" {
@@ -221,6 +263,11 @@ templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, 
 		}
 		if f.Locked == "" {
 			<a class="btn btn-primary btn-lg w-full" href={ templ.SafeURL("/clients/new?date=" + f.Date) }>Добавить клиента</a>
+		}
+		if booked.Enabled {
+			<div class="mt-4">
+				@BookingsSection(booked)
+			</div>
 		}
 		<div class="my-4 flex flex-col gap-4">
 			<h2 class="font-semibold">Итоги дня</h2>

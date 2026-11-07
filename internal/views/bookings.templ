@@ -1,0 +1,132 @@
+package views
+
+import "strconv"
+
+// BookingCard is one Timely booking on a day: never the client's name.
+type BookingCard struct {
+	Time, Services, Price string
+	// Linked: entered as a client on this day (EntryHref) or another day
+	// (Elsewhere, e.g. «Связано с клиентом от 07.11»).
+	Linked     bool
+	EntryHref  string
+	Elsewhere  string
+	NewHref    string // «Внести»; empty when it can't be entered here
+	Event      string
+	Candidates []LinkCandidate // this day's unlinked clients
+}
+
+// LinkCandidate is an unlinked client a booking can be linked to.
+type LinkCandidate struct {
+	Action, Label string
+	Version       int64
+}
+
+// BookingsView is one person's bookings for a day.
+type BookingsView struct {
+	Name        string // admin day only
+	Enabled     bool
+	Unavailable bool
+	Unreadable  int
+	Counts      string // «Записей: 6 · Клиентов: 5 · Не связано: 1» (admin)
+	Cards       []BookingCard
+	Notes       []string // what became of linked bookings missing from the day
+	Locked      bool
+}
+
+templ BookingsSection(v BookingsView) {
+	if v.Enabled {
+		<section class="card bg-base-100 shadow-sm" aria-label="Записи в календаре">
+			<div class="card-body gap-3 p-4">
+				<h2 class="font-semibold">
+					if v.Name != "" {
+						{ v.Name } · записи в календаре
+					} else {
+						Записи в календаре
+					}
+				</h2>
+				if v.Counts != "" {
+					<p class="text-base-content/70">{ v.Counts }</p>
+				}
+				if v.Unavailable {
+					<div role="status" class="alert alert-warning alert-soft">
+						@Icon("calendar-x", "size-5")
+						<span>Записи недоступны — календарь не ответил. Клиентов можно вносить как обычно.</span>
+					</div>
+				}
+				if v.Unreadable > 0 {
+					<div role="status" class="alert alert-warning alert-soft">
+						@Icon("circle-alert", "size-5")
+						<span>Не удалось прочитать событий: { strconv.Itoa(v.Unreadable) }. Проверьте их в календаре.</span>
+					</div>
+				}
+				for _, note := range v.Notes {
+					<p class="rounded-box bg-base-200 p-3 text-sm">{ note }</p>
+				}
+				if !v.Unavailable && len(v.Cards) == 0 {
+					<p class="text-base-content/60">Записей на этот день нет.</p>
+				}
+				<ul class="flex flex-col gap-3">
+					for _, c := range v.Cards {
+						@bookingCard(c, v.Locked)
+					}
+				</ul>
+			</div>
+		</section>
+	}
+}
+
+templ bookingCard(c BookingCard, locked bool) {
+	<li class="rounded-box border border-base-300 p-3 flex flex-col gap-2">
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0">
+				<p class="font-semibold">{ c.Time }</p>
+				<p class="[overflow-wrap:anywhere]">{ c.Services }</p>
+				<p class="text-sm text-base-content/70">{ c.Price }</p>
+			</div>
+			if c.Linked {
+				<span class="badge badge-soft badge-success shrink-0">✓ внесено</span>
+			} else {
+				<span class="badge badge-soft badge-warning shrink-0">Не связано</span>
+			}
+		</div>
+		if c.Linked && c.EntryHref != "" {
+			<a class="link min-h-11 inline-flex items-center" href={ templ.SafeURL(c.EntryHref) }>
+				if c.Elsewhere != "" {
+					{ c.Elsewhere }
+				} else {
+					Открыть клиента
+				}
+			</a>
+		}
+		if !c.Linked && !locked {
+			if c.NewHref != "" {
+				<a class="btn btn-primary btn-lg w-full" href={ templ.SafeURL(c.NewHref) }>Внести</a>
+			}
+			if len(c.Candidates) > 0 {
+				<details class="collapse collapse-arrow bg-base-200">
+					<summary class="collapse-title min-h-12 font-medium">Связать с внесённым клиентом</summary>
+					<div class="collapse-content flex flex-col gap-2">
+						for _, cand := range c.Candidates {
+							<form method="post" action={ templ.SafeURL(cand.Action) }>
+								<input type="hidden" name="booking" value={ c.Event }/>
+								<input type="hidden" name="version" value={ strconv.FormatInt(cand.Version, 10) }/>
+								<button type="submit" class="btn btn-lg w-full">{ cand.Label }</button>
+							</form>
+						}
+					</div>
+				</details>
+			}
+		}
+	</li>
+}
+
+templ LinkFailedPage(nav Nav, msg, back string) {
+	@Layout("Записи в календаре", nav) {
+		@PageHeader("Записи в календаре", back)
+		<div role="alert" class="alert alert-error alert-soft">
+			@Icon("circle-alert", "size-5")
+			<span>{ msg }</span>
+		</div>
+		<a class="btn btn-lg w-full mt-4" href={ templ.SafeURL(back) }>Вернуться к дню</a>
+	}
+}

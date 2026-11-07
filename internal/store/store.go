@@ -96,6 +96,9 @@ func (s *Store) StartMonth() domain.Month { return s.start }
 // Today is the salon's calendar day now.
 func (s *Store) Today() domain.Date { return domain.Today(s.now(), s.loc) }
 
+// Location is the salon's time zone (Europe/Brussels).
+func (s *Store) Location() *time.Location { return s.loc }
+
 // Ping checks the backend answers, for /readyz.
 func (s *Store) Ping(ctx context.Context) error {
 	return s.db.run(ctx, true, func(t tx) error {

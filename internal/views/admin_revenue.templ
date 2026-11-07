@@ -23,6 +23,8 @@ type AdminDay struct {
 	Reports []AdminReport
 	Missing []string
 	Notice  string
+	// Bookings is each mapped person's calendar section.
+	Bookings []BookingsView
 }
 
 templ AdminDayPage(nav Nav, p AdminDay) {
@@ -53,6 +55,14 @@ templ AdminDayPage(nav Nav, p AdminDay) {
 						</ul>
 					</div>
 				</section>
+			}
+			if len(p.Bookings) > 0 {
+				<h2 class="text-lg font-semibold">Записи в календаре</h2>
+				<div class="grid gap-3 lg:grid-cols-2">
+					for _, b := range p.Bookings {
+						@BookingsSection(b)
+					}
+				</div>
 			}
 			if len(p.Reports) == 0 {
 				<p class="rounded-box bg-base-100 p-4 text-base-content/60">Отчётов за этот день нет.</p>

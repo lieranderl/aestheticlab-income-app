@@ -292,6 +292,25 @@ go run ./cmd/import history -project <project> -database aestheticlab-income -st
 ```
 Compare the dry run's table and per-person totals with the tab. Have Anna confirm whether the sheet's «Salon Retained Share» includes certificate sales, which the app's salon income leaves out. Then ask before the real run. The months load in one transaction, each with an «Импорт месяца» audit row. A month already loaded with the same figures is skipped. A month whose figures differ in the file replaces the old ones and gets its own audit row, so after a correction in the sheet, run it again.
 
+## Booking calendars (Timely → Google Calendar)
+The kassa reads Timely bookings from the staff calendars that Timely two-way syncs into the salon Google account ([plan](plans/booking-sync.md)). It only reads, on demand, and stores no client data. The feature is off until `BOOKING_CALENDARS` is set; deploys keep the variable (they only change the image).
+
+To turn it on (ask the owner first: it is a production change):
+1. **Share** each staff calendar (never «Aesthetic Lab», birthdays or holidays) with the runtime account `aestheticlab-income-runtime@<project>.iam.gserviceaccount.com`, set to «See all event details». Google Calendar → the calendar's settings → «Share with specific people».
+2. **Calendar IDs:** the same settings page → «Integrate calendar» → «Calendar ID».
+3. **Kassa IDs:** «Сотрудники» → the person; the ID is the last part of the address `/admin/users/<uid>`.
+4. **Set the mapping** (one calendar per person):
+   ```bash
+   gcloud run services update aestheticlab-income --project <project> --region europe-west1 \
+     --update-env-vars 'BOOKING_CALENDARS=<calendarId>|<uid>;<calendarId>|<uid>'
+   ```
+   gcloud splits the list at commas; the value has none, so it needs no custom delimiter. This creates a new revision; minimum instances stay 0.
+5. **Check:** for one day, «День» shows per person «Записей · Клиентов · Не связано»; the booking counts and times must match Google Calendar. Don't copy client names into notes, logs or screenshots.
+
+To turn it off: `gcloud run services update aestheticlab-income --project <project> --region europe-west1 --remove-env-vars BOOKING_CALENDARS`.
+
+If a calendar stops answering (share removed, calendar recreated), screens show «Записи недоступны» or «Не удалось проверить связанную запись», never a deletion. Fix the share or the mapping. Locally, `INCOME_DEV_BOOKINGS=1 make dev-memory` gives anna a made-up calendar for today (`.claude/launch.json` → `kassa-web-bookings-demo`).
+
 ## Renaming a kassa account
 The app has no screen for account names. `cmd/renameaccount` changes only the display name, audited as `cli:renameaccount`. Run the dry run, then the real command after approval:
 ```bash

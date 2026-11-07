@@ -30,6 +30,16 @@
       ],
       "port": 8080,
       "autoPort": true
+    },
+    {
+      "name": "kassa-web-bookings-demo",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "cd \"$(git rev-parse --show-toplevel)\" && INCOME_DEV_BOOKINGS=1 make dev-memory DEV_PORT=8091"
+      ],
+      "port": 8091,
+      "autoPort": true
     }
   ]
 }
