@@ -261,8 +261,13 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	e.Input.ExtrasDestination = domain.Destination(f.Values["extrasDestination"])
 	var bookingProblem string
-	if r.PathValue("id") == "" && !bad {
-		bookingProblem, f.OfferNoBooking = a.clientBooking(r, u, &e, &f)
+	if r.PathValue("id") == "" {
+		if r.PostFormValue("nobooking") != "1" {
+			f.Booking = r.PostFormValue("booking") // survives an amount error; checked before saving
+		}
+		if !bad {
+			bookingProblem, f.OfferNoBooking = a.clientBooking(r, u, &e, &f)
+		}
 	}
 	if bad {
 		f.Error = "Проверьте суммы: введите число, например 600 или 600,50"
@@ -328,15 +333,15 @@ func (a *app) bookingPrefill(r *http.Request, u store.User, day domain.Date, f *
 	if _, ok := a.cfg.Bookings.CalendarFor(u.ID); !ok {
 		return
 	}
+	f.Booking = event // kept even when the check fails: saving checks it again or asks to save without it
 	item, err := a.cfg.Bookings.Check(r.Context(), u.ID, day, event)
 	if err != nil {
-		f.BookingNotice = "Запись не найдена в календаре — клиент сохранится без привязки."
+		f.BookingNotice = "Запись не найдена в календаре. При сохранении можно будет сохранить клиента без привязки."
 		if errors.Is(err, bookings.ErrUnavailable) {
-			f.BookingNotice = "Записи недоступны — клиент сохранится без привязки."
+			f.BookingNotice = "Календарь не ответил — запись проверим при сохранении."
 		}
 		return
 	}
-	f.Booking = event
 	f.BookingLabel = "По записи " + item.Start.In(a.store.Location()).Format("15:04") + " · " + strings.Join(item.Booking.Services, " + ")
 	if item.Booking.PriceKnown {
 		f.BookingPriced = true

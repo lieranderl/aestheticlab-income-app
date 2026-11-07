@@ -271,3 +271,21 @@ func TestStartingFromABookingAsksTheCalendarOnce(t *testing.T) {
 		t.Fatalf("calendar asked %d times", src.Gets()-before)
 	}
 }
+
+func TestTheBookingStaysOnTheFormThroughErrorsAndOutages(t *testing.T) {
+	s, src := bookedSite(t)
+	src.Put(olgaCal, timely("b1", "2026-11-20", "10:00", "Wax Price: €30.00 with Olga Test (Confirmed)"))
+	z := s.login("olga", olgaPass)
+
+	in := clientForm("kept-booking-client-1", "oops")
+	in.Set("booking", "b1")
+	wantPage(t, "amount error", s.post("/clients", in, z), http.StatusUnprocessableEntity, `value="oops"`, `name="booking" value="b1"`)
+
+	src.Fail(errors.New("calendar down"))
+	wantPage(t, "prefill outage", s.get("/clients/new?date=2026-11-20&booking=b1", z), http.StatusOK, `name="booking" value="b1"`, "Календарь не ответил")
+	src.Fail(nil)
+	wantPage(t, "unknown booking", s.get("/clients/new?date=2026-11-20&booking=nope", z), http.StatusOK, `name="booking" value="nope"`, "Запись не найдена в календаре")
+	in.Set("services", "30")
+	in.Set("booking", "nope")
+	wantPage(t, "save with the unknown booking", s.post("/clients", in, z), http.StatusUnprocessableEntity, `name="nobooking"`)
+}
