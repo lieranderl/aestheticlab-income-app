@@ -705,3 +705,77 @@ func TestAdminRemovesAnEmployeeClientButNotInAClosedMonth(t *testing.T) {
 	}
 	wantPage(t, "closed removal", s.post(kept+"/remove", url.Values{"date": {"2026-11-20"}, "version": {"1"}, "reason": {"Поздно"}}, z), http.StatusUnprocessableEntity, "Месяц закрыт")
 }
+
+func TestAdminAddsAClientOnBehalfOfAnEmployee(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	admin := s.login("anna", annaPass)
+	z := s.login("olga", olgaPass)
+	wantPage(t, "admin day offers staff", s.get("/admin/day?date=2026-11-20", admin), http.StatusOK, "Добавить клиента", "/clients/new?date=2026-11-20&amp;person="+s.olga.ID)
+	wantPage(t, "on-behalf form", s.get("/clients/new?date=2026-11-20&person="+s.olga.ID+"&token="+strings.Repeat("ab", 24), admin), http.StatusOK, "Клиент 1", "Ольга", `name="person" value="`+s.olga.ID+`"`, "Распределение по условиям сотрудника", "Доля сотрудника от услуг — 70%")
+	form := url.Values{"date": {"2026-11-20"}, "person": {s.olga.ID}, "token": {"admin-behalf-token"}, "version": {"0"}, "services": {"100"}, "creams": {"20"}, "extrasDestination": {"cash"}, "serviceCash": {"30"}}
+	res := s.post("/clients", form, admin)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("save %d: %s", res.Code, res.Body.String())
+	}
+	href := strings.Split(res.Header().Get("Location"), "?")[0]
+	if !strings.Contains(href, s.olga.ID) {
+		t.Fatalf("client saved for the wrong person: %s", href)
+	}
+	if retry := s.post("/clients", form, admin); retry.Header().Get("Location") != res.Header().Get("Location") {
+		t.Fatalf("retry duplicated: %s", retry.Header().Get("Location"))
+	}
+	// The employee sees it as their own client: services earn their «Себе», the kassa got €50.
+	wantPage(t, "employee day", s.get("/?date=2026-11-20", z), http.StatusOK, "Клиент 1", "€120", "€50")
+	wantPage(t, "admin own day untouched", s.get("/?date=2026-11-20", admin), http.StatusOK)
+	if body := s.get("/?date=2026-11-20", admin).Body.String(); strings.Contains(body, "Клиент 1") {
+		t.Fatal("client landed on the admin's own day")
+	}
+	wantPage(t, "admin sees it", s.get("/admin/day?date=2026-11-20", admin), http.StatusOK, "Ольга", "€120")
+	audit, err := s.st.Audit(ctx, strings.TrimPrefix(href, "/clients/"))
+	if err != nil || len(audit) != 1 || audit[0].ActorID != s.anna.ID {
+		t.Fatalf("audit should name the admin: %+v %v", audit, err)
+	}
+	// Next client stays with the same employee.
+	wantPage(t, "next for same person", s.get(res.Header().Get("Location"), admin), http.StatusOK, "/clients/new?date=2026-11-20&amp;person="+s.olga.ID)
+}
+
+func TestOnlyAdminsAddClientsForSomeoneElse(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	s.withTerms(s.maria, 7000)
+	z := s.login("maria", mariaPass)
+	wantPage(t, "employee form for other", s.get("/clients/new?date=2026-11-20&person="+s.olga.ID+"&token="+strings.Repeat("ab", 24), z), http.StatusForbidden, "Нет доступа")
+	form := url.Values{"date": {"2026-11-20"}, "person": {s.olga.ID}, "token": {"employee-behalf-token"}, "version": {"0"}, "services": {"100"}, "extrasDestination": {"cash"}}
+	wantPage(t, "employee post for other", s.post("/clients", form, z), http.StatusForbidden, "Нет доступа")
+	admin := s.login("anna", annaPass)
+	wantPage(t, "unknown person", s.get("/clients/new?date=2026-11-20&person=nobody&token="+strings.Repeat("ab", 24), admin), http.StatusNotFound)
+}
+
+func TestAdminSeesWhyAnEmployeeWithoutTermsCannotGetAClient(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	wantPage(t, "no terms", s.get("/clients/new?date=2026-11-20&person="+s.olga.ID+"&token="+strings.Repeat("ab", 24), admin), http.StatusOK, "Условия сотрудника", "disabled")
+	form := url.Values{"date": {"2026-11-20"}, "person": {s.olga.ID}, "token": {"admin-no-terms-token"}, "version": {"0"}, "services": {"100"}, "extrasDestination": {"cash"}}
+	wantPage(t, "no terms post", s.post("/clients", form, admin), http.StatusUnprocessableEntity, "Условия сотрудника")
+}
+
+func TestAClosedMonthStaysTheReasonForSomeoneElsesRecord(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	admin := s.login("anna", annaPass)
+	form := url.Values{"date": {"2026-11-20"}, "person": {s.olga.ID}, "token": {"admin-closed-token"}, "version": {"0"}, "services": {"100"}, "extrasDestination": {"cash"}}
+	res := s.post("/clients", form, admin)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("save %d", res.Code)
+	}
+	*s.clock = s.clock.AddDate(0, 0, 15)
+	if _, err := s.st.CloseMonth(ctx, s.anna.Actor(), domain.Month{Year: 2026, Mon: 11}); err != nil {
+		t.Fatal(err)
+	}
+	wantPage(t, "closed", s.get(strings.Split(res.Header().Get("Location"), "?")[0], admin), http.StatusOK, "Месяц закрыт")
+	wantPage(t, "closed new, no terms", s.get("/clients/new?date=2026-11-20&person="+s.maria.ID+"&token="+strings.Repeat("ab", 24), admin), http.StatusOK, "Месяц закрыт")
+	if strings.Contains(s.get("/admin/day?date=2026-11-20", admin).Body.String(), "Добавить клиента") {
+		t.Fatal("closed day offers new clients")
+	}
+}

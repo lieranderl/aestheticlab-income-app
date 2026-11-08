@@ -25,7 +25,12 @@ type AdminDay struct {
 	Notice  string
 	// Bookings is each mapped person's calendar section.
 	Bookings []BookingsView
+	// AddClient lets the admin enter a client for anyone who reports.
+	AddClient []PersonLink
 }
+
+// PersonLink is a person's name and where it leads.
+type PersonLink struct{ Name, Href string }
 
 templ AdminDayPage(nav Nav, p AdminDay) {
 	@Layout("День", nav) {
@@ -41,6 +46,22 @@ templ AdminDayPage(nav Nav, p AdminDay) {
 		}
 		<div class="flex flex-col gap-4">
 			@MoneyPanel(p.Money)
+			if len(p.AddClient) > 0 {
+				<section class="card bg-base-100 shadow-sm" aria-labelledby="add-client-title">
+					<div class="card-body gap-3 p-4">
+						<h2 id="add-client-title" class="font-semibold">Добавить клиента</h2>
+						<p class="text-sm text-base-content/70">Клиент сохранится у выбранного сотрудника, «Себе» — по условиям сотрудника.</p>
+						<div class="grid gap-2 sm:grid-cols-2">
+							for _, person := range p.AddClient {
+								<a class="btn btn-lg justify-start h-auto min-h-12 py-2 text-left" href={ templ.SafeURL(person.Href) }>
+									@Icon("user-plus", "size-5")
+									<span class="min-w-0 [overflow-wrap:anywhere]">{ person.Name }</span>
+								</a>
+							}
+						</div>
+					</div>
+				</section>
+			}
 			@RevenueDetails(p.Figures, "день")
 			if len(p.Missing) > 0 {
 				<section class="card bg-base-100 shadow-sm">
