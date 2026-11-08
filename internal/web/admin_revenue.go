@@ -222,9 +222,9 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 		for _, id := range domain.MissingReporters(expected, personReports(reports)) {
 			p.Missing = append(p.Missing, personName(users, id))
 		}
-		if dayForm.Locked == "" {
-			p.AddClient = addClientLinks(u, users, expected, day)
-		}
+	}
+	if dayForm.Locked == "" {
+		p.AddClient = addClientLinks(u, users, day)
 	}
 	p.Bookings = a.adminBookings(r.Context(), u, users, day, reports, dayForm.Locked != "")
 	a.render(w, r, views.AdminDayPage(a.navFor(u, "/admin/day"), p))
@@ -350,12 +350,13 @@ func removeUnavailableClientStats(rows []views.MoneyRow) []views.MoneyRow {
 	return out
 }
 
-// addClientLinks lists who the admin can enter a client for on day: the
-// people expected to report that day, as the missing list counts them.
-func addClientLinks(u store.User, users []store.User, expected []string, day domain.Date) []views.PersonLink {
+// addClientLinks lists who the admin can enter a client for on day: everyone
+// on the current staff list who submits reports. It ignores when an account
+// was made, so days worked before it (the October backfill) can be entered.
+func addClientLinks(u store.User, users []store.User, day domain.Date) []views.PersonLink {
 	var out []views.PersonLink
 	for _, person := range users {
-		if person.Removed || !person.SubmitsReports || !slices.Contains(expected, person.ID) {
+		if person.Removed || !person.SubmitsReports {
 			continue
 		}
 		href := "/clients/new?date=" + day.String()

@@ -146,7 +146,7 @@ func TestHistoricalMissingReportsUseThatDaysStaffStatus(t *testing.T) {
 	anna := s.login("anna", annaPass)
 	old := s.get("/admin/day?date=2026-11-20", anna)
 	wantPage(t, "historical gaps", old, http.StatusOK, "Не сдали отчёт", "Мария", "Ольга")
-	if strings.Contains(old.Body.String(), "Вера") {
+	if strings.Contains(missingSection(old.Body.String()), "Вера") {
 		t.Fatal("new staff is missing before account creation")
 	}
 	before := s.get("/admin/day?date=2026-11-19", anna)
@@ -155,7 +155,10 @@ func TestHistoricalMissingReportsUseThatDaysStaffStatus(t *testing.T) {
 	}
 	current := s.get("/admin/day?date=2026-11-21", anna)
 	wantPage(t, "current roster", current, http.StatusOK, "Вера")
-	if strings.Contains(current.Body.String(), "Мария") || strings.Contains(current.Body.String(), "Ольга") {
+	if !strings.Contains(missingSection(current.Body.String()), "Вера") {
+		t.Fatal("new staff are not expected on the current day")
+	}
+	if strings.Contains(missingSection(current.Body.String()), "Мария") || strings.Contains(missingSection(current.Body.String()), "Ольга") {
 		t.Fatal("disabled staff are expected on the current day")
 	}
 }
@@ -261,4 +264,14 @@ func TestChangeLogNamesCommandLineChanges(t *testing.T) {
 	if strings.Contains(page.Body.String(), "Неизвестный сотрудник") {
 		t.Fatal("the command's change is attributed to an unknown person")
 	}
+}
+
+// missingSection is the «Не сдали отчёт» card of an admin day page.
+func missingSection(body string) string {
+	_, rest, ok := strings.Cut(body, "Не сдали отчёт")
+	if !ok {
+		return ""
+	}
+	section, _, _ := strings.Cut(rest, "</section>")
+	return section
 }
