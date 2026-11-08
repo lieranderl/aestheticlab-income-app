@@ -779,3 +779,16 @@ func TestAClosedMonthStaysTheReasonForSomeoneElsesRecord(t *testing.T) {
 		t.Fatal("closed day offers new clients")
 	}
 }
+
+func TestAdminBackfillsClientsForDaysBeforeTheAccountsExisted(t *testing.T) {
+	// The October backfill: staff accounts were made after the days they worked.
+	s := newSiteOptions(t, store.WithStartMonth(domain.Month{Year: 2026, Mon: 10}))
+	s.withTerms(s.olga, 7000) // from the start month, October
+	admin := s.login("anna", annaPass)
+	wantPage(t, "1 October", s.get("/admin/day?date=2026-10-01", admin), http.StatusOK, "Добавить клиента", "/clients/new?date=2026-10-01&amp;person="+s.olga.ID, "/clients/new?date=2026-10-01&amp;person="+s.maria.ID)
+	form := url.Values{"date": {"2026-10-01"}, "person": {s.olga.ID}, "token": {"october-backfill-token"}, "version": {"0"}, "services": {"100"}, "extrasDestination": {"cash"}, "serviceCash": {"30"}}
+	if res := s.post("/clients", form, admin); res.Code != http.StatusSeeOther {
+		t.Fatalf("save %d %s", res.Code, res.Body.String())
+	}
+	wantPage(t, "Olga's 1 October", s.get("/?date=2026-10-01", s.login("olga", olgaPass)), http.StatusOK, "Клиент 1", "€100")
+}
