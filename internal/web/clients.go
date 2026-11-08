@@ -66,7 +66,7 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 	if r.URL.Query().Get("removed") == "1" {
 		notice = "Клиент удалён"
 	}
-	booked := a.bookingsView(r.Context(), u, u.ID, day, selected, picker.Locked != "", false)
+	booked := a.bookingsView(r.Context(), u, u, day, selected, picker.Locked != "", false)
 	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, dayMoney, notice, booked))
 }
 
@@ -82,6 +82,9 @@ func (a *app) handleClient(w http.ResponseWriter, r *http.Request, u store.User)
 	}
 	if r.PathValue("id") == "" && r.URL.Query().Get("token") == "" {
 		next := "/clients/new?date=" + f.Date + "&token=" + f.Token
+		if f.Person != "" {
+			next += "&person=" + url.QueryEscape(f.Person)
+		}
 		if event := r.URL.Query().Get("booking"); event != "" {
 			next += "&booking=" + url.QueryEscape(event) // checked on the page it leads to
 		}
@@ -140,7 +143,27 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		}
 		f.Linked = in.Booking != nil
 	} else {
-		if !u.SubmitsReports {
+		person := r.URL.Query().Get("person")
+		if r.Method == http.MethodPost {
+			person = r.PostFormValue("person")
+		}
+		switch {
+		case person != "" && person != u.ID:
+			// An admin enters a client on behalf of someone who reports.
+			if !u.Actor().Admin {
+				return f, store.ErrForbidden
+			}
+			other, err := a.store.User(r.Context(), person)
+			if err != nil {
+				return f, err
+			}
+			if other.Removed || !other.SubmitsReports {
+				return f, store.ErrForbidden
+			}
+			owner = other
+			f.User = owner.ID
+			f.Person = owner.ID
+		case !u.SubmitsReports:
 			return f, store.ErrForbidden
 		}
 		token := make([]byte, 24)
@@ -155,7 +178,7 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 			}
 			f.Token = canonical
 		}
-		next, err := a.store.NextClientNumber(r.Context(), u.ID, day)
+		next, err := a.store.NextClientNumber(r.Context(), owner.ID, day)
 		if err != nil {
 			return f, err
 		}
@@ -164,7 +187,7 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		f.Entry = "new"
 		f.Values["extrasDestination"] = "cash"
 		if r.Method == http.MethodGet && r.URL.Query().Get("token") != "" {
-			a.bookingPrefill(r, u, day, &f)
+			a.bookingPrefill(r, owner, day, &f)
 		}
 	}
 	dc, err := a.loadDay(r.Context(), owner, day)
@@ -176,7 +199,17 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		f.SharePct = percent(dc.terms.SelfPct)
 	}
 	f.OtherEmployee = owner.ID != u.ID
-	f.CanNext = owner.ID == u.ID && u.SubmitsReports
+	if f.OtherEmployee {
+		f.OwnerName = owner.DisplayName
+	}
+	f.NextHref = "/clients/new?date=" + day.String()
+	switch {
+	case owner.ID == u.ID:
+		f.CanNext = u.SubmitsReports
+	case u.Actor().Admin:
+		f.CanNext = !owner.Removed && owner.SubmitsReports
+		f.NextHref += "&person=" + url.QueryEscape(owner.ID)
+	}
 	f.Back = "/?date=" + day.String()
 	if owner.ID != u.ID {
 		f.Back = "/admin/day?date=" + day.String()
@@ -201,8 +234,14 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		f.Effect = "Оставьте в кассе " + domain.FormatEUR(-show.BalanceDelta)
 	case show.BalanceDelta > 0:
 		f.Effect = "По этой записи салон должен вам " + domain.FormatEUR(show.BalanceDelta)
+		if f.OtherEmployee {
+			f.Effect = "По этой записи салон должен сотруднику " + domain.FormatEUR(show.BalanceDelta)
+		}
 	}
 	f.Locked = dc.form(nil).Locked
+	if f.OtherEmployee && !dc.hasTerms && !dc.closed && !day.Month().Before(dc.start) {
+		f.Locked = otherTermsMissing
+	}
 	return f, nil
 }
 
@@ -299,6 +338,9 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 		default:
 			f.Error = clientProblem(r, err)
 			var ve *domain.ValidationError
+			if f.OtherEmployee && errors.As(err, &ve) && ve.Problem == domain.ProblemMissingTerms {
+				f.Error = otherTermsMissing
+			}
 			if errors.As(err, &ve) {
 				f.Bad[ve.Field] = true
 				switch ve.Problem {
@@ -391,6 +433,10 @@ func myReportCard(rep store.SavedReport, day, href string) views.MyReport {
 	fact, expected := recordLines(rep.Report, ownMoney)
 	return views.MyReport{Day: day, Href: href, Total: domain.FormatEUR(rep.Report.Total), Status: status, Owed: tone, Fact: fact, Expected: expected}
 }
+
+// otherTermsMissing is what the admin reads when the person they enter a
+// client for has no terms for the month.
+const otherTermsMissing = "Условия сотрудника («Себе» %) на этот месяц не заданы — задайте их в разделе «Сотрудники»"
 
 func clientProblem(r *http.Request, err error) string {
 	var ve *domain.ValidationError

@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 
@@ -221,6 +222,9 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 		for _, id := range domain.MissingReporters(expected, personReports(reports)) {
 			p.Missing = append(p.Missing, personName(users, id))
 		}
+		if dayForm.Locked == "" {
+			p.AddClient = addClientLinks(u, users, expected, day)
+		}
 	}
 	p.Bookings = a.adminBookings(r.Context(), u, users, day, reports, dayForm.Locked != "")
 	a.render(w, r, views.AdminDayPage(a.navFor(u, "/admin/day"), p))
@@ -342,6 +346,23 @@ func removeUnavailableClientStats(rows []views.MoneyRow) []views.MoneyRow {
 		if row.Name != "Клиенты" && row.Name != "Касса — наличные" && row.Name != "Касса — карта салона" {
 			out = append(out, row)
 		}
+	}
+	return out
+}
+
+// addClientLinks lists who the admin can enter a client for on day: the
+// people expected to report that day, as the missing list counts them.
+func addClientLinks(u store.User, users []store.User, expected []string, day domain.Date) []views.PersonLink {
+	var out []views.PersonLink
+	for _, person := range users {
+		if person.Removed || !person.SubmitsReports || !slices.Contains(expected, person.ID) {
+			continue
+		}
+		href := "/clients/new?date=" + day.String()
+		if person.ID != u.ID {
+			href += "&person=" + url.QueryEscape(person.ID)
+		}
+		out = append(out, views.PersonLink{Name: person.DisplayName, Href: href})
 	}
 	return out
 }

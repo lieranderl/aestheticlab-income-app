@@ -46,7 +46,8 @@ func (a *app) readBookings(ctx context.Context, uid string, day domain.Date) per
 
 // bookingsView builds one person's section. entries are the person's clients
 // on the day; admin adds counts and notes on linked bookings missing from it.
-func (a *app) bookingsView(ctx context.Context, actor store.User, uid string, day domain.Date, entries []store.SavedReport, locked, admin bool) views.BookingsView {
+func (a *app) bookingsView(ctx context.Context, actor, owner store.User, day domain.Date, entries []store.SavedReport, locked, admin bool) views.BookingsView {
+	uid := owner.ID
 	if _, ok := a.cfg.Bookings.CalendarFor(uid); !ok {
 		return views.BookingsView{}
 	}
@@ -88,8 +89,11 @@ func (a *app) bookingsView(ctx context.Context, actor store.User, uid string, da
 			}
 		} else {
 			notLinked++
-			if actor.ID == uid && actor.SubmitsReports {
+			switch {
+			case actor.ID == uid && actor.SubmitsReports:
 				c.NewHref = "/clients/new?date=" + day.String() + "&booking=" + url.QueryEscape(b.Ref.Event)
+			case actor.ID != uid && actor.Actor().Admin && owner.SubmitsReports && !owner.Removed:
+				c.NewHref = "/clients/new?date=" + day.String() + "&person=" + url.QueryEscape(uid) + "&booking=" + url.QueryEscape(b.Ref.Event)
 			}
 			for _, e := range unlinked {
 				c.Candidates = append(c.Candidates, views.LinkCandidate{Action: "/clients/" + e.ID + "/link", Label: "Клиент " + strconv.FormatInt(e.ClientNumber, 10) + " · " + domain.FormatEUR(e.Report.Total), Version: e.Version})
@@ -156,7 +160,7 @@ func (a *app) adminBookings(ctx context.Context, u store.User, users []store.Use
 					own = append(own, rep)
 				}
 			}
-			v := a.bookingsView(ctx, u, p.ID, day, own, locked, true)
+			v := a.bookingsView(ctx, u, p, day, own, locked, true)
 			v.Name = p.DisplayName
 			out[i] = v
 		})

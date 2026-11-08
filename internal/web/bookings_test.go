@@ -12,6 +12,7 @@ import (
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/bookings"
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
+	"github.com/lieranderl/aestheticlab-income-app/internal/store"
 	"github.com/lieranderl/aestheticlab-income-app/internal/web"
 )
 
@@ -288,4 +289,32 @@ func TestTheBookingStaysOnTheFormThroughErrorsAndOutages(t *testing.T) {
 	in.Set("services", "30")
 	in.Set("booking", "nope")
 	wantPage(t, "save with the unknown booking", s.post("/clients", in, z), http.StatusUnprocessableEntity, `name="nobooking"`)
+}
+
+func TestAdminEntersAClientFromAnEmployeesBooking(t *testing.T) {
+	s, src := bookedSite(t)
+	src.Put(olgaCal, timely("b1", "2026-11-20", "10:00", "Upper Lip Wax Price: €10.00 with Olga Test (Confirmed)"))
+	admin := s.login("anna", annaPass)
+	start := "/clients/new?date=2026-11-20&amp;person=" + s.olga.ID + "&amp;booking=b1"
+	wantPage(t, "admin day", s.get("/admin/day?date=2026-11-20", admin), http.StatusOK, start)
+	wantPage(t, "prefilled from Olga's calendar", s.get(strings.ReplaceAll(start, "&amp;", "&")+"&token="+strings.Repeat("cd", 24), admin), http.StatusOK, "По записи 10:00 · Upper Lip Wax · €10", `name="person"`, `name="booking" value="b1"`)
+	form := clientForm("admin-booking-token", "10")
+	form.Set("person", s.olga.ID)
+	form.Set("booking", "b1")
+	if res := s.post("/clients", form, admin); res.Code != http.StatusSeeOther {
+		t.Fatalf("save %d %s", res.Code, res.Body.String())
+	}
+	if strings.Contains(s.get("/admin/day?date=2026-11-20", admin).Body.String(), start) {
+		t.Fatal("a linked booking still offers a new client")
+	}
+	wantPage(t, "Olga sees it linked", s.get("/?date=2026-11-20", s.login("olga", olgaPass)), http.StatusOK, "Клиент 1")
+
+	// Nobody can enter clients for a person whose reporting is off, so the admin day offers none.
+	src.Put(mariaCal, timely("m1", "2026-11-20", "12:00", "Massage Price: €50.00 with Maria Test (Confirmed)"))
+	if _, err := s.st.UpdateUser(ctx, s.anna.Actor(), s.maria.ID, func(u *store.User) error { u.SubmitsReports = false; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if body := s.get("/admin/day?date=2026-11-20", admin).Body.String(); strings.Contains(body, "person="+s.maria.ID) {
+		t.Fatal("offers a client for someone who does not report")
+	}
 }
