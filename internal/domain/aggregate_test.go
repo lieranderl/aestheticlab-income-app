@@ -299,3 +299,31 @@ func TestALegacyDayCountsItsSalesAsPaidIntoTheKassaFirst(t *testing.T) {
 		t.Errorf("deposited = %+v, want %+v", s.Deposited, want)
 	}
 }
+
+// Each person's higher-rate bonus moves only their own side: Olga's
+// −€1 497,50 with a €1 135 bonus is still a debt of €362,50, Maria's €0 with
+// €1 200 becomes the salon's debt to her, and they never cancel out.
+func TestOpenDebtsWithBonusesKeepEachPersonsSide(t *testing.T) {
+	s := domain.Summary{People: map[string]domain.PersonSummary{"olga": {BalanceDelta: -149750}, "maria": {}, "vera": {BalanceDelta: 5000}}}
+	toStaff, toSalon := s.OpenDebtsWith(map[string]domain.Cents{"olga": 113500, "maria": 120000})
+	if toStaff != 125000 || toSalon != 36250 {
+		t.Fatalf("open debts with bonuses = %d / %d, want 125000 / 36250", toStaff, toSalon)
+	}
+}
+
+// The owner's month at 50%: «Себе» €2 837,50, «Салону» €2 849,50, a debt of
+// €1 497,50 with €4 335 kept. With the €1 135 bonus close accrues it reads
+// «Себе» €3 972,50, «Салону» €1 714,50, a debt of €362,50, and the kept cash
+// still meets «Себе»: €4 335 − €362,50 = €3 972,50.
+func TestMonthSharesWithTheSelfBonus(t *testing.T) {
+	got := domain.MonthShares{Self: 283750, Salon: 284950, Delta: -149750}.WithSelfBonus(113500)
+	if got != (domain.MonthShares{Self: 397250, Salon: 171450, Delta: -36250}) {
+		t.Fatalf("with bonus = %+v", got)
+	}
+	if kept := domain.Cents(433500); kept+got.Delta != got.Self {
+		t.Fatalf("kept %d + delta %d != self %d", kept, got.Delta, got.Self)
+	}
+	if total := domain.TotalBonus(map[string]domain.Cents{"olga": 113500, "maria": 120000}); total != 233500 {
+		t.Fatalf("total bonus = %d", total)
+	}
+}

@@ -87,6 +87,7 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 	if next := m.Next(); !current.Before(next) {
 		p.Next = "/admin/month?m=" + next.String()
 	}
+	bonuses := map[string]domain.Cents{} // the higher «Себе» rate's bonus per person, at close
 	for _, person := range users {
 		if s, ok := sum.People[person.ID]; ok {
 			personSum := domain.Summarize(personReports(reportsForPerson(reports, person.ID)))
@@ -107,6 +108,19 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 			if month.Snapshot != nil {
 				pr := month.Snapshot.Result.People[person.ID]
 				freezeShares(&personMoney, pr.Revenue, pr.Self, pr.SalonShare(), staffMoney)
+				atHigherRate(&personMoney, pr.SelfBonus, pr.Self, pr.SalonShare(), personSum.BalanceDelta, personSum.CashKept, month.Snapshot.Terms[person.ID].HighSelfPct, anyHandSet(reportsForPerson(reports, person.ID)), staffMoney)
+				bonuses[person.ID] = pr.SelfBonus
+			} else {
+				entries, err := a.store.Terms(r.Context(), person.ID)
+				if err != nil {
+					a.serverError(w, r, err)
+					return
+				}
+				if terms, ok := history(entries).For(m); ok {
+					bonus := domain.SelfBonusFor(personSum.SelfBase, personSum.BonusBase, terms)
+					atHigherRate(&personMoney, bonus, personSum.Self, personSum.SalonShare, personSum.BalanceDelta, personSum.CashKept, terms.HighSelfPct, anyHandSet(reportsForPerson(reports, person.ID)), staffMoney)
+					bonuses[person.ID] = bonus
+				}
 			}
 			p.People = append(p.People, views.MonthPerson{
 				Name: person.DisplayName, Days: strconv.Itoa(s.WorkingDays), Clients: clients, Details: detail,
@@ -114,6 +128,11 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 			})
 		}
 	}
+	self, salon := sum.Self, sum.SalonShare
+	if month.Snapshot != nil {
+		self, salon = month.Snapshot.Result.Self, month.Snapshot.Result.SalonShare()
+	}
+	salonAtHigherRate(&p.Money, sum, self, salon, bonuses)
 	a.render(w, r, views.AdminMonthPage(a.navFor(u, "/admin/month"), p))
 }
 
