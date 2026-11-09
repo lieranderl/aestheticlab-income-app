@@ -299,3 +299,14 @@ func TestALegacyDayCountsItsSalesAsPaidIntoTheKassaFirst(t *testing.T) {
 		t.Errorf("deposited = %+v, want %+v", s.Deposited, want)
 	}
 }
+
+// Each person's higher-rate bonus moves only their own side: Olga's
+// −€1 497,50 with a €1 135 bonus is still a debt of €362,50, Maria's €0 with
+// €1 200 becomes the salon's debt to her, and they never cancel out.
+func TestOpenDebtsWithBonusesKeepEachPersonsSide(t *testing.T) {
+	s := domain.Summary{People: map[string]domain.PersonSummary{"olga": {BalanceDelta: -149750}, "maria": {}, "vera": {BalanceDelta: 5000}}}
+	toStaff, toSalon := s.OpenDebtsWith(map[string]domain.Cents{"olga": 113500, "maria": 120000})
+	if toStaff != 125000 || toSalon != 36250 {
+		t.Fatalf("open debts with bonuses = %d / %d, want 125000 / 36250", toStaff, toSalon)
+	}
+}

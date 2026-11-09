@@ -275,3 +275,65 @@ func missingSection(body string) string {
 	section, _, _ := strings.Cut(rest, "</section>")
 	return section
 }
+
+// The owner's November: «Себе» 50%, 70% above €5 500 of services. €5 675 of
+// services passes the threshold, so close accrues 20% of it (€1 135). The
+// admin's month card shows the month at 70% straight away: «Себе» €3 972,50,
+// «Салону» €1 714,50 and a debt of €362,50, not 50% plus a bonus line.
+func TestAdminMonthShowsTheHigherSelfRateInPlace(t *testing.T) {
+	s := newSite(t)
+	terms := domain.Terms{SelfPct: 5000, HighSelfFromCents: 550000, HighSelfPct: 7000, DividendWeight: 1}
+	for _, u := range []store.User{s.olga, s.maria} {
+		if err := s.st.SetTerms(ctx, s.anna.Actor(), u.ID, s.st.StartMonth(), terms, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entry := store.ClientEntry{
+		Token:  "test-client-token-owner-bonus",
+		Person: s.olga.ID,
+		Date:   domain.Date{Year: 2026, Mon: 11, Day: 1},
+		Input:  domain.ClientInput{Services: 567500, ServiceCash: 134000, Extras: map[string]domain.Cents{"creams": 1200}, ExtrasDestination: domain.ToCash},
+	}
+	if _, err := s.st.SaveClientReport(ctx, s.anna.Actor(), entry); err != nil {
+		t.Fatal(err)
+	}
+	// Maria: €6 000 of services, the salon's half paid in, so at 70% the
+	// salon owes her the €1 200 bonus.
+	entry.Token, entry.Person, entry.Input = "test-client-token-maria-bonus", s.maria.ID, domain.ClientInput{Services: 600000, ServiceCash: 300000}
+	if _, err := s.st.SaveClientReport(ctx, s.anna.Actor(), entry); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"«Себе» за ставку 70%", domain.FormatEUR(397250), domain.FormatEUR(171450), "Долг перед салоном " + domain.FormatEUR(36250),
+		domain.FormatEUR(420000), "Салон должен " + domain.FormatEUR(120000),
+		// The salon: «Себе» €3 972,50 + €4 200, «Салону» €11 687 − €8 172,50.
+		domain.FormatEUR(817250), domain.FormatEUR(351450), "Ожидалось салону " + domain.FormatEUR(351450),
+		"Салон должен сотрудникам " + domain.FormatEUR(120000) + " · сотрудники должны салону " + domain.FormatEUR(36250),
+	}
+	check := func(label string, body string) {
+		t.Helper()
+		for _, gone := range []string{"Доплата «Себе»", "с доплатой", domain.FormatEUR(283750), domain.FormatEUR(149750)} {
+			if strings.Contains(body, gone) {
+				t.Errorf("%s still shows %q", label, gone)
+			}
+		}
+	}
+	open := s.get("/admin/month?m=2026-11", s.login("anna", annaPass))
+	wantPage(t, "open month", open, http.StatusOK, want...)
+	check("open month", open.Body.String())
+	*s.clock = s.clock.AddDate(0, 0, 40)
+	if _, err := s.st.CloseMonth(ctx, s.anna.Actor(), domain.Month{Year: 2026, Mon: 11}); err != nil {
+		t.Fatal(err)
+	}
+	closed := s.get("/admin/month?m=2026-11", s.login("anna", annaPass))
+	wantPage(t, "closed month", closed, http.StatusOK, append(want, "Зафиксировано при закрытии")...)
+	check("closed month", closed.Body.String())
+	// Olga's own closed month agrees with the admin's.
+	own := s.get("/my?m=2026-11", s.login("olga", olgaPass))
+	wantPage(t, "closed own month", own, http.StatusOK, "Зафиксировано при закрытии",
+		"Ваши «Себе» за ставку 70%", domain.FormatEUR(397250), domain.FormatEUR(171450), "Вы должны салону "+domain.FormatEUR(36250))
+	// Only the client's own record card keeps the rate it was saved with.
+	if body := own.Body.String(); strings.Count(body, domain.FormatEUR(283750)) > 1 || strings.Count(body, "Вы должны салону "+domain.FormatEUR(149750)) > 1 {
+		t.Error("the closed own month still shows the 50% figures")
+	}
+}

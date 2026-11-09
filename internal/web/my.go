@@ -51,6 +51,10 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	if status == domain.MonthClosed {
 		if page.Money.Status != "" {
 			freezeShares(&page.Money, own.Revenue, own.Self, own.SalonShare(), ownMoney)
+			// The month's terms can't change once it has reports, so they name
+			// the rate the snapshot's bonus was accrued at.
+			terms, _ := history(entries).For(m)
+			atHigherRate(&page.Money, own.SelfBonus, own.Self, own.SalonShare(), sum.BalanceDelta, terms.HighSelfPct, anyHandSet(reports), ownMoney)
 		}
 		page.Details = nil
 		if own.StatsVersion >= 1 {
@@ -65,9 +69,8 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 	if terms, ok := history(entries).For(m); ok && status != domain.MonthClosed {
 		if p, ok := domain.SelfProgressFor(sum.SelfBase, terms); ok {
 			page.Progress, page.Reached = progressText(p, baseLabel(sum), anyHandSet(reports)), p.Reached
-			if bonus := domain.SelfBonusFor(sum.SelfBase, sum.BonusBase, terms); bonus > 0 && page.Money.Status != "" {
-				page.Money.Expected = append(page.Money.Expected, views.MoneyLine{Name: "Доплата «Себе» за ставку " + percent(p.HighPct) + " (при закрытии)", Value: domain.FormatEUR(bonus)})
-			}
+			bonus := domain.SelfBonusFor(sum.SelfBase, sum.BonusBase, terms)
+			atHigherRate(&page.Money, bonus, sum.Self, sum.SalonShare, sum.BalanceDelta, p.HighPct, anyHandSet(reports), ownMoney)
 		}
 	}
 	for i := len(reports) - 1; i >= 0; i-- { // newest first

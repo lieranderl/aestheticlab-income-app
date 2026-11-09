@@ -176,3 +176,61 @@ func recordLines(r domain.Report, who audience) (fact, expected string) {
 	}
 	return fact, "Ожидается: «Себе» " + domain.FormatEUR(r.SelfAmount) + " · «Салону» " + domain.FormatEUR(r.SalonShare)
 }
+
+// atHigherRate shows a person's month at the higher «Себе» rate once its
+// base is above the threshold: «Себе», «Салону» and the result move by the
+// bonus that close accrues (SelfBonusFor, a self_bonus row), so the card
+// reads «Себе» за ставку 70% instead of a separate bonus line. The records
+// themselves keep the rate they were saved with.
+// handSet days keep what they were given, and the label says so.
+func atHigherRate(v *views.MoneyView, bonus, self, salon, delta domain.Cents, highPct domain.BasisPoints, handSet bool, who audience) {
+	if bonus <= 0 || v.Status == "" {
+		return
+	}
+	name := "«Себе»"
+	if who == ownMoney {
+		name = "Ваши «Себе»"
+	}
+	label := name
+	if highPct > 0 {
+		label += " за ставку " + percent(highPct)
+		if handSet {
+			label += " (кроме дней, заданных вручную)"
+		}
+	}
+	setShares(v, name, label, self+bonus, salon-bonus)
+	v.Status, v.Tone = statusText(delta+bonus, who)
+	if v.Explain != "" {
+		v.Explain = selfEquation(self+bonus, self-delta, delta+bonus, who)
+	}
+}
+
+// salonAtHigherRate does the same for the salon's card, with each person's
+// bonus kept on their own side of the open debts.
+func salonAtHigherRate(v *views.MoneyView, s domain.Summary, self, salon domain.Cents, bonuses map[string]domain.Cents) {
+	var total domain.Cents
+	for _, b := range bonuses {
+		total += b
+	}
+	if total <= 0 || v.Status == "" {
+		return
+	}
+	setShares(v, "«Себе» сотрудников", "«Себе» сотрудников", self+total, salon-total)
+	v.Status, v.Tone = salonStatus(s.OpenDebtsWith(bonuses))
+	v.StatusNote = "Ожидалось салону " + domain.FormatEUR(salon-total) + " · зачтено " + domain.FormatEUR(s.KassaCredit)
+	if s.Prepaid > 0 {
+		v.StatusNote += " (из них сертификатами " + domain.FormatEUR(s.Prepaid) + ")"
+	}
+}
+
+// setShares rewrites the «Себе» and «Салону» lines of the expected shares.
+func setShares(v *views.MoneyView, selfName, selfLabel string, self, salon domain.Cents) {
+	for i, l := range v.Expected {
+		switch l.Name {
+		case selfName:
+			v.Expected[i].Name, v.Expected[i].Value = selfLabel, domain.FormatEUR(self)
+		case "«Салону»":
+			v.Expected[i].Value = domain.FormatEUR(salon)
+		}
+	}
+}

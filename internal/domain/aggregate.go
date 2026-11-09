@@ -90,6 +90,19 @@ func (s Summary) OpenDebts() (toStaff, toSalon Cents) {
 	return toStaff, toSalon
 }
 
+// OpenDebtsWith is OpenDebts once each person's higher-rate «Себе» bonus
+// (what close accrues to them) is added to their side.
+func (s Summary) OpenDebtsWith(bonuses map[string]Cents) (toStaff, toSalon Cents) {
+	for id, p := range s.People {
+		if d := p.BalanceDelta + bonuses[id]; d > 0 {
+			toStaff += d
+		} else {
+			toSalon -= d
+		}
+	}
+	return toStaff, toSalon
+}
+
 // Summarize adds up reports by category, payment method and person.
 func Summarize(reports []PersonReport) Summary {
 	s := Summary{ByCategory: map[string]Cents{}, ByPayment: map[string]Cents{}, People: map[string]PersonSummary{}}
