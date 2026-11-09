@@ -196,7 +196,12 @@ func TestMovementFailuresAndBothResponseModesKeepFormsSafe(t *testing.T) {
 	wantPage(t, "empty reason", s.post(path, url.Values{"version": {"1"}}, z), http.StatusUnprocessableEntity, "Укажите комментарий")
 	wantPage(t, "SSE void stale", s.do(request{method: http.MethodPost, path: path, form: url.Values{"version": {"2"}, "reason": {"Ошибка"}}, cookies: z, datastar: true}), http.StatusOK, "datastar-patch-elements", "Запись изменена", "movement-action-"+e.ID+"-void")
 	wantPage(t, "SSE void", s.do(request{method: http.MethodPost, path: path, form: url.Values{"version": {"1"}, "reason": {"Ошибка"}}, cookies: z, datastar: true}), http.StatusOK, "redirectUrl")
-	wantPage(t, "void persists", s.get("/my", z), http.StatusOK, "Причина отмены: Ошибка", "Отменено")
+	if got, err := s.st.Entry(ctx, e.ID); err != nil || got.Status != domain.Voided || got.VoidReason != "Ошибка" {
+		t.Fatalf("void persists: %+v %v", got, err)
+	}
+	if body := s.get("/my", z).Body.String(); strings.Contains(body, "Причина отмены: Ошибка") {
+		t.Fatal("voided movement still listed on /my")
+	}
 }
 
 func cloneValues(v url.Values) url.Values {

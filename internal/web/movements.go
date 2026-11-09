@@ -330,6 +330,9 @@ func (a *app) movementCards(r *http.Request, u store.User, es []store.Entry, adm
 		if status != domain.MonthClosed && !domain.IsAccrual(e.Type) && e.Status != domain.Voided && mayVoid {
 			c.VoidURL = "/movements/" + e.ID + "/void"
 		}
+		if status != domain.MonthClosed && mayEdit(u, e) {
+			c.EditURL = "/movements/" + e.ID + "/edit"
+		}
 		if admin && status != domain.MonthClosed && e.Status == domain.Pending {
 			c.ConfirmURL = "/admin/movements/" + e.ID + "/confirm"
 		}
@@ -388,8 +391,7 @@ func (a *app) handleKassa(w http.ResponseWriter, r *http.Request, u store.User) 
 		a.serverError(w, r, err)
 		return
 	}
-	es = slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending })
-	slices.Reverse(es)
+	es = newestEntered(slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending }))
 	if len(es) > 10 {
 		es = es[:10]
 	}

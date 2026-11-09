@@ -109,6 +109,12 @@ func TestFinancialWritesPaused(t *testing.T) {
 			t.Errorf("VoidMovement err = %v, want ErrFinancialWritesPaused", err)
 		}
 
+		// 7b. EditMovement is refused with ErrFinancialWritesPaused.
+		_, err = st.EditMovement(ctx, admin.Actor(), "some-id", 1, store.NewMovement{Type: domain.Expense})
+		if !errors.Is(err, store.ErrFinancialWritesPaused) {
+			t.Errorf("EditMovement err = %v, want ErrFinancialWritesPaused", err)
+		}
+
 		// 8. Recount is refused with ErrFinancialWritesPaused.
 		_, err = st.Recount(ctx, admin.Actor(), domain.KassaCash, 5000, "test recount")
 		if !errors.Is(err, store.ErrFinancialWritesPaused) {

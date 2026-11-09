@@ -5,11 +5,12 @@ import "strconv"
 type MovementFormData struct {
 	Action, Back, Type, Amount, Date, MinDate, MaxDate, From, To, Category, Note, Error string
 	SettlementMonth, SettlementPerson, SettlementRevision, ContextNotice                string
-	Admin                                                                               bool
+	Version                                                                             string // the row being edited
+	Admin, Edit                                                                         bool
 	Sources, Destinations, Categories                                                   []FilterOption
 }
 type MovementCard struct {
-	ID, Title, Date, Amount, Parties, Note, Status, VoidReason, VoidURL, ConfirmURL string
+	ID, Title, Date, Amount, Parties, Note, Status, VoidReason, VoidURL, ConfirmURL, EditURL string
 	Version                                                                         int64
 }
 type AccountCard struct {
@@ -37,9 +38,16 @@ type MovementHistoryData struct {
 	Cards   []MovementCard
 }
 
+func movementFormTitle(f MovementFormData) string {
+	if f.Edit {
+		return "Изменить расход"
+	}
+	return "Движение"
+}
+
 templ MovementFormPage(nav Nav, f MovementFormData) {
-	@Layout("Движение", nav) {
-		@PageHeader("Движение", f.Back)
+	@Layout(movementFormTitle(f), nav) {
+		@PageHeader(movementFormTitle(f), f.Back)
 		@MovementForm(f)
 	}
 }
@@ -64,7 +72,10 @@ templ MovementForm(f MovementFormData) {
 		if f.ContextNotice!="" {
 			<p class="alert alert-info alert-soft" role="status">{ f.ContextNotice }</p>
 		}
-		<nav class="flex flex-wrap gap-2" aria-label="Вид движения">
+		if f.Edit {
+			<p class="text-base-content/70">Старая запись будет отменена с причиной «Исправлено», исправленная сохранится вместо неё.</p>
+		}
+		<nav class={ "flex flex-wrap gap-2", templ.KV("hidden", f.Edit) } aria-label="Вид движения">
 			if f.Admin {
 				<a
 					class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "payout") }
@@ -110,6 +121,9 @@ templ MovementForm(f MovementFormData) {
 		</nav>
 		<fieldset class="flex min-w-0 flex-col gap-3" data-attr:disabled="$_movementloading || !$_movementready" data-attr:aria-busy="$_movementloading">
 			<input type="hidden" name="type" value={ f.Type }/>
+			if f.Version != "" {
+				<input type="hidden" name="version" value={ f.Version }/>
+			}
 			if f.SettlementMonth!="" {
 				<input type="hidden" name="settlement" value={ f.SettlementMonth }/>
 				<input type="hidden" name="settlementPerson" value={ f.SettlementPerson }/>
@@ -268,6 +282,9 @@ templ movementCard(c MovementCard) {
 						value={ strconv.FormatInt(c.Version, 10) }
 					/><button class="btn btn-primary min-h-11 w-full">Подтвердить</button>
 				</form>
+			}
+			if c.EditURL != "" {
+				<a class="btn min-h-11" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
 			}
 			if c.VoidURL != "" {
 				<a class="btn btn-ghost min-h-11" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger">Отменить движение</a>

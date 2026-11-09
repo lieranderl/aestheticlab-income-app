@@ -105,9 +105,7 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		a.serverError(w, r, err)
 		return
 	}
-	for i, j := 0, len(movements)-1; i < j; i, j = i+1, j-1 {
-		movements[i], movements[j] = movements[j], movements[i]
-	}
+	movements = newestEntered(movements)
 	page.Movements, err = a.movementCards(r, u, movements, false)
 	if err != nil {
 		a.serverError(w, r, err)

@@ -58,7 +58,10 @@ func (a *app) handleMovementHistory(w http.ResponseWriter, r *http.Request, u st
 	es = slices.DeleteFunc(es, func(e store.Entry) bool {
 		return (f.person != "" && e.PersonID != f.person) || (f.kind != "" && string(e.Type) != f.kind) || (f.status != "" && string(e.Status) != f.status)
 	})
-	slices.Reverse(es)
+	if f.status == "" { // voided rows only on request: «Отменено» in the status filter
+		es = newestEntered(es)
+	}
+	byEntry(es)
 	paging, first, last := f.paging("/admin/history/movements", len(es))
 	cards, err := a.movementCards(r, u, es[first:last], true)
 	if err != nil {
