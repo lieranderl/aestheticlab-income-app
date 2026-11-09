@@ -59,6 +59,7 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 	var money views.MoneyView
 	if len(reports) > 0 {
 		money = moneyView(sum, "месяца", salonMoney)
+		splitFact(&money, sum, salonMoney)
 	}
 	if month.Snapshot != nil {
 		frozen := month.Snapshot.Result
@@ -102,6 +103,7 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 				}
 			}
 			personMoney := moneyView(personSum, "месяца", staffMoney)
+			splitFact(&personMoney, personSum, staffMoney)
 			if month.Snapshot != nil {
 				pr := month.Snapshot.Result.People[person.ID]
 				freezeShares(&personMoney, pr.Revenue, pr.Self, pr.SalonShare(), staffMoney)

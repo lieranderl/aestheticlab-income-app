@@ -66,6 +66,37 @@ func moneyView(s domain.Summary, period string, who audience) views.MoneyView {
 	return v
 }
 
+// splitFact rewrites a month's «Факт» so the money received and the money
+// paid into the kassa each show what they were for: services, certificates
+// and other sales, then their total.
+func splitFact(v *views.MoneyView, s domain.Summary, who audience) {
+	if v.Status == "" {
+		return
+	}
+	kept := "Наличными у сотрудника"
+	if who == salonMoney {
+		kept = "Наличными у сотрудников"
+	}
+	split := func(name string, m domain.MoneySplit, newGroup bool) []views.MoneyLine {
+		return []views.MoneyLine{
+			{Name: name + " (услуги)", Value: domain.FormatEUR(m.Services), NewGroup: newGroup},
+			{Name: name + " (сертификаты)", Value: domain.FormatEUR(m.Certificates)},
+			{Name: name + " (продажи)", Value: domain.FormatEUR(m.Sales)},
+			{Name: name, Value: domain.FormatEUR(m.Total()), Strong: true},
+		}
+	}
+	fact := split("Получено от клиентов", s.Received, false)
+	fact = append(fact, split("Внесено в кассу", s.Deposited, true)...)
+	fact = append(fact,
+		views.MoneyLine{Name: "В кассу — наличные", Value: domain.FormatEUR(s.KassaCash), Sub: true},
+		views.MoneyLine{Name: "В кассу — карта салона", Value: domain.FormatEUR(s.KassaCard), Sub: true})
+	if s.Prepaid > 0 {
+		fact = append(fact, views.MoneyLine{Name: "Оплачено сертификатом", Value: domain.FormatEUR(s.Prepaid), NewGroup: true})
+	}
+	fact = append(fact, views.MoneyLine{Name: kept, Value: domain.FormatEUR(s.CashKept), Strong: true, NewGroup: s.Prepaid == 0})
+	v.Fact = fact
+}
+
 // freezeShares replaces the expected shares of a closed month with the
 // figures its snapshot froze.
 func freezeShares(v *views.MoneyView, revenue, self, salon domain.Cents, who audience) {

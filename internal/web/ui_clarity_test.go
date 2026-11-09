@@ -236,3 +236,46 @@ func TestTheSalonHeadlineNeverNetsOppositeDebts(t *testing.T) {
 		t.Error("opposite debts of two people read as settled")
 	}
 }
+
+// 2026-11-09: the admin's month shows what the money received and the money
+// paid into the kassa were for: services, certificates and other sales.
+func TestTheMonthSplitsMoneyIntoServicesCertificatesAndSales(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 5000)
+	olga := s.login("olga", olgaPass)
+	for token, v := range map[string]url.Values{
+		"split-certificate-token": {"date": {"2026-11-17"}, "certificates": {"50"}, "extrasDestination": {"cash"}},
+		"split-redeemed-token":    {"date": {"2026-11-18"}, "services": {"100"}, "certificatePaid": {"100"}, "extrasDestination": {"cash"}},
+		"split-card-day-token":    {"date": {"2026-11-19"}, "services": {"427"}, "serviceCard": {"327"}, "creams": {"100"}, "extrasDestination": {"kassa_card"}},
+		"split-cash-day-token":    {"date": {"2026-11-20"}, "services": {"365"}, "extrasDestination": {"cash"}},
+	} {
+		v.Set("token", token)
+		v.Set("version", "0")
+		if res := s.post("/clients", v, olga); res.Code != http.StatusSeeOther {
+			t.Fatalf("save %s: %d %s", token, res.Code, res.Body.String())
+		}
+	}
+	rows := func(page, name, value string) int {
+		t.Helper()
+		return len(regexp.MustCompile(regexp.QuoteMeta(name)+`\s*</dt>\s*<dd[^>]*>\s*`+regexp.QuoteMeta(value)+`\s*</dd>`).FindAllStringIndex(page, -1))
+	}
+	month := s.get("/admin/month?m=2026-11", s.login("anna", annaPass)).Body.String()
+	// The salon's «Факт» card and Olga's card show the same figures.
+	for _, want := range []struct{ name, value string }{
+		{"Получено от клиентов (услуги)", "€792"},
+		{"Получено от клиентов (сертификаты)", "€50"},
+		{"Получено от клиентов (продажи)", "€100"},
+		{"Получено от клиентов", "€942"},
+		{"Внесено в кассу (услуги)", "€327"},
+		{"Внесено в кассу (сертификаты)", "€50"},
+		{"Внесено в кассу (продажи)", "€100"},
+		{"Внесено в кассу", "€477"},
+	} {
+		if n := rows(month, want.name, want.value); n != 2 {
+			t.Errorf("row %q = %s appears %d times, want 2 (salon and person)", want.name, want.value, n)
+		}
+	}
+	if day := s.get("/admin/day?date=2026-11-19", s.login("anna", annaPass)).Body.String(); strings.Contains(day, "Получено от клиентов (услуги)") {
+		t.Error("the day page grew the month's split")
+	}
+}

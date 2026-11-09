@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/ru"
@@ -18,6 +19,8 @@ var trendMetrics = []views.TrendMetric{
 	{ID: "services", Label: "Услуги"},
 	{ID: "creams", Label: "Кремы"},
 	{ID: "certificates", Label: "Сертификаты"},
+	{ID: "received", Label: "Получено от клиентов"},
+	{ID: "deposited", Label: "Внесено в кассу"},
 	{ID: "self", Label: "«Себе»"},
 	{ID: "salon_income", Label: "Доход салона"},
 	{ID: "expenses", Label: "Расходы"},
@@ -102,6 +105,22 @@ func (a *app) handleTrends(w http.ResponseWriter, r *http.Request, u store.User)
 	}
 
 	points := domain.Trend(window, results, imported)
+	if metric == "received" || metric == "deposited" {
+		// Closed months' records are locked, so their split read from the
+		// records is as final as the snapshot; nothing new is stored.
+		for i := range points {
+			if _, ok := results[points[i].Month]; !ok {
+				continue
+			}
+			reports, err := a.store.ReportsIn(r.Context(), points[i].Month)
+			if err != nil {
+				a.serverError(w, r, err)
+				return
+			}
+			sum := domain.Summarize(personReports(reports))
+			points[i].Received, points[i].Deposited, points[i].HasSplit = sum.Received, sum.Deposited, true
+		}
+	}
 
 	data := a.buildTrendData(period, metric, metricLabel, personID, people, points)
 	a.render(w, r, views.TrendsPage(a.navFor(u, "/admin/trends"), data))
@@ -133,12 +152,22 @@ func trendValue(metric, personID string, pt domain.TrendPoint) (raw int64, ok bo
 		return int64(pt.Dividends), true
 	case "clients":
 		return int64(pt.Clients), stats
+	case "received_services", "received_certificates", "received_sales", "deposited_services", "deposited_certificates", "deposited_sales":
+		m := pt.Received
+		if strings.HasPrefix(metric, "deposited") {
+			m = pt.Deposited
+		}
+		part := map[string]domain.Cents{"services": m.Services, "certificates": m.Certificates, "sales": m.Sales}[metric[strings.IndexByte(metric, '_')+1:]]
+		return int64(part), pt.HasSplit
 	}
 	return 0, false
 }
 
 // trendSeries are the bars drawn per month: three for «Обзор», otherwise one.
 func trendSeries(metric, metricLabel string) []views.TrendSeries {
+	if metric == "received" || metric == "deposited" {
+		return []views.TrendSeries{{ID: metric + "_services", Label: "Услуги"}, {ID: metric + "_certificates", Label: "Сертификаты"}, {ID: metric + "_sales", Label: "Продажи"}}
+	}
 	if metric == "overview" {
 		return []views.TrendSeries{{ID: "revenue", Label: "Выручка"}, {ID: "expenses", Label: "Расходы"}, {ID: "profit", Label: "Прибыль"}}
 	}
