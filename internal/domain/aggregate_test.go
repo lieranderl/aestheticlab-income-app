@@ -228,6 +228,33 @@ func TestTheSalonsOpenDebtsAreSummedPerSideNotNetted(t *testing.T) {
 	}
 }
 
+// Client entries pay sales into the kassa in full, so their split is exact:
+// certificates and sales are what was sold, and the rest is services.
+func TestAClientEntrySplitIsExactForAnyInput(t *testing.T) {
+	rng := rand.New(rand.NewPCG(2026, 11)) //nolint:gosec // seeded on purpose: reproducible, not secret
+	amount := func() domain.Cents { return domain.Cents(rng.IntN(50000)) }
+	for i := range 500 {
+		in := domain.ClientInput{Services: amount(), Extras: map[string]domain.Cents{"creams": amount(), "oil": amount(), "certificates": amount()}, ExtrasDestination: [...]domain.Destination{domain.ToCash, domain.ToKassaCard}[rng.IntN(2)]}
+		in.CertificatePaid = domain.Cents(rng.Int64N(int64(in.Services) + 1))
+		in.ServiceCash = domain.Cents(rng.Int64N(int64(in.Services-in.CertificatePaid) + 1))
+		in.ServiceCard = domain.Cents(rng.Int64N(int64(in.Services-in.CertificatePaid-in.ServiceCash) + 1))
+		pr, err := domain.NewClientReport("olga", domain.Date{Year: 2026, Mon: 11, Day: 20}, in, domain.BasisPoints(rng.IntN(10001)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := domain.Summarize([]domain.PersonReport{pr})
+		sales := in.Extras["creams"] + in.Extras["oil"]
+		want := domain.MoneySplit{Services: in.Services - in.CertificatePaid, Certificates: in.Extras["certificates"], Sales: sales}
+		if s.Received != want {
+			t.Fatalf("case %d %+v: received %+v, want %+v", i, in, s.Received, want)
+		}
+		want.Services = in.ServiceCash + in.ServiceCard
+		if s.Deposited != want {
+			t.Fatalf("case %d %+v: deposited %+v, want %+v", i, in, s.Deposited, want)
+		}
+	}
+}
+
 func TestMoneyIsSplitIntoServicesCertificatesAndSales(t *testing.T) {
 	client := func(in domain.ClientInput) domain.PersonReport {
 		t.Helper()

@@ -6,7 +6,9 @@ import (
 )
 
 // MoneySplit is money by what it paid for: services, certificate sales and
-// other sales (creams, oil and any non-service category).
+// other sales. «Продажи» is every category other than "services" and
+// certificate sales: creams and oil for client entries, and also the legacy
+// daily report's goods and «Прочее».
 type MoneySplit struct {
 	Services, Certificates, Sales Cents
 }
