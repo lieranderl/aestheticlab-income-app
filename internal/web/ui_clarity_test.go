@@ -257,7 +257,7 @@ func TestTheMonthSplitsMoneyIntoServicesCertificatesAndSales(t *testing.T) {
 	}
 	rows := func(page, name, value string) int {
 		t.Helper()
-		return len(regexp.MustCompile(regexp.QuoteMeta(name) + `\s*</dt>\s*<dd[^>]*>\s*` + regexp.QuoteMeta(value) + `\s*</dd>`).FindAllStringIndex(page, -1))
+		return len(regexp.MustCompile(regexp.QuoteMeta(name)+`\s*</dt>\s*<dd[^>]*>\s*`+regexp.QuoteMeta(value)+`\s*</dd>`).FindAllStringIndex(page, -1))
 	}
 	month := s.get("/admin/month?m=2026-11", s.login("anna", annaPass)).Body.String()
 	// The salon's «Факт» card and Olga's card show the same figures.
