@@ -108,7 +108,7 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 			if month.Snapshot != nil {
 				pr := month.Snapshot.Result.People[person.ID]
 				freezeShares(&personMoney, pr.Revenue, pr.Self, pr.SalonShare(), staffMoney)
-				atHigherRate(&personMoney, pr.SelfBonus, pr.Self, pr.SalonShare(), personSum.BalanceDelta, month.Snapshot.Terms[person.ID].HighSelfPct, anyHandSet(reportsForPerson(reports, person.ID)), staffMoney)
+				atHigherRate(&personMoney, pr.SelfBonus, pr.Self, pr.SalonShare(), personSum.BalanceDelta, personSum.CashKept, month.Snapshot.Terms[person.ID].HighSelfPct, anyHandSet(reportsForPerson(reports, person.ID)), staffMoney)
 				bonuses[person.ID] = pr.SelfBonus
 			} else {
 				entries, err := a.store.Terms(r.Context(), person.ID)
@@ -118,7 +118,7 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 				}
 				if terms, ok := history(entries).For(m); ok {
 					bonus := domain.SelfBonusFor(personSum.SelfBase, personSum.BonusBase, terms)
-					atHigherRate(&personMoney, bonus, personSum.Self, personSum.SalonShare, personSum.BalanceDelta, terms.HighSelfPct, anyHandSet(reportsForPerson(reports, person.ID)), staffMoney)
+					atHigherRate(&personMoney, bonus, personSum.Self, personSum.SalonShare, personSum.BalanceDelta, personSum.CashKept, terms.HighSelfPct, anyHandSet(reportsForPerson(reports, person.ID)), staffMoney)
 					bonuses[person.ID] = bonus
 				}
 			}

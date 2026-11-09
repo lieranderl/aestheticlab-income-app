@@ -90,6 +90,29 @@ func (s Summary) OpenDebts() (toStaff, toSalon Cents) {
 	return toStaff, toSalon
 }
 
+// MonthShares are a month's «Себе», «Салону» and what its records leave
+// between the person (or the staff) and the salon (+ the salon owes).
+type MonthShares struct {
+	Self, Salon, Delta Cents
+}
+
+// WithSelfBonus counts the higher «Себе» rate's bonus that close accrues
+// (SelfBonusFor, a self_bonus row from the salon to the person): «Себе» and
+// the result grow by it and «Салону» shrinks by it. The cash kept does not
+// change, so CashKept + Delta == Self still holds.
+func (m MonthShares) WithSelfBonus(bonus Cents) MonthShares {
+	return MonthShares{Self: m.Self + bonus, Salon: m.Salon - bonus, Delta: m.Delta + bonus}
+}
+
+// TotalBonus is the staff's bonuses together.
+func TotalBonus(bonuses map[string]Cents) Cents {
+	var total Cents
+	for _, b := range bonuses {
+		total += b
+	}
+	return total
+}
+
 // OpenDebtsWith is OpenDebts once each person's higher-rate «Себе» bonus
 // (what close accrues to them) is added to their side.
 func (s Summary) OpenDebtsWith(bonuses map[string]Cents) (toStaff, toSalon Cents) {

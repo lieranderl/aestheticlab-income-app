@@ -54,7 +54,7 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 			// The month's terms can't change once it has reports, so they name
 			// the rate the snapshot's bonus was accrued at.
 			terms, _ := history(entries).For(m)
-			atHigherRate(&page.Money, own.SelfBonus, own.Self, own.SalonShare(), sum.BalanceDelta, terms.HighSelfPct, anyHandSet(reports), ownMoney)
+			atHigherRate(&page.Money, own.SelfBonus, own.Self, own.SalonShare(), sum.BalanceDelta, sum.CashKept, terms.HighSelfPct, anyHandSet(reports), ownMoney)
 		}
 		page.Details = nil
 		if own.StatsVersion >= 1 {
@@ -70,7 +70,7 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		if p, ok := domain.SelfProgressFor(sum.SelfBase, terms); ok {
 			page.Progress, page.Reached = progressText(p, baseLabel(sum), anyHandSet(reports)), p.Reached
 			bonus := domain.SelfBonusFor(sum.SelfBase, sum.BonusBase, terms)
-			atHigherRate(&page.Money, bonus, sum.Self, sum.SalonShare, sum.BalanceDelta, p.HighPct, anyHandSet(reports), ownMoney)
+			atHigherRate(&page.Money, bonus, sum.Self, sum.SalonShare, sum.BalanceDelta, sum.CashKept, p.HighPct, anyHandSet(reports), ownMoney)
 		}
 	}
 	for i := len(reports) - 1; i >= 0; i-- { // newest first

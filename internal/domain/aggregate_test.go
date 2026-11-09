@@ -310,3 +310,20 @@ func TestOpenDebtsWithBonusesKeepEachPersonsSide(t *testing.T) {
 		t.Fatalf("open debts with bonuses = %d / %d, want 125000 / 36250", toStaff, toSalon)
 	}
 }
+
+// The owner's month at 50%: «Себе» €2 837,50, «Салону» €2 849,50, a debt of
+// €1 497,50 with €4 335 kept. With the €1 135 bonus close accrues it reads
+// «Себе» €3 972,50, «Салону» €1 714,50, a debt of €362,50, and the kept cash
+// still meets «Себе»: €4 335 − €362,50 = €3 972,50.
+func TestMonthSharesWithTheSelfBonus(t *testing.T) {
+	got := domain.MonthShares{Self: 283750, Salon: 284950, Delta: -149750}.WithSelfBonus(113500)
+	if got != (domain.MonthShares{Self: 397250, Salon: 171450, Delta: -36250}) {
+		t.Fatalf("with bonus = %+v", got)
+	}
+	if kept := domain.Cents(433500); kept+got.Delta != got.Self {
+		t.Fatalf("kept %d + delta %d != self %d", kept, got.Delta, got.Self)
+	}
+	if total := domain.TotalBonus(map[string]domain.Cents{"olga": 113500, "maria": 120000}); total != 233500 {
+		t.Fatalf("total bonus = %d", total)
+	}
+}

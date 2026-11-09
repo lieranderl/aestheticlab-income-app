@@ -183,7 +183,7 @@ func recordLines(r domain.Report, who audience) (fact, expected string) {
 // reads «Себе» за ставку 70% instead of a separate bonus line. The records
 // themselves keep the rate they were saved with.
 // handSet days keep what they were given, and the label says so.
-func atHigherRate(v *views.MoneyView, bonus, self, salon, delta domain.Cents, highPct domain.BasisPoints, handSet bool, who audience) {
+func atHigherRate(v *views.MoneyView, bonus, self, salon, delta, kept domain.Cents, highPct domain.BasisPoints, handSet bool, who audience) {
 	if bonus <= 0 || v.Status == "" {
 		return
 	}
@@ -198,26 +198,25 @@ func atHigherRate(v *views.MoneyView, bonus, self, salon, delta domain.Cents, hi
 			label += " (кроме дней, заданных вручную)"
 		}
 	}
-	setShares(v, name, label, self+bonus, salon-bonus)
-	v.Status, v.Tone = statusText(delta+bonus, who)
+	shares := domain.MonthShares{Self: self, Salon: salon, Delta: delta}.WithSelfBonus(bonus)
+	setShares(v, name, label, shares.Self, shares.Salon)
+	v.Status, v.Tone = statusText(shares.Delta, who)
 	if v.Explain != "" {
-		v.Explain = selfEquation(self+bonus, self-delta, delta+bonus, who)
+		v.Explain = selfEquation(shares.Self, kept, shares.Delta, who)
 	}
 }
 
 // salonAtHigherRate does the same for the salon's card, with each person's
 // bonus kept on their own side of the open debts.
 func salonAtHigherRate(v *views.MoneyView, s domain.Summary, self, salon domain.Cents, bonuses map[string]domain.Cents) {
-	var total domain.Cents
-	for _, b := range bonuses {
-		total += b
-	}
+	total := domain.TotalBonus(bonuses)
 	if total <= 0 || v.Status == "" {
 		return
 	}
-	setShares(v, "«Себе» сотрудников", "«Себе» сотрудников", self+total, salon-total)
+	shares := domain.MonthShares{Self: self, Salon: salon}.WithSelfBonus(total)
+	setShares(v, "«Себе» сотрудников", "«Себе» сотрудников", shares.Self, shares.Salon)
 	v.Status, v.Tone = salonStatus(s.OpenDebtsWith(bonuses))
-	v.StatusNote = "Ожидалось салону " + domain.FormatEUR(salon-total) + " · зачтено " + domain.FormatEUR(s.KassaCredit)
+	v.StatusNote = "Ожидалось салону " + domain.FormatEUR(shares.Salon) + " · зачтено " + domain.FormatEUR(s.KassaCredit)
 	if s.Prepaid > 0 {
 		v.StatusNote += " (из них сертификатами " + domain.FormatEUR(s.Prepaid) + ")"
 	}
