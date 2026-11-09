@@ -27,6 +27,19 @@ func byEntry(es []store.Entry) {
 	})
 }
 
+// errProcessed: the author's own expense was confirmed or voided since they opened it.
+var errProcessed = errors.New("movement already processed")
+
+// editReadError answers the edit form's read failures.
+func (a *app) editReadError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, errProcessed):
+		http.Error(w, "Движение уже обработано — обновите страницу", http.StatusConflict)
+	case !actionReadError(w, r, err):
+		a.serverError(w, r, err)
+	}
+}
+
 // mayEdit is who may correct a row: the admin any expense, the author only
 // their own pending one (the same people who may void it).
 func mayEdit(u store.User, e store.Entry) bool {
@@ -50,6 +63,9 @@ func (a *app) editForm(r *http.Request, u store.User) (views.MovementFormData, e
 		return views.MovementFormData{}, store.ErrNotFound
 	}
 	if !canEdit(u, e) {
+		if e.Type == domain.Expense && e.CreatedBy == u.ID && e.PersonID == u.ID {
+			return views.MovementFormData{}, errProcessed // confirmed or voided meanwhile
+		}
 		return views.MovementFormData{}, store.ErrForbidden
 	}
 	admin := u.Actor().Admin
@@ -75,9 +91,7 @@ func (a *app) editForm(r *http.Request, u store.User) (views.MovementFormData, e
 func (a *app) handleEditMovementPage(w http.ResponseWriter, r *http.Request, u store.User) {
 	f, err := a.editForm(r, u)
 	if err != nil {
-		if !actionReadError(w, r, err) {
-			a.serverError(w, r, err)
-		}
+		a.editReadError(w, r, err)
 		return
 	}
 	a.render(w, r, views.MovementFormPage(a.navFor(u, f.Back), f))
@@ -86,9 +100,7 @@ func (a *app) handleEditMovementPage(w http.ResponseWriter, r *http.Request, u s
 func (a *app) handleEditMovement(w http.ResponseWriter, r *http.Request, u store.User) {
 	f, err := a.editForm(r, u)
 	if err != nil {
-		if !actionReadError(w, r, err) {
-			a.serverError(w, r, err)
-		}
+		a.editReadError(w, r, err)
 		return
 	}
 	if err := readForm(w, r); err != nil {
@@ -127,8 +139,12 @@ func (a *app) handleEditMovement(w http.ResponseWriter, r *http.Request, u store
 		})
 	}
 	if err != nil {
-		if errors.Is(err, store.ErrForbidden) {
-			http.Error(w, "Нет доступа", http.StatusForbidden)
+		if errors.Is(err, store.ErrForbidden) { // e.g. confirmed between the read and the write
+			// The form read passed, so for the author it can only have been processed since.
+			if !u.Actor().Admin {
+				err = errProcessed
+			}
+			a.editReadError(w, r, err)
 			return
 		}
 		f.Error = movementProblem(r, err)

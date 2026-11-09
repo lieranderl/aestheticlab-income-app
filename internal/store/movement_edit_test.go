@@ -72,3 +72,33 @@ func TestStaffEditOnlyTheirOwnPendingExpense(t *testing.T) {
 		wantErr(t, "edit after confirmation", err, store.ErrForbidden)
 	})
 }
+
+func TestAdminCorrectionOfAPendingExpenseStillWaitsForConfirmation(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		nov12 := date(t, "2026-11-12")
+		own, err := s.RecordMovement(ctx, s.actor(s.olga), store.NewMovement{Type: domain.Expense, Amount: 5000, From: domain.Person(s.olga), To: domain.Outside, ExpenseCategory: "materials", Date: nov12, Note: "перчатки"})
+		must(t, err)
+		fix := store.NewMovement{Type: domain.Expense, Amount: 4500, From: domain.Person(s.olga), To: domain.Outside, ExpenseCategory: "materials", Date: nov12, Note: "перчатки"}
+
+		bad := fix
+		bad.ExpenseCategory = "nope"
+		_, err = s.EditMovement(ctx, s.admin, own.ID, own.Version, bad)
+		wantProblem(t, "unknown category", err, store.ProblemUnknownParty)
+		untouched, err := s.Entry(ctx, own.ID)
+		must(t, err)
+		if untouched.Status != domain.Pending || untouched.Version != own.Version {
+			t.Fatalf("a refused edit changed the old row: %+v", untouched)
+		}
+
+		got, err := s.EditMovement(ctx, s.admin, own.ID, own.Version, fix)
+		must(t, err)
+		if got.Status != domain.Pending || got.CreatedBy != s.olga || got.ConfirmedBy != "" {
+			t.Fatalf("admin correction = %+v, want still pending and Olga's", got)
+		}
+		b, err := s.PersonBalance(ctx, s.olga)
+		must(t, err)
+		if b != 0 {
+			t.Fatalf("balance before confirmation = %d, want 0", b)
+		}
+	})
+}

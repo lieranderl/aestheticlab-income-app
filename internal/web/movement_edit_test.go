@@ -116,6 +116,13 @@ func TestStaffEditOnlyTheirOwnPendingExpenses(t *testing.T) {
 	wantPage(t, "foreign edit", s.post("/movements/"+id+"/edit", form, r), http.StatusForbidden, "Нет доступа")
 	wantRedirect(t, "own edit", s.post("/movements/"+id+"/edit", form, z), "/my?saved=pending")
 	wantPage(t, "after own edit", s.get("/my", z), http.StatusOK, "€45", "Ожидает подтверждения")
+	es, _ = s.st.PersonMovementsIn(ctx, s.olga.ID, s.st.StartMonth())
+	for _, e := range es {
+		if e.Status == domain.Pending {
+			wantRedirect(t, "confirm", s.post("/admin/movements/"+e.ID+"/confirm", url.Values{"version": {"1"}}, j), "/admin/kassa?saved=1")
+			wantPage(t, "edit after confirmation", s.post("/movements/"+e.ID+"/edit", form, z), http.StatusConflict, "Движение уже обработано")
+		}
+	}
 
 	deposit := url.Values{"type": {"deposit"}, "amount": {"10"}, "date": {"2026-11-10"}, "from": {"person:" + s.olga.ID}, "to": {"account:kassa_cash"}}
 	wantRedirect(t, "deposit", s.post("/movements", deposit, z), "/my?saved=pending")

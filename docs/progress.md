@@ -1,5 +1,13 @@
 # Progress
 
+## Movement edit and cleaner lists (2026-11-09)
+Owner feedback: expenses need editing, cancelled rows clutter the lists, and rows entered one after another end up mixed by date.
+- **«Изменить» on expenses:** `store.EditMovement` voids the old row («Исправлено») and records the corrected one in one transaction, each with an audit row; both months must be open. Admin edits any expense; staff only their own pending one. Correcting a pending expense keeps it pending (and its author) until «Подтвердить».
+- **Voided rows hidden** on «Касса», «Мои» and movement history; history shows them with the «Отменено» status filter. Balances never counted them, so totals are unchanged.
+- **Order:** these lists are newest entered first (`createdAt`), not by date.
+- Verified: `make ci`, store contract tests on memory and the emulator, money audit, edit flow at 375 pt in light and dark.
+- Open: old and new rows are linked only through the audit trail (no field); an expense whose category was later archived can't be corrected without changing the category.
+
 ## Daily screen simplification (2026-11-07)
 - Staff day totals and client cards omit settlement/debt banners and badges. The money breakdown and monthly balance/settlement remain available; calculations and stored records are unchanged.
 - «Записи в календаре» starts collapsed on staff and admin day pages; tap the heading to expand it.

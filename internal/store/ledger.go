@@ -483,6 +483,9 @@ func (s *Store) EditMovement(ctx context.Context, actor Actor, id string, versio
 				return err
 			}
 		}
+		if before.Status == domain.Pending { // correcting is not confirming: it still waits for «Подтвердить»
+			e.Status, e.ConfirmedBy, e.CreatedBy = domain.Pending, "", before.CreatedBy
+		}
 		old := before
 		old.Status, old.VoidReason, old.Version = domain.Voided, EditedReason, before.Version+1
 		if err := s.writeEntry(t, actor.UID, ActionVoid, &before, old); err != nil {
