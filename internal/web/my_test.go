@@ -115,10 +115,11 @@ func TestTheExpectedSharesPreviewOnlyABonusThatCloseWillAccrue(t *testing.T) {
 	}
 	olga := s.login("olga", olgaPass)
 	s.seedLegacyForm(s.olga, 19, url.Values{"r_services": {"200"}, "p_card": {"200"}, "selfManual": {"1"}, "selfOverride": {"50"}, "version": {"0"}})
-	if body := s.get("/my", olga).Body.String(); strings.Contains(body, "Доплата «Себе»") {
+	if body := s.get("/my", olga).Body.String(); strings.Contains(body, "за ставку 80%") {
 		t.Error("promises a bonus although every day above the threshold was set by hand")
 	}
 	s.seedLegacyForm(s.olga, 20, url.Values{"r_services": {"100"}, "r_creams": {"50"}, "p_card": {"150"}, "version": {"0"}})
 	wantPage(t, "with an eligible day", s.get("/my", olga), http.StatusOK,
-		"Доплата «Себе» за ставку 80% (при закрытии)", "€15", "Услуги и продажи для «Себе» за месяц")
+		// €50 hand-set + €105 at 70%, plus 10% of the eligible €150 at close.
+		"Ваши «Себе» за ставку 80% (кроме дней, заданных вручную)", domain.FormatEUR(17000), "Услуги и продажи для «Себе» за месяц")
 }
