@@ -594,8 +594,8 @@ github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 h1:M8mH9eK4OUR4l
 github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567/go.mod h1:DWNGW8A4Y+GyBgPuaQJuWiy0XYftx4Xm/y5Jqk9I6VQ=
 github.com/raeperd/recvcheck v0.3.0 h1:PM+XYvyxIj3bo+kobJfFTdTuU3Lmfu96mKDbyHDbRt8=
 github.com/raeperd/recvcheck v0.3.0/go.mod h1:PZNwG+HztFYMH2ZPq0Hu3QgkV2yiA6VrtNz9c1fXWJo=
-github.com/richardlehane/mscfb v1.0.8 h1:UXdg61fxF69/X9yMYuRHAWSrGXIul/UAPivAsUXMme8=
-github.com/richardlehane/mscfb v1.0.8/go.mod h1:pe0+IUIc0AHh0+teNzBlJCtSyZdFOGgV4ZK9bsoV+Jo=
+github.com/richardlehane/mscfb v1.0.9 h1:8xdd9auUvXbFoCw3L9h1spnQHZgjNsSX+ek46J6A9tE=
+github.com/richardlehane/mscfb v1.0.9/go.mod h1:pe0+IUIc0AHh0+teNzBlJCtSyZdFOGgV4ZK9bsoV+Jo=
 github.com/richardlehane/msoleps v1.0.6 h1:9BvkpjvD+iUBalUY4esMwv6uBkfOip/Lzvd93jvR9gg=
 github.com/richardlehane/msoleps v1.0.6/go.mod h1:BWev5JBpU9Ko2WAgmZEuiz4/u3ZYTKbjLycmwiWUfWg=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
@@ -715,10 +715,10 @@ github.com/xen0n/gosmopolitan v1.3.0 h1:zAZI1zefvo7gcpbCOrPSHJZJYA9ZgLfJqtKzZ5pH
 github.com/xen0n/gosmopolitan v1.3.0/go.mod h1:rckfr5T6o4lBtM1ga7mLGKZmLxswUoH1zxHgNXOsEt4=
 github.com/xo/terminfo v1.0.0 h1:2ZpYzqWzyyytjk3TP6aJVDhkMAkc99/1xKQdA3TDTBY=
 github.com/xo/terminfo v1.0.0/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
-github.com/xuri/efp v0.0.1 h1:fws5Rv3myXyYni8uwj2qKjVaRP30PdjeYe2Y6FDsCL8=
-github.com/xuri/efp v0.0.1/go.mod h1:ybY/Jr0T0GTCnYjKqmdwxyxn2BQf2RcQIIvex5QldPI=
-github.com/xuri/excelize/v2 v2.11.1-0.20260915055537-22f76f9acb94 h1:yPdJeJLC1uTN8zQBHE2nqHjZ15PfxU9xsX75vNcyy/c=
-github.com/xuri/excelize/v2 v2.11.1-0.20260915055537-22f76f9acb94/go.mod h1:WnwweQUkWv/3Y6OBVy0bgqN0zHAbn2N+i2zPUAXF1SI=
+github.com/xuri/efp v0.0.3-0.20260924042702-217b81952dec h1:sZZokRLgr8nyrzkDDCQcvEYBsTrZr6eqXa/R9qALoQA=
+github.com/xuri/efp v0.0.3-0.20260924042702-217b81952dec/go.mod h1:ybY/Jr0T0GTCnYjKqmdwxyxn2BQf2RcQIIvex5QldPI=
+github.com/xuri/excelize/v2 v2.11.1 h1:tm/FVufArvfUiJXJtGv8jna/zZS1t9Uji2ImsnS9iBo=
+github.com/xuri/excelize/v2 v2.11.1/go.mod h1:NQLBThVu4BB7tYM8wJIBj2dZsptXbDW4WyrFlL8YLZQ=
 github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 h1:+C0TIdyyYmzadGaL/HBLbf3WdLgC29pgyhTjAT/0nuE=
 github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9/go.mod h1:WwHg+CVyzlv/TX9xqBFXEZAuxOPxn2k1GNHwG41IIUQ=
 github.com/xyproto/randomstring v1.0.5 h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZqKjWU=
@@ -866,8 +866,8 @@ golang.org/x/net v0.0.0-20210525063256-abc453219eb5/go.mod h1:9nx3DQGgdP8bBQD5qx
 golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/net v0.0.0-20220722155237-a158d28d115b/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
 golang.org/x/net v0.6.0/go.mod h1:2Tu9+aMcznHK/AK1HMvgo6xiTLG5rD5rZLDS+rp2Bjs=
-golang.org/x/net v0.61.0 h1:RR+6j/BTBCrggOLugxa+66R8FvoN6MHlzDlZIbN9YFw=
-golang.org/x/net v0.61.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
+golang.org/x/net v0.62.0 h1:18ELalfM5+XNRwzM2nYqXsZQ9ByS1uhj2O/U7+5jqRY=
+golang.org/x/net v0.62.0/go.mod h1:WgDCOTH8iwtB66T4/GfI94AHo/hhdb7Hah9NDseQfiI=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be/go.mod h1:N/0e6XlmueqKjAGxoOufVs8QHGRruUQn6yWY3a++T0U=
 golang.org/x/oauth2 v0.0.0-20190226205417-e64efc72b421/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=
 golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45/go.mod h1:gOpvHmFTYa4IltrdGE7lF6nIHvwfUNPOp7c8zoXwtLw=

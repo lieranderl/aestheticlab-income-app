@@ -6,9 +6,9 @@ require (
 	cloud.google.com/go/firestore v1.29.0
 	github.com/a-h/templ v0.3.1100
 	github.com/starfederation/datastar-go v1.2.2
-	github.com/xuri/excelize/v2 v2.11.1-0.20260915055537-22f76f9acb94
+	github.com/xuri/excelize/v2 v2.11.1
 	golang.org/x/crypto v0.58.0
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	google.golang.org/api v0.308.0
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
@@ -193,7 +193,7 @@ require (
 	github.com/quasilyte/regex/syntax v0.0.0-20210819130434-b3f0c404a727 // indirect
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/raeperd/recvcheck v0.3.0 // indirect
-	github.com/richardlehane/mscfb v1.0.8 // indirect
+	github.com/richardlehane/mscfb v1.0.9 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
@@ -238,7 +238,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/xen0n/gosmopolitan v1.3.0 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
-	github.com/xuri/efp v0.0.1 // indirect
+	github.com/xuri/efp v0.0.3-0.20260924042702-217b81952dec // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	github.com/yagipy/maintidx v1.0.0 // indirect
 	github.com/yeya24/promlinter v0.3.0 // indirect
