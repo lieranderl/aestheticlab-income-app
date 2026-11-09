@@ -4,6 +4,8 @@ package views
 type MoneyLine struct {
 	Name, Value string
 	Strong      bool
+	Sub         bool // a part of the line above, indented
+	NewGroup    bool // starts a new group after a divider
 }
 
 // MoneyView separates what happened to the money from what the rates
@@ -87,8 +89,8 @@ templ expectedCard(lines []MoneyLine, explain string, frozen bool) {
 templ moneyLines(lines []MoneyLine, muted bool) {
 	<dl class={ "flex flex-col gap-2", templ.KV("text-base-content/70", muted) }>
 		for _, l := range lines {
-			<div class="flex justify-between gap-3">
-				<dt class={ "min-w-0 [overflow-wrap:anywhere]", templ.KV("font-semibold", l.Strong), templ.KV("text-base-content/70", !l.Strong && !muted) }>{ l.Name }</dt>
+			<div class={ "flex justify-between gap-3", templ.KV("mt-1 border-t border-base-content/10 pt-3", l.NewGroup) }>
+				<dt class={ "min-w-0 [overflow-wrap:anywhere]", templ.KV("font-semibold", l.Strong), templ.KV("text-base-content/70", !l.Strong && !muted), templ.KV("pl-4", l.Sub) }>{ l.Name }</dt>
 				<dd class={ "shrink-0", templ.KV("font-semibold", l.Strong), templ.KV("font-medium", !l.Strong) }>{ l.Value }</dd>
 			</div>
 		}

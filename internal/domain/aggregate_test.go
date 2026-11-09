@@ -199,6 +199,14 @@ func TestASummarysCashKeptPlusBalanceAlwaysEqualsSelf(t *testing.T) {
 		if s.KassaCredit-s.SalonShare != s.BalanceDelta {
 			t.Fatalf("case %d: credit %d − «Салону» %d != balance %d", i, s.KassaCredit, s.SalonShare, s.BalanceDelta)
 		}
+		if s.Received.Total() != s.MoneyReceived || s.Deposited.Total() != s.KassaCash+s.KassaCard {
+			t.Fatalf("case %d: split %+v / %+v does not add up to %d / %d", i, s.Received, s.Deposited, s.MoneyReceived, s.KassaCash+s.KassaCard)
+		}
+		for _, part := range []domain.Cents{s.Received.Services, s.Received.Certificates, s.Received.Sales, s.Deposited.Services, s.Deposited.Certificates, s.Deposited.Sales} {
+			if part < 0 {
+				t.Fatalf("case %d: negative part in %+v / %+v", i, s.Received, s.Deposited)
+			}
+		}
 	}
 }
 
@@ -217,5 +225,50 @@ func TestTheSalonsOpenDebtsAreSummedPerSideNotNetted(t *testing.T) {
 	toStaff, toSalon := s.OpenDebts()
 	if s.BalanceDelta != 0 || toStaff != 7000 || toSalon != 7000 {
 		t.Errorf("net %d, salon owes %d, staff owe %d; want 0, 70, 70", s.BalanceDelta, toStaff, toSalon)
+	}
+}
+
+func TestMoneyIsSplitIntoServicesCertificatesAndSales(t *testing.T) {
+	client := func(in domain.ClientInput) domain.PersonReport {
+		t.Helper()
+		pr, err := domain.NewClientReport("julia", date(t, "2026-10-15"), in, 5000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return pr
+	}
+	s := domain.Summarize([]domain.PersonReport{
+		// Service 100: 30 cash and 50 card left in the kassa, 20 kept.
+		client(domain.ClientInput{Services: 10000, ServiceCash: 3000, ServiceCard: 5000}),
+		// Certificate 100 and cream 20 sold by card, both fully to the kassa.
+		client(domain.ClientInput{Extras: map[string]domain.Cents{"certificates": 10000, "creams": 2000}, ExtrasDestination: domain.ToKassaCard}),
+		// Service 80 redeemed with a certificate: no new money.
+		client(domain.ClientInput{Services: 8000, CertificatePaid: 8000}),
+	})
+	want := domain.MoneySplit{Services: 10000, Certificates: 10000, Sales: 2000}
+	if s.Received != want || s.Received.Total() != s.MoneyReceived {
+		t.Errorf("received = %+v (total %d), want %+v = %d", s.Received, s.Received.Total(), want, s.MoneyReceived)
+	}
+	want = domain.MoneySplit{Services: 8000, Certificates: 10000, Sales: 2000}
+	if s.Deposited != want || s.Deposited.Total() != s.KassaCash+s.KassaCard {
+		t.Errorf("deposited = %+v, want %+v", s.Deposited, want)
+	}
+	if p := s.People["julia"]; p.Received != s.Received || p.Deposited != s.Deposited {
+		t.Errorf("person split = %+v / %+v", p.Received, p.Deposited)
+	}
+}
+
+func TestALegacyDayCountsItsSalesAsPaidIntoTheKassaFirst(t *testing.T) {
+	// Spec day: services 600, creams 50, certificate 100; card 600, cash 150,
+	// nothing left in the till: 600 reached the kassa (by card).
+	s := domain.Summarize([]domain.PersonReport{entry(t, "anna", "2026-10-05", domain.ReportInput{
+		Revenue:  map[string]domain.Cents{"services": 60000, "creams": 5000, "certificates": 10000},
+		Payments: map[string]domain.Cents{"card": 60000, "cash": 15000}, SelfPct: 5000,
+	})})
+	if want := (domain.MoneySplit{Services: 60000, Certificates: 10000, Sales: 5000}); s.Received != want {
+		t.Errorf("received = %+v, want %+v", s.Received, want)
+	}
+	if want := (domain.MoneySplit{Services: 45000, Certificates: 10000, Sales: 5000}); s.Deposited != want {
+		t.Errorf("deposited = %+v, want %+v", s.Deposited, want)
 	}
 }

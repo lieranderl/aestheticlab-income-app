@@ -5,11 +5,37 @@ import (
 	"slices"
 )
 
+// MoneySplit is money by what it paid for: services, certificate sales and
+// other sales (creams, oil and any non-service category).
+type MoneySplit struct {
+	Services, Certificates, Sales Cents
+}
+
+// Total is the three parts together.
+func (m MoneySplit) Total() Cents { return m.Services + m.Certificates + m.Sales }
+
+func (m MoneySplit) add(o MoneySplit) MoneySplit {
+	return MoneySplit{m.Services + o.Services, m.Certificates + o.Certificates, m.Sales + o.Sales}
+}
+
+// splitMoney attributes an amount of one report's money to certificate sales
+// first, then other sales, and the rest to services. Client entries pay
+// sales into the kassa in full, so this is exact for them; a legacy daily
+// report never recorded the split, so its sales are assumed paid first.
+func splitMoney(amount Cents, pr PersonReport) MoneySplit {
+	certificates := min(max(pr.Report.CertificateSales, 0), max(amount, 0))
+	sales := pr.Report.Total - pr.Revenue["services"] - pr.Report.CertificateSales
+	sales = min(max(sales, 0), max(amount-certificates, 0))
+	return MoneySplit{Services: amount - certificates - sales, Certificates: certificates, Sales: sales}
+}
+
 // PersonSummary is one person's part of a day or month summary.
 type PersonSummary struct {
 	ByCategory   map[string]Cents
 	KassaCash    Cents
 	KassaCard    Cents
+	Received     MoneySplit // card + cash from clients, by what it paid for
+	Deposited    MoneySplit // kassa cash + card, by what it paid for
 	Clients      int
 	Total        Cents
 	SelfBase     Cents
@@ -35,12 +61,14 @@ type Summary struct {
 	CardIn           Cents
 	Cash             Cents
 	CashToKassa      Cents
-	TransferToCard   Cents // the salon's share sent to the kassa card instead of the till
-	Prepaid          Cents // paid with certificates
-	MoneyReceived    Cents // card + cash: new money, unlike certificate payments
-	CashKept         Cents // cash the person kept; CashKept + BalanceDelta == Self
-	KassaCredit      Cents // kassa cash + card + certificate payments; KassaCredit − SalonShare == BalanceDelta
-	BalanceDelta     Cents // + the salon owes the person, − the person owes the salon
+	TransferToCard   Cents      // the salon's share sent to the kassa card instead of the till
+	Prepaid          Cents      // paid with certificates
+	MoneyReceived    Cents      // card + cash: new money, unlike certificate payments
+	Received         MoneySplit // MoneyReceived by what it paid for
+	Deposited        MoneySplit // KassaCash + KassaCard by what it paid for
+	CashKept         Cents      // cash the person kept; CashKept + BalanceDelta == Self
+	KassaCredit      Cents      // kassa cash + card + certificate payments; KassaCredit − SalonShare == BalanceDelta
+	BalanceDelta     Cents      // + the salon owes the person, − the person owes the salon
 	ByCategory       map[string]Cents
 	ByPayment        map[string]Cents
 	WorkingDays      int
@@ -67,6 +95,10 @@ func Summarize(reports []PersonReport) Summary {
 	personDays := map[string]map[Date]bool{}
 	for _, pr := range reports {
 		r := pr.Report
+		received := splitMoney(r.CardIn+r.Cash, pr)
+		deposited := splitMoney(r.CashToKassa+r.CardIn+r.TransferToCard, pr)
+		s.Received = s.Received.add(received)
+		s.Deposited = s.Deposited.add(deposited)
 		s.KassaCash += r.CashToKassa
 		s.KassaCard += r.CardIn + r.TransferToCard
 		s.Total += r.Total
@@ -108,6 +140,8 @@ func Summarize(reports []PersonReport) Summary {
 		for id, v := range pr.Revenue {
 			p.ByCategory[id] += v
 		}
+		p.Received = p.Received.add(received)
+		p.Deposited = p.Deposited.add(deposited)
 		p.KassaCash += r.CashToKassa
 		p.KassaCard += r.CardIn + r.TransferToCard
 		if pr.Client {
