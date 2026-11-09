@@ -130,7 +130,16 @@ func recovery(next http.Handler) http.Handler {
 
 // logValue encodes line breaks so a request value cannot forge a log line.
 func logValue(v string) string {
-	return strings.NewReplacer("\r", "%0D", "\n", "%0A").Replace(v)
+	v = strings.ReplaceAll(v, "\r", "%0D")
+	return strings.ReplaceAll(v, "\n", "%0A")
+}
+
+// logError is err's text as logValue makes it: errors can quote form input.
+func logError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return logValue(err.Error())
 }
 
 // statusRecorder remembers the response status for logs and recovery.

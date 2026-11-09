@@ -184,7 +184,7 @@ func storeOptions() ([]store.Option, error) {
 }
 
 // setUpLocal gives the in-memory store the default data and an admin to
-// sign in with: anna, with a random password printed to the log. Only
+// sign in with: anna, with a random password printed to the terminal. Only
 // ever for local runs; production is set up once by cmd/seed.
 // openBookings reads BOOKING_CALENDARS ("<calendarId>|<uid>;…"): the staff
 // calendars Timely syncs to, shared read-only with the runtime service
@@ -253,6 +253,7 @@ func setUpLocal(st *store.Store) error {
 	if err := st.SetTerms(ctx, admin.Actor(), admin.ID, st.StartMonth(), terms, "local"); err != nil {
 		return err
 	}
-	slog.Warn("local in-memory login (must be changed at first login)", "username", "anna", "password", password)
-	return nil
+	// Straight to the terminal, never into the structured log.
+	_, err = fmt.Fprintf(os.Stderr, "Local in-memory login: anna, temporary password (must be changed at first login):\n%s\n", password)
+	return err
 }

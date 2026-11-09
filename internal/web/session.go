@@ -165,7 +165,7 @@ func (a *app) signedIn(h userHandler) http.HandlerFunc {
 			a.navigate(w, r, "/login")
 			return
 		case err != nil:
-			slog.ErrorContext(r.Context(), "load session user", "error", err)
+			slog.ErrorContext(r.Context(), "load session user", "error", logError(err))
 			http.Error(w, "Сервис временно недоступен, попробуйте ещё раз", http.StatusServiceUnavailable)
 			return
 		}
@@ -176,7 +176,7 @@ func (a *app) signedIn(h userHandler) http.HandlerFunc {
 		auth := time.Unix(s.Auth, 0)
 		if time.Unix(s.Expires, 0).Sub(a.now()) < sessionTTL-sessionRenewAfter && s.Expires < auth.Add(sessionMaxAge).Unix() {
 			if err := a.writeSession(w, u, auth); err != nil {
-				slog.ErrorContext(r.Context(), "renew session", "error", err)
+				slog.ErrorContext(r.Context(), "renew session", "error", logError(err))
 			}
 		}
 		h(w, r, u)

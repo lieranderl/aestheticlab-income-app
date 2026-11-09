@@ -29,14 +29,16 @@ func readForm(w http.ResponseWriter, r *http.Request) error {
 // redirectUrl signal (the CSP forbids the inline script Datastar's own
 // redirect uses), a plain request with a 303.
 func (a *app) navigate(w http.ResponseWriter, r *http.Request, url string) {
-	if !strings.HasPrefix(url, "/") || strings.HasPrefix(url, "//") || strings.ContainsAny(url, "\\\r\n") {
+	// Only a local path: a leading '/' not followed by '/' or a backslash
+	// (browsers read both as another host), and no backslash or line break.
+	if url == "" || url[0] != '/' || (len(url) > 1 && (url[1] == '/' || url[1] == '\\')) || strings.ContainsAny(url, "\\\r\n") {
 		a.serverError(w, r, store.ErrInvalid)
 		return
 	}
 	if isDatastar(r) {
 		sse := datastar.NewSSE(w, r)
 		if err := sse.MarshalAndPatchSignals(map[string]any{"redirectUrl": url}); err != nil {
-			slog.ErrorContext(r.Context(), "send redirect", "error", err)
+			slog.ErrorContext(r.Context(), "send redirect", "error", logError(err))
 		}
 		return
 	}
@@ -55,7 +57,7 @@ func (a *app) formFailedStatus(w http.ResponseWriter, r *http.Request, status in
 	if isDatastar(r) {
 		sse := datastar.NewSSE(w, r)
 		if err := sse.PatchElementTempl(form); err != nil {
-			slog.ErrorContext(r.Context(), "patch form", "error", err)
+			slog.ErrorContext(r.Context(), "patch form", "error", logError(err))
 		}
 		return
 	}
@@ -70,7 +72,7 @@ func (a *app) renderStatus(w http.ResponseWriter, r *http.Request, status int, c
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	if err := c.Render(r.Context(), w); err != nil {
-		slog.ErrorContext(r.Context(), "render failed", "path", logValue(r.URL.Path), "error", err)
+		slog.ErrorContext(r.Context(), "render failed", "path", logValue(r.URL.Path), "error", logError(err))
 	}
 }
 
@@ -109,6 +111,6 @@ func problemText(r *http.Request, err error) string {
 			return "Базовые категории нельзя архивировать или удалить"
 		}
 	}
-	slog.ErrorContext(r.Context(), "request failed", "path", logValue(r.URL.Path), "error", err)
+	slog.ErrorContext(r.Context(), "request failed", "path", logValue(r.URL.Path), "error", logError(err))
 	return "Не удалось сохранить, попробуйте ещё раз"
 }

@@ -130,7 +130,7 @@ func (a *app) saveReportFor(w http.ResponseWriter, r *http.Request, actor, owner
 	f := dc.form(nil)
 	f.Done = "Сохранено ✓"
 	if err := datastar.NewSSE(w, r).PatchElementTempl(views.ReportFormView(f)); err != nil {
-		slog.ErrorContext(r.Context(), "patch report form", "error", err)
+		slog.ErrorContext(r.Context(), "patch report form", "error", logError(err))
 	}
 }
 

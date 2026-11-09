@@ -198,7 +198,7 @@ func (a *app) handleReady(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if a.cfg.Ready != nil {
 		if err := a.cfg.Ready(r); err != nil {
-			slog.ErrorContext(r.Context(), "readiness check failed", "error", err)
+			slog.ErrorContext(r.Context(), "readiness check failed", "error", logError(err))
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = io.WriteString(w, "not ready\n")
 			return
@@ -209,6 +209,6 @@ func (a *app) handleReady(w http.ResponseWriter, r *http.Request) {
 
 // serverError logs an unexpected error and shows a short Russian message.
 func (a *app) serverError(w http.ResponseWriter, r *http.Request, err error) {
-	slog.ErrorContext(r.Context(), "request failed", "path", logValue(r.URL.Path), "error", err)
+	slog.ErrorContext(r.Context(), "request failed", "path", logValue(r.URL.Path), "error", logError(err))
 	http.Error(w, "Что-то пошло не так, попробуйте ещё раз", http.StatusInternalServerError)
 }

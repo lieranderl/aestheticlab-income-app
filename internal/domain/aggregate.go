@@ -277,8 +277,13 @@ type TrendPoint struct {
 	HasSplit          bool       // read from the month's records; imported months have none
 }
 
-// Window is the n months ending with end, oldest first (3, 6 or 12).
+// MaxWindow is the longest chart window: a year.
+const MaxWindow = 12
+
+// Window is the n months ending with end, oldest first (3, 6 or 12);
+// n is kept within 1..MaxWindow.
 func Window(end Month, n int) []Month {
+	n = min(max(n, 1), MaxWindow)
 	months := make([]Month, n)
 	for i := n - 1; i >= 0; i-- {
 		months[i] = end

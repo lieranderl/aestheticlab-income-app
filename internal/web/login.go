@@ -61,7 +61,9 @@ func (a *app) handleLogin(w http.ResponseWriter, r *http.Request) {
 	fail := func(msg string) { show(http.StatusUnprocessableEntity, msg) }
 	wrong := func() { fail(msgWrongLogin) }
 	if !a.throttle.admit(source) {
-		slog.WarnContext(r.Context(), "login refused: too many failures from source", "source", source)
+		// The client address stays out of app logs (personal data); Cloud
+		// Run's request log already has it for an investigation.
+		slog.WarnContext(r.Context(), "login refused: too many failures from one source")
 		show(http.StatusTooManyRequests, msgThrottled)
 		return
 	}
@@ -87,7 +89,7 @@ func (a *app) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		slog.ErrorContext(r.Context(), "login lookup", "error", err)
+		slog.ErrorContext(r.Context(), "login lookup", "error", logError(err))
 		a.throttle.release(source)
 		fail(msgLoginRetry)
 		return
@@ -110,9 +112,9 @@ func (a *app) handleLogin(w http.ResponseWriter, r *http.Request) {
 		after, err := a.store.RecordLoginFailure(r.Context(), u.ID, loginLimit, loginLockFor)
 		switch {
 		case err != nil:
-			slog.ErrorContext(r.Context(), "record login failure", "error", err)
+			slog.ErrorContext(r.Context(), "record login failure", "error", logError(err))
 		case a.now().Before(after.LockedUntil):
-			slog.WarnContext(r.Context(), "account locked after failed logins", "uid", u.ID, "source", source)
+			slog.WarnContext(r.Context(), "account locked after failed logins", "uid", u.ID)
 		}
 		wrong()
 		return
@@ -123,10 +125,10 @@ func (a *app) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	a.throttle.succeeded(source)
 	if _, err := a.store.RecordLoginSuccess(r.Context(), u.ID); err != nil {
-		slog.ErrorContext(r.Context(), "record login success", "error", err)
+		slog.ErrorContext(r.Context(), "record login success", "error", logError(err))
 	}
 	if err := a.startSession(w, u); err != nil {
-		slog.ErrorContext(r.Context(), "start session", "error", err)
+		slog.ErrorContext(r.Context(), "start session", "error", logError(err))
 		fail(msgLoginRetry)
 		return
 	}
@@ -146,7 +148,7 @@ func (a *app) handleLogout(w http.ResponseWriter, r *http.Request) {
 			x.SessionVersion++
 			return nil
 		}); err != nil {
-			slog.ErrorContext(r.Context(), "end sessions on logout", "error", err)
+			slog.ErrorContext(r.Context(), "end sessions on logout", "error", logError(err))
 		}
 	}
 	a.endSession(w)
