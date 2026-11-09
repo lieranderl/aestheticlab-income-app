@@ -284,12 +284,14 @@ const MaxWindow = 12
 // n is kept within 1..MaxWindow.
 func Window(end Month, n int) []Month {
 	n = min(max(n, 1), MaxWindow)
-	months := make([]Month, n)
-	for i := n - 1; i >= 0; i-- {
+	// A fixed-size year, sliced to n: the allocation never depends on n.
+	months := make([]Month, MaxWindow)
+	first := MaxWindow - n
+	for i := MaxWindow - 1; i >= first; i-- {
 		months[i] = end
 		end = end.Prev()
 	}
-	return months
+	return months[first:]
 }
 
 // Trend builds the chart series for window: app months from results
