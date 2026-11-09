@@ -127,6 +127,8 @@ func New(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /movements/new", a.signedIn(a.handleMovementPage))
 	mux.HandleFunc("POST /movements", a.signedIn(a.handleRecordMovement))
 	mux.HandleFunc("POST /admin/movements/{id}/confirm", a.adminOnly(a.handleConfirmMovement))
+	mux.HandleFunc("GET /movements/{id}/edit", a.signedIn(a.handleEditMovementPage))
+	mux.HandleFunc("POST /movements/{id}/edit", a.signedIn(a.handleEditMovement))
 	mux.HandleFunc("GET /movements/{id}/void", a.signedIn(a.handleVoidPage))
 	mux.HandleFunc("POST /movements/{id}/void", a.signedIn(a.handleVoidMovement))
 	mux.HandleFunc("GET /admin/accounts/{id}/recount", a.adminOnly(a.handleRecountPage))

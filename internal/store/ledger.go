@@ -433,6 +433,69 @@ func (s *Store) VoidMovement(ctx context.Context, actor Actor, id string, versio
 	return out, err
 }
 
+// EditedReason is the void reason on a row replaced by EditMovement.
+const EditedReason = "Исправлено"
+
+// EditMovement corrects an expense. Money rows are never changed in place:
+// in one transaction the old row is voided («Исправлено») and the corrected
+// one is recorded, each with its audit row. The admin edits any expense in an
+// open month, the author only their own pending one, as with VoidMovement.
+func (s *Store) EditMovement(ctx context.Context, actor Actor, id string, version int64, n NewMovement) (Entry, error) {
+	if s.financialWritesPaused {
+		return Entry{}, ErrFinancialWritesPaused
+	}
+	if n.Type != domain.Expense {
+		return Entry{}, ErrForbidden
+	}
+	e, err := s.newEntry(actor, n)
+	if err != nil {
+		return Entry{}, err
+	}
+	err = s.db.run(ctx, false, func(t tx) error {
+		before, err := readEntry(t, id)
+		if err != nil {
+			return err
+		}
+		switch {
+		case before.Type != domain.Expense:
+			return ErrForbidden
+		case !actor.Admin && (before.CreatedBy != actor.UID || before.Status != domain.Pending):
+			return ErrForbidden
+		case before.Status == domain.Voided: // already corrected: say so, not «changed»
+			return &domain.ValidationError{Field: "status", Problem: ProblemAlreadyVoided}
+		case before.Version != version:
+			return ErrVersionConflict
+		}
+		if err := requireOpen(t, before.Date.Month()); err != nil {
+			return err
+		}
+		if err := requireOpen(t, e.Date.Month()); err != nil {
+			return err
+		}
+		category, err := checkParties(t, e.Movement) // every read before any write
+		if err != nil {
+			return err
+		}
+		if category != nil && e.ExpenseCategory != before.ExpenseCategory {
+			was := *category
+			category.UsedCount++
+			if err := s.writeCategory(t, actor.UID, was, *category); err != nil {
+				return err
+			}
+		}
+		old := before
+		old.Status, old.VoidReason, old.Version = domain.Voided, EditedReason, before.Version+1
+		if err := s.writeEntry(t, actor.UID, ActionVoid, &before, old); err != nil {
+			return err
+		}
+		return s.writeEntry(t, actor.UID, ActionCreate, nil, e)
+	})
+	if err != nil {
+		return Entry{}, err
+	}
+	return e, nil
+}
+
 // Entry reads one ledger row.
 func (s *Store) Entry(ctx context.Context, id string) (Entry, error) {
 	var out Entry
