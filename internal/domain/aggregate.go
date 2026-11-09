@@ -234,6 +234,9 @@ type TrendPoint struct {
 	Dividends         Cents
 	RevenueByPerson   map[string]Cents
 	RevenueByCategory map[string]Cents
+	Received          MoneySplit // money from clients by what it paid for, when HasSplit
+	Deposited         MoneySplit // money into the kassa by what it paid for, when HasSplit
+	HasSplit          bool       // read from the month's records; imported months have none
 }
 
 // Window is the n months ending with end, oldest first (3, 6 or 12).

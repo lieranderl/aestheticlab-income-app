@@ -2,6 +2,7 @@ package web_test
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -143,5 +144,32 @@ func TestTrendsUnknownPersonFallsBackToFirstPerson(t *testing.T) {
 	}
 	if want := s.get("/admin/trends?metric=person_revenue", admin).Body.String(); body != want {
 		t.Fatal("an unknown person does not fall back to the default (first) person")
+	}
+}
+
+// 2026-11-09: «Динамика» charts the money received and the money paid into
+// the kassa by what it paid for, from the month's records.
+func TestTrendsSplitMoneyByServicesCertificatesAndSales(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 5000)
+	olga := s.login("olga", olgaPass)
+	for token, v := range map[string]url.Values{
+		"trend-certificate-token": {"date": {"2026-11-17"}, "certificates": {"50"}, "extrasDestination": {"cash"}},
+		"trend-card-day-token":    {"date": {"2026-11-19"}, "services": {"427"}, "serviceCard": {"327"}, "creams": {"100"}, "extrasDestination": {"kassa_card"}},
+		"trend-cash-day-token":    {"date": {"2026-11-20"}, "services": {"365"}, "extrasDestination": {"cash"}},
+	} {
+		v.Set("token", token)
+		v.Set("version", "0")
+		if res := s.post("/clients", v, olga); res.Code != http.StatusSeeOther {
+			t.Fatalf("save %s: %d %s", token, res.Code, res.Body.String())
+		}
+	}
+	admin := s.login("anna", annaPass)
+	for metric, want := range map[string][]string{
+		"received":  {"Получено от клиентов", "€792", "€50", "€100"},
+		"deposited": {"Внесено в кассу", "€327", "€50", "€100"},
+	} {
+		res := s.get("/admin/trends?period=3&metric="+metric, admin)
+		wantPage(t, metric, res, http.StatusOK, append(want, ">Услуги<", ">Сертификаты<", ">Продажи<")...)
 	}
 }
