@@ -76,7 +76,7 @@ func (a *app) handleChangePassword(w http.ResponseWriter, r *http.Request, u sto
 		after, err := a.store.RecordLoginFailure(r.Context(), u.ID, loginLimit, loginLockFor)
 		switch {
 		case err != nil:
-			slog.ErrorContext(r.Context(), "record reauth failure", "error", err)
+			slog.ErrorContext(r.Context(), "record reauth failure", "error", logError(err))
 		case a.now().Before(after.LockedUntil):
 			slog.WarnContext(r.Context(), "account locked after wrong current passwords", "uid", u.ID)
 		}
@@ -116,7 +116,7 @@ func (a *app) handleChangePassword(w http.ResponseWriter, r *http.Request, u sto
 		return
 	}
 	if err := a.startSession(w, updated); err != nil {
-		slog.ErrorContext(r.Context(), "start session", "error", err)
+		slog.ErrorContext(r.Context(), "start session", "error", logError(err))
 	}
 	if forced {
 		a.navigate(w, r, "/")

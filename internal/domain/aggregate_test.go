@@ -327,3 +327,13 @@ func TestMonthSharesWithTheSelfBonus(t *testing.T) {
 		t.Fatalf("total bonus = %d", total)
 	}
 }
+
+func TestWindowStaysWithinAYear(t *testing.T) {
+	end := month(t, "2026-11")
+	for _, tc := range []struct{ n, want int }{{-5, 1}, {0, 1}, {3, 3}, {12, 12}, {1 << 40, 12}} {
+		got := domain.Window(end, tc.n)
+		if len(got) != tc.want || got[len(got)-1] != end {
+			t.Fatalf("Window(%d) = %v; want %d months ending %s", tc.n, got, tc.want, end)
+		}
+	}
+}

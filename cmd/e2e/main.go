@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -39,7 +40,7 @@ func main() {
 	}
 	loc, err := time.LoadLocation("Europe/Brussels")
 	if err != nil {
-		slog.Error("timezone", "error", err)
+		slog.Error("timezone", "error", logError(err))
 		os.Exit(1)
 	}
 	// 20 November 2026, 10:00 in Brussels, ticking from there so sessions work.
@@ -48,20 +49,20 @@ func main() {
 
 	st := store.NewMemory(store.WithClock(now), store.WithLocation(loc), store.WithStartMonth(domain.Month{Year: 2026, Mon: time.November}))
 	if err := seed(context.Background(), st); err != nil {
-		slog.Error("seed", "error", err)
+		slog.Error("seed", "error", logError(err))
 		os.Exit(1)
 	}
 
 	addr := "127.0.0.1:" + cmp.Or(os.Getenv("PORT"), "8097")
 	handler, err := web.New(web.Config{BaseURL: "http://" + addr, Store: st, Now: now, PasswordCost: bcrypt.MinCost})
 	if err != nil {
-		slog.Error("web config", "error", err)
+		slog.Error("web config", "error", logError(err))
 		os.Exit(1)
 	}
 	slog.Info("e2e server", "addr", addr)
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		slog.Error("serve", "error", err)
+		slog.Error("serve", "error", logError(err))
 		os.Exit(1)
 	}
 }
@@ -119,4 +120,9 @@ func seed(ctx context.Context, st *store.Store) error {
 	olga := users["olga"]
 	_, err := st.RecordMovement(ctx, olga.Actor(), store.NewMovement{Type: domain.Expense, Amount: 1200, From: domain.Person(olga.ID), To: domain.Outside, ExpenseCategory: "materials", Note: "Перчатки", Date: day(18)})
 	return err
+}
+
+// logError is err's text with line breaks encoded, so no value can forge a log line.
+func logError(err error) string {
+	return strings.ReplaceAll(strings.ReplaceAll(err.Error(), "\r", "%0D"), "\n", "%0A")
 }
