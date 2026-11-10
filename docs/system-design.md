@@ -214,7 +214,7 @@ Each request reads categories, accounts and users once and keeps them in memory 
 | `GET /admin/history?…`, `GET /admin/history/movements?…` | admin | Report/movement history with filters. |
 | `GET /admin/reports/{uid}/{date}`, `POST …` | admin | Edit anyone's report using their effective terms, with version and closed-month checks. |
 | `GET /admin/export?…` | admin | Download an export. |
-| `GET/POST/PUT/DELETE /admin/categories…` | admin | Revenue, payment and expense categories, with their flags and destinations. |
+| `GET/POST/PUT/DELETE /admin/categories…` | admin | Revenue, payment and expense categories, with their flags and destinations. Only expense categories can be added (2026-11-10): revenue categories and payment methods are fixed lists, because client entries have a fixed shape; they can be renamed, and leftovers of the daily form archived. |
 | `GET /admin/users`, `GET /admin/users/new`, `POST /admin/users`, `GET /admin/users/{uid}`, `POST /admin/users/{uid}`, `POST /admin/users/{uid}/password`, `POST /admin/users/{uid}/terms` | admin | Staff: add, edit name, role, `submitsReports` and access (deactivating logs out everywhere), reset the password (temporary, logs out everywhere, unlocks), and effective-dated terms («Себе» %, salary, dividend share). |
 | `GET /admin/audit?…` | admin | Change log. |
 | `GET /readyz` | public | Health check that pings Firestore. |
@@ -305,7 +305,7 @@ Dates switch with «‹ 08.10.2026 ›» (tap the date for the native picker). M
 | Касса | **Two balance cards:** «Наличные» and «Карта Анны», each with «Пересчитать». An «Ожидают подтверждения» list with a ✓ button per item. A **«+ Движение»** sheet: type, amount, from/to, category, note. **Latest movements** as cards. **Outstanding certificates.** | Same, in two columns. |
 | Динамика | 3 / 6 / 12 segmented control. Metric chips; «Обзор» (default) shows Выручка, Расходы and Прибыль side by side. A server-drawn SVG bar chart scaled by `viewBox`, with a € (or count) axis that always includes €0. The selected month's exact figures sit above the chart: the latest month with data by default, changed with ‹ › or by tapping a month (a local Datastar signal; no custom JS). Imported months are drawn lighter. A table underneath. | Wider chart. |
 | История | «Записи» / «Движения» tabs, filters in a bottom sheet, chips for active filters, «Показать ещё». | Table. |
-| Категории | Three tabs: «Выручка», «Оплата», «Расходы». Bottom-sheet editing, ↑ ↓ reordering. | Same. |
+| Категории | Three tabs: «Расходы», «Выручка», «Оплата». Bottom-sheet editing, ↑ ↓ reordering. «Добавить категорию» only on «Расходы»; the other two say «Список постоянный». | Same. |
 | Сотрудники | A list. The bottom-sheet edit has: role, reports on/off, can log in, password reset, and **«Условия»**: «Себе» %, optional higher «Себе» (threshold € and the whole month's %), salary, «Доля в прибыли» (a whole number 0–1000; the profit is split in proportion to everyone's shares), plus «Действует с» (defaults to next month; the earliest allowed month is the first open month with no reports from that person), with the history of earlier terms underneath. As the share is typed, the form names everyone else's shares in force in the chosen month and says what this one gets: «Получит 33,3% прибыли месяца, остальные — 66,7%». | Same. |
 | Журнал изменений, Экспорт | Cards / a single form with a large «Скачать» button. | Table / same. |
 
