@@ -66,7 +66,11 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 			if kind == store.KindRevenue || kind == store.KindPayment {
 				@categoryFlagsScope(kind)
 			}
-			<a href={ templ.SafeURL("/admin/categories/new?kind=" + string(kind)) } class="btn btn-primary btn-lg w-full">Добавить категорию</a>
+			if kind == store.KindExpense {
+				<a href={ templ.SafeURL("/admin/categories/new?kind=" + string(kind)) } class="btn btn-primary btn-lg w-full">Добавить категорию</a>
+			} else {
+				<p class="text-sm text-base-content/70">Список постоянный: в записи клиента вносятся только эти виды. Название можно изменить.</p>
+			}
 			<ul class="flex flex-col gap-3">
 				for i, c := range rows {
 					<li class="card min-w-0 bg-base-100 shadow-sm">

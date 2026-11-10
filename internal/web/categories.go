@@ -53,6 +53,10 @@ func (a *app) handleNewCategory(w http.ResponseWriter, r *http.Request, u store.
 		a.problem(w, r, http.StatusBadRequest, "Проверьте вид категории")
 		return
 	}
+	if k != store.KindExpense {
+		a.problem(w, r, http.StatusBadRequest, "Виды выручки и способы оплаты постоянные — добавить можно только категорию расходов")
+		return
+	}
 	f := views.CategoryFormData{Category: store.Category{Kind: k, CountsTowardSelf: k == store.KindRevenue}, Action: "/admin/categories", New: true}
 	a.render(w, r, views.CategoryPage(a.navFor(u, "/admin/categories"), f))
 }

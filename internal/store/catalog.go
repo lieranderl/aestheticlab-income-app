@@ -105,6 +105,11 @@ func (c Category) check() error {
 	return nil
 }
 
+// ProblemFixedList refuses a new revenue category or payment method: client
+// entries count services, creams, oil and certificates, paid in cash, on the
+// salon's card or by certificate, and nothing else can be entered.
+const ProblemFixedList domain.Problem = "fixed_list"
+
 func (s *Store) createCategory(t tx, actorID string, c Category) (Category, error) {
 	c.Active, c.UsedCount, c.CreatedAt = true, 0, s.stamp()
 	c.Version, c.Deleted = 1, false
@@ -132,6 +137,9 @@ func (s *Store) CreateCategory(ctx context.Context, actor Actor, c Category) (Ca
 	}
 	if err := c.check(); err != nil {
 		return Category{}, err
+	}
+	if c.Kind != KindExpense { // client entries have a fixed shape: nothing could use it
+		return Category{}, &domain.ValidationError{Field: "kind", Problem: ProblemFixedList}
 	}
 	var out Category
 	err := s.db.run(ctx, false, func(t tx) error {

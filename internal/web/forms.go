@@ -110,6 +110,8 @@ func problemText(r *http.Request, err error) string {
 			return "Этот месяц раньше начала работы приложения"
 		case domain.ProblemMonthClosed:
 			return "Месяц закрыт — выберите открытый месяц"
+		case store.ProblemFixedList:
+			return "Виды выручки и способы оплаты постоянные — добавить можно только категорию расходов"
 		case "fixed_category":
 			return "Базовые категории нельзя архивировать или удалить"
 		}
