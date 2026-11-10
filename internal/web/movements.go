@@ -58,7 +58,7 @@ func (a *app) movementForm(r *http.Request, u store.User, admin bool, kind strin
 	if admin {
 		f.Action = "/admin/movements"
 	}
-	f.Token = strings.ToLower(rand.Text())
+	f.Token = "mv_" + strings.ToLower(rand.Text())
 	accounts, err := a.store.Accounts(r.Context())
 	if err != nil {
 		return f, err
@@ -287,6 +287,8 @@ func movementFieldProblem(r *http.Request, err error, kind string) (field, messa
 			return "to", "«Откуда» и «Куда» должны различаться"
 		}
 		return "from", "Проверьте «Откуда» и «Куда» для этого вида движения"
+	case store.ProblemAlreadyVoided:
+		return "", "Это движение уже сохранено, а потом отменено или исправлено — проверьте список движений"
 	case store.ProblemOpeningExists:
 		return "to", "Начальный остаток уже внесён — сначала отмените прежний"
 	}

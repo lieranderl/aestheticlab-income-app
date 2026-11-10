@@ -62,12 +62,14 @@ const clientFill = `((name, c) => { const f = el.form.elements[name]; f.value = 
 
 // clientFillSalonCash leaves the salon's share of the services in the till:
 // what the entry still owes after the certificate and the card contribution.
-const clientFillSalonCash = clientFill + `('serviceCash', Math.max(($_cc.services) - $_clientSelf - ($_cc.certificatePaid) - ($_cc.serviceCard), 0))`
+const clientFillSalonCash = clientFill + `('serviceCash', Math.max(($_cc.services) - $_clientSelf - ($_cc.certificatePaid) - (Number.isFinite($_cc.serviceCard) ? $_cc.serviceCard : 0), 0))`
 
 // clientFillCard records services the client paid to the salon's card.
 const clientFillCard = clientFill + `('serviceCash', 0); ` + clientFill + `('serviceCard', ($_cc.services) - ($_cc.certificatePaid))`
 
-const clientFillDisabled = `!$_clientReady || !(($_cc.services) - ($_cc.certificatePaid) > 0)`
+// The buttons stay usable while only the contribution fields are wrong:
+// that is what they correct.
+const clientFillDisabled = `Boolean($_clientErrors.services || $_clientErrors.certificatePaid) || !(($_cc.services) - ($_cc.certificatePaid) > 0)`
 
 func ownerOwes(other bool) string {
 	if other {
@@ -135,7 +137,7 @@ func ClientPage(nav Nav, f ClientForm) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(f.OwnerName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 89, Col: 106}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 91, Col: 106}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -149,7 +151,7 @@ func ClientPage(nav Nav, f ClientForm) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(f.DayLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 91, Col: 15}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 93, Col: 15}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -176,7 +178,7 @@ func ClientPage(nav Nav, f ClientForm) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(f.Action + "/unlink")).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 99, Col: 70}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 101, Col: 70}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 					if templ_7745c5c3_Err != nil {
@@ -189,7 +191,7 @@ func ClientPage(nav Nav, f ClientForm) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.FormatInt(f.Version, 10)).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 100, Col: 83}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 102, Col: 83}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 					if templ_7745c5c3_Err != nil {
@@ -217,7 +219,7 @@ func ClientPage(nav Nav, f ClientForm) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(f.NextHref)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 108, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 110, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -240,7 +242,7 @@ func ClientPage(nav Nav, f ClientForm) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(f.Action + "/remove")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 111, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 113, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -266,7 +268,7 @@ func ClientPage(nav Nav, f ClientForm) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(DraftScript).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 116, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 118, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 			if templ_7745c5c3_Err != nil {
@@ -310,7 +312,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(f.Action)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -323,7 +325,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Date).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 120}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 120}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -336,7 +338,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.User).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 147}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 147}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 		if templ_7745c5c3_Err != nil {
@@ -349,7 +351,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Entry).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 176}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 176}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -362,7 +364,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Token).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 205}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 205}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -375,7 +377,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Acknowledged).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 239}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 239}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 		if templ_7745c5c3_Err != nil {
@@ -388,7 +390,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.FormatInt(f.Version, 10)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 289}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 289}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -401,7 +403,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientSignals(f)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 323}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 323}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -414,7 +416,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientCents).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 357}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 357}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
@@ -427,7 +429,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientExtras).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 392}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 392}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
@@ -440,7 +442,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientErrors).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 438}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 438}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 		if templ_7745c5c3_Err != nil {
@@ -453,7 +455,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientSelf).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 551}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 551}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 		if templ_7745c5c3_Err != nil {
@@ -466,7 +468,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientCash).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 594}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 594}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {
@@ -479,7 +481,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientCard).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 637}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 637}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 		if templ_7745c5c3_Err != nil {
@@ -492,7 +494,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientDelta).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 681}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 681}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 		if templ_7745c5c3_Err != nil {
@@ -505,7 +507,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientFocusInvalid + "; " + sendFinancialForm(f.Action)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 779}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 779}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 		if templ_7745c5c3_Err != nil {
@@ -518,7 +520,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templruntime.NewAttributeExpression(onFinancialFetch).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 823}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 823}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 		if templ_7745c5c3_Err != nil {
@@ -531,7 +533,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(nextField).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 121, Col: 853}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 853}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 		if templ_7745c5c3_Err != nil {
@@ -544,7 +546,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Date).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 122, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 124, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 		if templ_7745c5c3_Err != nil {
@@ -557,7 +559,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Token).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 123, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 125, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 		if templ_7745c5c3_Err != nil {
@@ -570,7 +572,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.FormatInt(f.Version, 10)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 124, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 126, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 		if templ_7745c5c3_Err != nil {
@@ -588,7 +590,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Person).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 126, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 128, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 			if templ_7745c5c3_Err != nil {
@@ -607,7 +609,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Booking).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 129, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 131, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 			if templ_7745c5c3_Err != nil {
@@ -634,7 +636,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(f.BookingLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 135, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 137, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
@@ -676,7 +678,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(f.BookingNotice)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 147, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 149, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 			if templ_7745c5c3_Err != nil {
@@ -703,7 +705,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(f.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 153, Col: 125}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 155, Col: 125}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -731,7 +733,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression("const form = el.closest('form'); const field = form.querySelector('[aria-invalid=true]'); if (field) { field.closest('details')?.setAttribute('open', ''); field.focus({preventScroll: true}); field.scrollIntoView({block: 'center'}) }").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 160, Col: 270}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 162, Col: 270}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 			if templ_7745c5c3_Err != nil {
@@ -758,7 +760,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(f.Locked)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 165, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 167, Col: 20}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -794,7 +796,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientCertificateOpen).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 173, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 175, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 		if templ_7745c5c3_Err != nil {
@@ -825,7 +827,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientExtrasOpen).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 181, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 183, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
 		if templ_7745c5c3_Err != nil {
@@ -890,7 +892,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var43 string
 			templ_7745c5c3_Var43, templ_7745c5c3_Err = templruntime.NewAttributeExpression(boolText(f.Bad["extrasDestination"])).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 190, Col: 247}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 192, Col: 247}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
 			if templ_7745c5c3_Err != nil {
@@ -922,7 +924,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Values["extrasDestination"]).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 192, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 194, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 			if templ_7745c5c3_Err != nil {
@@ -1000,7 +1002,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(f.FieldErrors["extrasDestination"])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 198, Col: 265}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 200, Col: 265}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -1013,7 +1015,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientFillDisabled).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 206, Col: 121}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 208, Col: 121}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 		if templ_7745c5c3_Err != nil {
@@ -1026,7 +1028,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientFillSalonCash).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 206, Col: 159}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 208, Col: 159}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 		if templ_7745c5c3_Err != nil {
@@ -1039,7 +1041,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var50 string
 		templ_7745c5c3_Var50, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientFillDisabled).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 207, Col: 121}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 209, Col: 121}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 		if templ_7745c5c3_Err != nil {
@@ -1052,7 +1054,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		var templ_7745c5c3_Var51 string
 		templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(clientFillCard).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 207, Col: 154}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 209, Col: 154}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
 		if templ_7745c5c3_Err != nil {
@@ -1088,7 +1090,7 @@ func ClientFormView(f ClientForm) templ.Component {
 				var templ_7745c5c3_Var52 string
 				templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(f.SharePct)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 221, Col: 109}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 223, Col: 109}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 				if templ_7745c5c3_Err != nil {
@@ -1106,7 +1108,7 @@ func ClientFormView(f ClientForm) templ.Component {
 				var templ_7745c5c3_Var53 string
 				templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(f.SharePct)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 224, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 226, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 				if templ_7745c5c3_Err != nil {
@@ -1204,7 +1206,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var58 string
 			templ_7745c5c3_Var58, templ_7745c5c3_Err = templruntime.NewAttributeExpression(jsEUR("$_clientSelf")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 228, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 230, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 			if templ_7745c5c3_Err != nil {
@@ -1217,7 +1219,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var59 string
 			templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(f.Self)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 228, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 230, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 			if templ_7745c5c3_Err != nil {
@@ -1230,7 +1232,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var60 string
 			templ_7745c5c3_Var60, templ_7745c5c3_Err = templruntime.NewAttributeExpression(jsEUR("($_cc.services) + $_ce - $_clientSelf")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 229, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 231, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var60)
 			if templ_7745c5c3_Err != nil {
@@ -1243,7 +1245,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var61 string
 			templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(f.Salon)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 229, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 231, Col: 105}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 			if templ_7745c5c3_Err != nil {
@@ -1256,7 +1258,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var62 string
 			templ_7745c5c3_Var62, templ_7745c5c3_Err = templruntime.NewAttributeExpression(jsEUR("$_cashDeposit")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 233, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 235, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var62)
 			if templ_7745c5c3_Err != nil {
@@ -1269,7 +1271,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var63 string
 			templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(f.Cash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 233, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 235, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 			if templ_7745c5c3_Err != nil {
@@ -1282,7 +1284,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var64 string
 			templ_7745c5c3_Var64, templ_7745c5c3_Err = templruntime.NewAttributeExpression(jsEUR("$_cardDeposit")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 234, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 236, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var64)
 			if templ_7745c5c3_Err != nil {
@@ -1295,7 +1297,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var65 string
 			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(f.Card)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 234, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 236, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 			if templ_7745c5c3_Err != nil {
@@ -1308,7 +1310,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var66 string
 			templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(ownerHeld(f.OtherEmployee))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 235, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 237, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
 			if templ_7745c5c3_Err != nil {
@@ -1321,7 +1323,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var67 string
 			templ_7745c5c3_Var67, templ_7745c5c3_Err = templruntime.NewAttributeExpression(jsEUR("($_cc.services) - ($_cc.certificatePaid) - ($_cc.serviceCash) - ($_cc.serviceCard)")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 235, Col: 152}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 237, Col: 152}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var67)
 			if templ_7745c5c3_Err != nil {
@@ -1334,7 +1336,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var68 string
 			templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(f.Held)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 235, Col: 163}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 237, Col: 163}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 			if templ_7745c5c3_Err != nil {
@@ -1347,7 +1349,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var69 string
 			templ_7745c5c3_Var69, templ_7745c5c3_Err = templruntime.NewAttributeExpression(`$_clientDelta > 0 ? '` + ownerOwed(f.OtherEmployee) + ` ' + ` + jsEUR("$_clientDelta") + ` : $_clientDelta < 0 ? '` + ownerOwes(f.OtherEmployee) + ` ' + ` + jsEUR("-$_clientDelta") + ` : 'По этой записи расчёт с салоном — €0'`).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 237, Col: 302}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 239, Col: 302}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var69)
 			if templ_7745c5c3_Err != nil {
@@ -1360,7 +1362,7 @@ func ClientFormView(f ClientForm) templ.Component {
 			var templ_7745c5c3_Var70 string
 			templ_7745c5c3_Var70, templ_7745c5c3_Err = templ.JoinStringErrs(f.Effect)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 237, Col: 315}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 239, Col: 315}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var70))
 			if templ_7745c5c3_Err != nil {
@@ -1467,7 +1469,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 		var templ_7745c5c3_Var74 string
 		templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 272, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 		if templ_7745c5c3_Err != nil {
@@ -1488,7 +1490,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 			var templ_7745c5c3_Var75 string
 			templ_7745c5c3_Var75, templ_7745c5c3_Err = templruntime.NewAttributeExpression(name).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 272, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var75)
 			if templ_7745c5c3_Err != nil {
@@ -1501,7 +1503,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 			var templ_7745c5c3_Var76 string
 			templ_7745c5c3_Var76, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Values[name]).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 272, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var76)
 			if templ_7745c5c3_Err != nil {
@@ -1532,7 +1534,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 			var templ_7745c5c3_Var79 string
 			templ_7745c5c3_Var79, templ_7745c5c3_Err = templruntime.NewAttributeExpression(boolText(f.Bad[name])).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 272, Col: 307}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 307}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var79)
 			if templ_7745c5c3_Err != nil {
@@ -1545,7 +1547,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 			var templ_7745c5c3_Var80 string
 			templ_7745c5c3_Var80, templ_7745c5c3_Err = templruntime.NewAttributeExpression("client-" + name + "-hint client-" + name + "-error").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 272, Col: 381}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 381}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var80)
 			if templ_7745c5c3_Err != nil {
@@ -1568,7 +1570,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 			var templ_7745c5c3_Var81 string
 			templ_7745c5c3_Var81, templ_7745c5c3_Err = templruntime.NewAttributeExpression("_client." + name).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 272, Col: 623}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 623}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var81)
 			if templ_7745c5c3_Err != nil {
@@ -1595,7 +1597,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 		var templ_7745c5c3_Var82 string
 		templ_7745c5c3_Var82, templ_7745c5c3_Err = templruntime.NewAttributeExpression("client-" + name + "-hint").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 273, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 275, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var82)
 		if templ_7745c5c3_Err != nil {
@@ -1608,7 +1610,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 		var templ_7745c5c3_Var83 string
 		templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(hint)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 273, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 275, Col: 82}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 		if templ_7745c5c3_Err != nil {
@@ -1629,7 +1631,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 			var templ_7745c5c3_Var84 string
 			templ_7745c5c3_Var84, templ_7745c5c3_Err = templruntime.NewAttributeExpression("client-" + name + "-error").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 276, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var84)
 			if templ_7745c5c3_Err != nil {
@@ -1660,7 +1662,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 			var templ_7745c5c3_Var87 string
 			templ_7745c5c3_Var87, templ_7745c5c3_Err = templruntime.NewAttributeExpression(name).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 122}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 276, Col: 122}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var87)
 			if templ_7745c5c3_Err != nil {
@@ -1687,7 +1689,7 @@ func clientField(f ClientForm, name, label, hint string) templ.Component {
 		var templ_7745c5c3_Var88 string
 		templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.JoinStringErrs(f.FieldErrors[name])
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 274, Col: 251}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 276, Col: 251}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var88))
 		if templ_7745c5c3_Err != nil {
@@ -1814,7 +1816,7 @@ func ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, m
 				var templ_7745c5c3_Var92 string
 				templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(f.Locked)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 322, Col: 20}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 324, Col: 20}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
 				if templ_7745c5c3_Err != nil {
@@ -1837,7 +1839,7 @@ func ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, m
 				var templ_7745c5c3_Var93 string
 				templ_7745c5c3_Var93, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/clients/new?date=" + f.Date)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 326, Col: 95}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 328, Col: 95}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var93)
 				if templ_7745c5c3_Err != nil {
@@ -1956,7 +1958,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var96 string
 			templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.JoinStringErrs(f.DayLabel)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 360, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 362, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var96))
 			if templ_7745c5c3_Err != nil {
@@ -1969,7 +1971,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var97 string
 			templ_7745c5c3_Var97, templ_7745c5c3_Err = templ.JoinStringErrs(f.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 363, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 365, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 			if templ_7745c5c3_Err != nil {
@@ -1982,7 +1984,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var98 string
 			templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(f.Total)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 364, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 366, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 			if templ_7745c5c3_Err != nil {
@@ -1995,7 +1997,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var99 string
 			templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(f.Cash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 365, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 367, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 			if templ_7745c5c3_Err != nil {
@@ -2008,7 +2010,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 			var templ_7745c5c3_Var100 string
 			templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(f.Card)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 366, Col: 109}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 368, Col: 109}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 			if templ_7745c5c3_Err != nil {
@@ -2034,7 +2036,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var101 string
 				templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(f.Locked)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 373, Col: 20}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 375, Col: 20}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 				if templ_7745c5c3_Err != nil {
@@ -2066,7 +2068,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var102 string
 				templ_7745c5c3_Var102, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(f.Action)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 381, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 383, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var102)
 				if templ_7745c5c3_Err != nil {
@@ -2079,7 +2081,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var103 string
 				templ_7745c5c3_Var103, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Date).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 382, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 384, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var103)
 				if templ_7745c5c3_Err != nil {
@@ -2092,7 +2094,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var104 string
 				templ_7745c5c3_Var104, templ_7745c5c3_Err = templruntime.NewAttributeExpression(strconv.FormatInt(f.Version, 10)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 383, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 385, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var104)
 				if templ_7745c5c3_Err != nil {
@@ -2131,7 +2133,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 						var templ_7745c5c3_Var106 string
 						templ_7745c5c3_Var106, templ_7745c5c3_Err = templruntime.NewAttributeExpression(f.Reason).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 388, Col: 54}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 390, Col: 54}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var106)
 						if templ_7745c5c3_Err != nil {
@@ -2162,7 +2164,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 						var templ_7745c5c3_Var109 string
 						templ_7745c5c3_Var109, templ_7745c5c3_Err = templruntime.NewAttributeExpression(boolText(f.BadReason)).Resolve(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 388, Col: 266}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 390, Col: 266}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var109)
 						if templ_7745c5c3_Err != nil {
@@ -2236,7 +2238,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 					var templ_7745c5c3_Var112 string
 					templ_7745c5c3_Var112, templ_7745c5c3_Err = templ.JoinStringErrs(f.Error)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 392, Col: 15}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 394, Col: 15}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var112))
 					if templ_7745c5c3_Err != nil {
@@ -2250,7 +2252,7 @@ func ClientRemovePage(nav Nav, f ClientRemoveForm) templ.Component {
 				var templ_7745c5c3_Var113 string
 				templ_7745c5c3_Var113, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(f.Cancel)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 396, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/clients.templ`, Line: 398, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var113)
 				if templ_7745c5c3_Err != nil {

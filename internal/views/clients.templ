@@ -53,12 +53,14 @@ const clientFill = `((name, c) => { const f = el.form.elements[name]; f.value = 
 
 // clientFillSalonCash leaves the salon's share of the services in the till:
 // what the entry still owes after the certificate and the card contribution.
-const clientFillSalonCash = clientFill + `('serviceCash', Math.max(($_cc.services) - $_clientSelf - ($_cc.certificatePaid) - ($_cc.serviceCard), 0))`
+const clientFillSalonCash = clientFill + `('serviceCash', Math.max(($_cc.services) - $_clientSelf - ($_cc.certificatePaid) - (Number.isFinite($_cc.serviceCard) ? $_cc.serviceCard : 0), 0))`
 
 // clientFillCard records services the client paid to the salon's card.
 const clientFillCard = clientFill + `('serviceCash', 0); ` + clientFill + `('serviceCard', ($_cc.services) - ($_cc.certificatePaid))`
 
-const clientFillDisabled = `!$_clientReady || !(($_cc.services) - ($_cc.certificatePaid) > 0)`
+// The buttons stay usable while only the contribution fields are wrong:
+// that is what they correct.
+const clientFillDisabled = `Boolean($_clientErrors.services || $_clientErrors.certificatePaid) || !(($_cc.services) - ($_cc.certificatePaid) > 0)`
 
 func ownerOwes(other bool) string {
 	if other {

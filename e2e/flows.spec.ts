@@ -36,6 +36,12 @@ test("one tap leaves the salon's share in the till", async ({ page }) => {
   await expect(page.locator('input[name="serviceCash"]')).toHaveValue("");
   await expect(page.locator('input[name="serviceCard"]')).toHaveValue("85");
   await expect(page.getByText("По этой записи салон должен вам €55,25")).toBeVisible();
+  // An over-contribution is what the buttons correct, so they stay usable.
+  await page.locator('input[name="serviceCash"]').fill("90");
+  await page.getByRole("button", { name: "Оставляю долю салона наличными" }).click();
+  await expect(page.locator('input[name="serviceCard"]')).toHaveValue("85");
+  await page.getByRole("button", { name: "Клиент оплатил картой салона" }).click();
+  await expect(page.locator('input[name="serviceCash"]')).toHaveValue("");
   expect(await phoneRules(page)).toEqual([]);
 });
 

@@ -403,7 +403,7 @@ func TestRepeatedMovementFormIsRecordedOnce(t *testing.T) {
 	s := newSite(t)
 	z := s.login("olga", olgaPass)
 	page := s.get("/movements/new", z)
-	token := regexp.MustCompile(`name="token" value="([a-z0-9]{20,64})"`).FindStringSubmatch(page.Body.String())
+	token := regexp.MustCompile(`name="token" value="(mv_[a-z0-9]{20,61})"`).FindStringSubmatch(page.Body.String())
 	if token == nil {
 		t.Fatal("the movement form carries no repeat-protection token")
 	}

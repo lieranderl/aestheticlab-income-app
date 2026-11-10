@@ -200,6 +200,8 @@ func (s *Store) recordMovement(ctx context.Context, actor Actor, n NewMovement, 
 			case err == nil && sameMovement(saved, e):
 				e = saved // the same form again: answer with the saved row
 				return nil
+			case err == nil && saved.Status == domain.Voided:
+				return &domain.ValidationError{Field: "status", Problem: ProblemAlreadyVoided}
 			case err == nil:
 				return ErrVersionConflict
 			case !errors.Is(err, ErrNotFound):
@@ -238,7 +240,9 @@ func (s *Store) recordMovement(ctx context.Context, actor Actor, n NewMovement, 
 // newEntry checks a movement as someone records it, before any read: who
 // may record it, its date, note and shape.
 // movementTokenPattern keeps a form's token usable as a ledger document ID.
-var movementTokenPattern = regexp.MustCompile(`^[a-z0-9]{20,64}$`)
+// The "mv_" prefix keeps form tokens apart from generated row IDs, so a
+// hand-made token can never name an existing row.
+var movementTokenPattern = regexp.MustCompile(`^mv_[a-z0-9]{20,61}$`)
 
 // sameMovement says whether a saved row is what this form would have
 // written: then sending it again is a repeat, not a second movement. A
