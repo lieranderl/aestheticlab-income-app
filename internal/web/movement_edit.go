@@ -136,6 +136,7 @@ func (a *app) handleEditMovement(w http.ResponseWriter, r *http.Request, u store
 			To:              domain.Outside,
 			ExpenseCategory: f.Category,
 			Note:            f.Note,
+			WarnNegative:    r.PostFormValue("allowNegative") != "1",
 		})
 	}
 	if err != nil {
@@ -147,7 +148,11 @@ func (a *app) handleEditMovement(w http.ResponseWriter, r *http.Request, u store
 			a.editReadError(w, r, err)
 			return
 		}
-		f.Error = movementProblem(r, err)
+		f.Bad, f.Error = movementFieldProblem(r, err, f.Type)
+		var v *domain.ValidationError
+		if errors.As(err, &v) && v.Problem == store.ProblemKassaNegative {
+			f.NegativeWarning = f.Error
+		}
 		a.formFailed(w, r, views.MovementForm(f), views.MovementFormPage(a.navFor(u, f.Back), f))
 		return
 	}

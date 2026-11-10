@@ -533,6 +533,19 @@ func (s *Store) EditMovement(ctx context.Context, actor Actor, id string, versio
 		if err != nil {
 			return err
 		}
+		if n.WarnNegative && before.Status == domain.Confirmed && e.From.Kind == domain.PartyAccount {
+			b, err := s.balances(t)
+			if err != nil {
+				return err
+			}
+			balance := b.Accounts[e.From.ID]
+			if before.From == e.From {
+				balance += before.Amount // the old row is voided by this edit
+			}
+			if after := balance - e.Amount; after < 0 {
+				return &domain.ValidationError{Field: e.From.ID, Problem: ProblemKassaNegative, Difference: after}
+			}
+		}
 		if category != nil && e.ExpenseCategory != before.ExpenseCategory {
 			was := *category
 			category.UsedCount++

@@ -466,7 +466,7 @@ func TestAMovementThatEmptiesTheKassaAsksBeforeSaving(t *testing.T) {
 	admin := s.login("anna", annaPass)
 	form := url.Values{"type": {"payout"}, "amount": {"40"}, "date": {"2026-11-20"}, "from": {"account:kassa_cash"}, "to": {"person:" + s.olga.ID}}
 	page := s.post("/admin/movements", form, admin)
-	wantPage(t, "warned", page, http.StatusUnprocessableEntity, "Касса — наличные уйдёт в минус: −€40", `name="allowNegative"`, "Всё равно сохранить")
+	wantPage(t, "warned", page, http.StatusUnprocessableEntity, "Касса — наличные: после этого остаток −€40 — меньше €0", `name="allowNegative"`, "Всё равно сохранить")
 	if b, _ := s.st.Balances(ctx); b.Accounts[domain.KassaCash] != 0 {
 		t.Fatalf("saved before confirming: %d", b.Accounts[domain.KassaCash])
 	}

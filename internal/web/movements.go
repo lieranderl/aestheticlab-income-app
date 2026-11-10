@@ -295,7 +295,7 @@ func movementFieldProblem(r *http.Request, err error, kind string) (field, messa
 	case store.ProblemAlreadyVoided:
 		return "", "Это движение уже сохранено, а потом отменено или исправлено — проверьте список движений"
 	case store.ProblemKassaNegative:
-		return "amount", kassaName(v.Field) + " уйдёт в минус: " + domain.FormatEUR(v.Difference) + ". Проверьте сумму или отметьте «Всё равно сохранить»."
+		return "amount", kassaName(v.Field) + ": после этого остаток " + domain.FormatEUR(v.Difference) + " — меньше €0. Проверьте сумму или отметьте «Всё равно сохранить»."
 	case store.ProblemOpeningExists:
 		return "to", "Начальный остаток уже внесён — сначала отмените прежний"
 	}
