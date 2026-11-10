@@ -14,7 +14,7 @@ import (
 func (s *site) adminExpense(amount, day, note string, cookies []*http.Cookie) store.Entry {
 	s.t.Helper()
 	*s.clock = s.clock.Add(time.Minute)
-	form := url.Values{"type": {"expense"}, "amount": {amount}, "date": {day}, "from": {"account:kassa_cash"}, "to": {"outside"}, "expenseCategory": {"rent"}, "note": {note}}
+	form := url.Values{"type": {"expense"}, "amount": {amount}, "date": {day}, "from": {"account:kassa_cash"}, "to": {"outside"}, "expenseCategory": {"rent"}, "note": {note}, "allowNegative": {"1"}} // spending from an empty test kassa
 	wantRedirect(s.t, note, s.post("/admin/movements", form, cookies), "/admin/kassa?saved=1")
 	es, err := s.st.LedgerBetween(ctx, s.st.StartMonth().FirstDay(), s.st.Today())
 	if err != nil {

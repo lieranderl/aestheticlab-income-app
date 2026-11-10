@@ -460,3 +460,24 @@ func TestMovementErrorsNameTheFieldAtFault(t *testing.T) {
 		}
 	}
 }
+
+func TestAMovementThatEmptiesTheKassaAsksBeforeSaving(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	form := url.Values{"type": {"payout"}, "amount": {"40"}, "date": {"2026-11-20"}, "from": {"account:kassa_cash"}, "to": {"person:" + s.olga.ID}}
+	page := s.post("/admin/movements", form, admin)
+	wantPage(t, "warned", page, http.StatusUnprocessableEntity, "Касса — наличные уйдёт в минус: −€40", `name="allowNegative"`, "Всё равно сохранить")
+	if b, _ := s.st.Balances(ctx); b.Accounts[domain.KassaCash] != 0 {
+		t.Fatalf("saved before confirming: %d", b.Accounts[domain.KassaCash])
+	}
+	form.Set("allowNegative", "1")
+	wantRedirect(t, "confirmed", s.post("/admin/movements", form, admin), "/admin/kassa?saved=1")
+	if b, _ := s.st.Balances(ctx); b.Accounts[domain.KassaCash] != -4000 {
+		t.Fatalf("kassa %d, want −4000", b.Accounts[domain.KassaCash])
+	}
+	deposit := url.Values{"type": {"deposit"}, "amount": {"100"}, "date": {"2026-11-20"}, "from": {"person:" + s.olga.ID}, "to": {"account:kassa_cash"}}
+	wantRedirect(t, "deposits never warn", s.post("/admin/movements", deposit, admin), "/admin/kassa?saved=1")
+	form.Del("allowNegative")
+	form.Set("amount", "60")
+	wantRedirect(t, "a payout that stays above €0", s.post("/admin/movements", form, admin), "/admin/kassa?saved=1")
+}

@@ -7,6 +7,7 @@ type MovementFormData struct {
 	Token                                                                               string // names this form, so sending it twice books the money once
 	Bad                                                                                 string // the field at fault, shown next to it
 	MinDateLabel                                                                        string
+	NegativeWarning                                                                     string // the account would go below €0; saving needs «Всё равно сохранить»
 	SettlementMonth, SettlementPerson, SettlementRevision, ContextNotice                string
 	Version                                                                             string // the row being edited
 	Admin, Edit                                                                         bool
@@ -160,6 +161,12 @@ templ MovementForm(f MovementFormData) {
 			@Field(movementCommentLabel(f.Type), "") {
 				<textarea name="note" class={ "textarea textarea-lg w-full text-base", templ.KV("textarea-error", f.Bad == "note") } aria-invalid={ boolText(f.Bad == "note") } aria-describedby="movement-note-error" required?={ f.Type == "expense" }>{ f.Note }</textarea>
 				@movementFieldError(f, "note")
+			}
+			if f.NegativeWarning != "" {
+				<label class="flex items-center gap-3 min-h-11 cursor-pointer">
+					<input type="checkbox" name="allowNegative" value="1" class="checkbox"/>
+					<span>Всё равно сохранить</span>
+				</label>
 			}
 			@FinancialActionRow() {
 				@SubmitButton("Сохранить")
