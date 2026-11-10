@@ -5,6 +5,7 @@ import (
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -299,7 +300,7 @@ func TestExpenseNoteAndSSEActionConflictsRemainActionable(t *testing.T) {
 		}
 	}
 	f := url.Values{"type": {"expense"}, "amount": {"12,50"}, "date": {"2026-11-20"}, "from": {"person:" + s.olga.ID}, "to": {"outside"}, "expenseCategory": {category}, "note": {""}}
-	wantPage(t, "expense requires note", s.do(request{method: http.MethodPost, path: "/movements", cookies: z, form: f, datastar: true}), http.StatusOK, "datastar-patch-elements", "Укажите комментарий", `value="12,50"`)
+	wantPage(t, "expense requires note", s.do(request{method: http.MethodPost, path: "/movements", cookies: z, form: f, datastar: true}), http.StatusOK, "datastar-patch-elements", "Для расхода нужен комментарий", `id="movement-note-error"`, `value="12,50"`)
 	f.Set("note", "Материалы")
 	f.Set("expenseCategory", "missing")
 	wantPage(t, "unknown expense category", s.post("/movements", f, z), http.StatusUnprocessableEntity, "Проверьте")
@@ -396,4 +397,66 @@ func TestLoadedMovementTypePatchesFormBeforeEnablingInput(t *testing.T) {
 	}
 	wantPage(t, "no-JS expense page", s.get("/movements/new?type=expense", z), http.StatusOK, `action="/movements"`, `name="type" value="expense"`, `href="/movements/new?type=deposit"`)
 	wantPage(t, "unknown type never enables", s.do(request{method: http.MethodGet, path: "/movements/new?type=opening", cookies: z, datastar: true}), http.StatusBadRequest, "Проверьте вид движения")
+}
+
+func TestRepeatedMovementFormIsRecordedOnce(t *testing.T) {
+	s := newSite(t)
+	z := s.login("olga", olgaPass)
+	page := s.get("/movements/new", z)
+	token := regexp.MustCompile(`name="token" value="(mv_[a-z0-9]{20,61})"`).FindStringSubmatch(page.Body.String())
+	if token == nil {
+		t.Fatal("the movement form carries no repeat-protection token")
+	}
+	form := url.Values{"type": {"deposit"}, "amount": {"100"}, "date": {"2026-11-20"}, "from": {"person:" + s.olga.ID}, "to": {"account:kassa_cash"}, "token": {token[1]}}
+	wantRedirect(t, "deposit", s.post("/movements", form, z), "/my?saved=pending")
+	wantRedirect(t, "the same form again", s.post("/movements", form, z), "/my?saved=pending")
+	es, err := s.st.PersonMovementsIn(ctx, s.olga.ID, s.st.StartMonth())
+	if err != nil || len(es) != 1 {
+		t.Fatalf("a repeated form made %d rows (%v), want 1", len(es), err)
+	}
+	form.Set("amount", "150")
+	wantPage(t, "a changed repeat", s.post("/movements", form, z), http.StatusConflict, "уже сохранено с другими данными")
+	form.Set("token", "../../users/x")
+	wantPage(t, "a forged token", s.post("/movements", form, z), http.StatusUnprocessableEntity, "Проверьте поля формы")
+	if es, _ := s.st.PersonMovementsIn(ctx, s.olga.ID, s.st.StartMonth()); len(es) != 1 {
+		t.Fatalf("rejected repeats made rows: %d", len(es))
+	}
+}
+
+func TestMovementErrorsNameTheFieldAtFault(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	base := url.Values{"type": {"transfer"}, "amount": {"50"}, "date": {"2026-11-20"}, "from": {"account:kassa_cash"}, "to": {"account:kassa_card"}}
+	for name, tc := range map[string]struct {
+		change      map[string]string
+		field, text string
+	}{
+		"no amount":       {map[string]string{"amount": ""}, "amount", "Укажите сумму, например 100,50"},
+		"unreadable":      {map[string]string{"amount": "сто"}, "amount", "Укажите сумму, например 100,50"},
+		"zero":            {map[string]string{"amount": "0"}, "amount", "Сумма должна быть больше €0"},
+		"no date":         {map[string]string{"date": ""}, "date", "Укажите дату"},
+		"future":          {map[string]string{"date": "2026-11-21"}, "date", "Дата не может быть позже сегодняшней"},
+		"before start":    {map[string]string{"date": "2026-10-31"}, "date", "Дата раньше начала работы приложения"},
+		"same account":    {map[string]string{"to": "account:kassa_cash"}, "to", "«Откуда» и «Куда» должны различаться"},
+		"unknown account": {map[string]string{"to": "account:nowhere"}, "to", "Выберите счёт или сотрудника из списка"},
+		"expense note":    {map[string]string{"type": "expense", "to": "outside", "expenseCategory": "rent", "note": " "}, "note", "Для расхода нужен комментарий"},
+		"bad category":    {map[string]string{"type": "expense", "to": "outside", "expenseCategory": "nowhere", "note": "x"}, "expenseCategory", "Выберите категорию расхода из списка"},
+	} {
+		form := url.Values{}
+		for k, v := range base {
+			form[k] = v
+		}
+		for k, v := range tc.change {
+			form.Set(k, v)
+		}
+		res := s.post("/admin/movements", form, admin)
+		wantPage(t, name, res, http.StatusUnprocessableEntity, tc.text, `name="`+tc.field+`"`, "movement-"+tc.field+"-error")
+		invalid := regexp.MustCompile(`<(input|select|textarea)[^>]*name="` + tc.field + `"[^>]*aria-invalid="true"`)
+		if !invalid.MatchString(res.Body.String()) {
+			t.Errorf("%s: %s is not marked invalid", name, tc.field)
+		}
+		if strings.Contains(res.Body.String(), "Проверьте сумму, дату, вид движения и участников") {
+			t.Errorf("%s: still the catch-all message", name)
+		}
+	}
 }

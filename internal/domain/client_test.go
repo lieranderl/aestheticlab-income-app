@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"errors"
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"math/rand"
 	"testing"
@@ -83,5 +84,22 @@ func TestClientFundsHeldAndBalanceAlwaysEqualSelf(t *testing.T) {
 		if held+pr.Report.BalanceDelta != pr.Report.SelfAmount {
 			t.Fatalf("invariant %+v -> %+v", in, pr.Report)
 		}
+	}
+}
+
+func TestClientWithNoServicesAndNoSalesIsRefused(t *testing.T) {
+	day := domain.Date{Year: 2026, Mon: 11, Day: 20}
+	for name, in := range map[string]domain.ClientInput{
+		"blank":       {},
+		"zero extras": {Extras: map[string]domain.Cents{"creams": 0, "oil": 0, "certificates": 0}, ExtrasDestination: domain.ToCash},
+	} {
+		_, err := domain.NewClientReport("olga", day, in, 7000)
+		var ve *domain.ValidationError
+		if !errors.As(err, &ve) || ve.Problem != domain.ProblemEmptyEntry || ve.Field != "services" {
+			t.Fatalf("%s: got %v, want an empty-entry problem on services", name, err)
+		}
+	}
+	if _, err := domain.NewClientReport("olga", day, domain.ClientInput{Extras: map[string]domain.Cents{"certificates": 5000}, ExtrasDestination: domain.ToKassaCard}, 7000); err != nil {
+		t.Fatalf("a sale without services is a client: %v", err)
 	}
 }

@@ -1,5 +1,14 @@
 # Progress
 
+## Entry guards and refusal pages (2026-11-10)
+From a review of logic and phone use:
+- **Blank client refused:** a client with no services and no sales is rejected («пустую запись сохранить нельзя»); it used to save a €0 record that counted as a client and a working day. Earlier €0 clients stay; they can be removed with a reason.
+- **Kassa contribution in one tap:** the client form has «Оставляю долю салона наличными» and «Клиент оплатил картой салона», which fill the service contribution fields (still editable). An unrecorded share now reads «По этой записи вы должны салону €X» instead of «Оставьте в кассе €X», which looked done while the till got €0.
+- **Movements booked once:** the movement form carries a token that becomes the ledger row ID; sending the same form again (lost answer, second tap) answers with the saved row, a changed repeat is refused. Openings and expense edits are unaffected.
+- **No dead ends:** refused requests (bad links, filters, 404, server errors) render a page with the bottom bar, a same-origin «Назад» and «На главную», or a message inside the page for in-page forms, instead of a bare text line.
+- **Movement errors name the field:** amount, date (future, before the start month, closed month), from/to, category and comment each get their own message next to the field.
+- Verified: `make ci`; Playwright on iPhone SE and iPhone 15 (Pixel 7 not run locally: Chromium not installed; CI runs it); client form and refusal page at 375 pt in dark.
+
 ## Movement edit and cleaner lists (2026-11-09)
 Owner feedback: expenses need editing, cancelled rows clutter the lists, and rows entered one after another end up mixed by date.
 - **«Изменить» on expenses:** `store.EditMovement` voids the old row («Исправлено») and records the corrected one in one transaction, each with an audit row; both months must be open. Admin edits any expense; staff only their own pending one. Correcting a pending expense keeps it pending (and its author) until «Подтвердить».

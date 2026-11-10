@@ -49,7 +49,7 @@ func (a *app) handleTrends(w http.ResponseWriter, r *http.Request, u store.User)
 		}
 	}
 	if !metricValid {
-		http.Error(w, "Проверьте показатель", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте показатель")
 		return
 	}
 

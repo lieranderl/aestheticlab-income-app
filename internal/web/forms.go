@@ -1,9 +1,11 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
+	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 )
 
 // maxFormBytes bounds a form post; the largest form is a few hundred bytes.
@@ -113,4 +116,60 @@ func problemText(r *http.Request, err error) string {
 	}
 	slog.ErrorContext(r.Context(), "request failed", "path", logValue(r.URL.Path), "error", logError(err))
 	return "Не удалось сохранить, попробуйте ещё раз"
+}
+
+type signedInKey struct{}
+
+// withSignedIn remembers who is signed in for the rest of the request, so a
+// refusal can still draw their navigation.
+func withSignedIn(r *http.Request, u store.User) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), signedInKey{}, u))
+}
+
+// problem refuses a request without stranding the person: a page with the
+// navigation and a way back, or, for a request sent from inside a page, a
+// message patched into that page. The installed app has no back button, so
+// a bare line of text would be a dead end.
+func (a *app) problem(w http.ResponseWriter, r *http.Request, status int, message string) {
+	if isDatastar(r) && r.Method == http.MethodGet {
+		// A fragment the page asked for: the failing status tells the page,
+		// which shows its own «не удалось загрузить» in place.
+		http.Error(w, message, status)
+		return
+	}
+	if isDatastar(r) {
+		sse := datastar.NewSSE(w, r)
+		if err := sse.PatchElementTempl(views.ProblemToast(message)); err != nil {
+			slog.ErrorContext(r.Context(), "patch problem", "error", logError(err))
+			return
+		}
+		// The toast's own initializer runs once: after someone closes it, a
+		// morph leaves it hidden, so every refusal shows it again.
+		if err := sse.MarshalAndPatchSignals(map[string]any{"_problem": true}); err != nil {
+			slog.ErrorContext(r.Context(), "show problem", "error", logError(err))
+		}
+		return
+	}
+	var nav views.Nav
+	if u, ok := r.Context().Value(signedInKey{}).(store.User); ok {
+		nav = a.navFor(u, "")
+	}
+	a.renderStatus(w, r, status, views.ProblemPage(nav, message, wayBack(r)))
+}
+
+// wayBack is the page a refused request came from, when it is one of ours
+// and not the refused page itself; otherwise "".
+func wayBack(r *http.Request) string {
+	ref, err := url.Parse(r.Referer())
+	if err != nil || ref.Host == "" || ref.Host != r.Host || ref.Path == "" || ref.Path[0] != '/' ||
+		strings.HasPrefix(ref.Path, "//") || strings.ContainsAny(ref.Path, "\\\r\n") {
+		return ""
+	}
+	if ref.Path == r.URL.Path && ref.RawQuery == r.URL.RawQuery {
+		return ""
+	}
+	if ref.RawQuery != "" {
+		return ref.Path + "?" + ref.RawQuery
+	}
+	return ref.Path
 }

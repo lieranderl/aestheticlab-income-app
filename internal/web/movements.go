@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/rand"
 	"errors"
 	"net/http"
 	"slices"
@@ -57,6 +58,7 @@ func (a *app) movementForm(r *http.Request, u store.User, admin bool, kind strin
 	if admin {
 		f.Action = "/admin/movements"
 	}
+	f.Token = "mv_" + strings.ToLower(rand.Text())
 	accounts, err := a.store.Accounts(r.Context())
 	if err != nil {
 		return f, err
@@ -119,7 +121,7 @@ func (a *app) handleMovementPage(w http.ResponseWriter, r *http.Request, u store
 		kind = "deposit"
 	}
 	if !movementKind(kind, admin) {
-		http.Error(w, "Проверьте вид движения", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид движения")
 		return
 	}
 	f, err := a.movementForm(r, u, admin, kind)
@@ -128,7 +130,7 @@ func (a *app) handleMovementPage(w http.ResponseWriter, r *http.Request, u store
 		return
 	}
 	if err := a.prefillSettlement(r, &f); err != nil {
-		http.Error(w, "Проверьте месяц, сотрудника и текущий остаток — обновите расчёт", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте месяц, сотрудника и текущий остаток — обновите расчёт")
 		return
 	}
 	if isDatastar(r) {
@@ -146,24 +148,24 @@ func (a *app) handleMovementPage(w http.ResponseWriter, r *http.Request, u store
 }
 func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	admin := strings.HasPrefix(r.URL.Path, "/admin/")
 	kind := r.PostFormValue("type")
 	if !movementKind(kind, admin) {
-		http.Error(w, "Проверьте вид движения", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид движения")
 		return
 	}
 	if !admin {
 		for _, key := range []string{"person", "personId", "uid"} {
 			if v := r.PostFormValue(key); v != "" && v != u.ID {
-				http.Error(w, "Нет доступа", http.StatusForbidden)
+				a.problem(w, r, http.StatusForbidden, "Нет доступа")
 				return
 			}
 		}
 		if movementParty(r.PostFormValue("from")) != domain.Person(u.ID) {
-			http.Error(w, "Нет доступа", http.StatusForbidden)
+			a.problem(w, r, http.StatusForbidden, "Нет доступа")
 			return
 		}
 	}
@@ -173,7 +175,7 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		return
 	}
 	if err := settlementContext(r, &f); err != nil {
-		http.Error(w, "Проверьте контекст расчёта", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте контекст расчёта")
 		return
 	}
 	f.Amount = r.PostFormValue("amount")
@@ -182,15 +184,18 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 	f.To = r.PostFormValue("to")
 	f.Category = r.PostFormValue("expenseCategory")
 	f.Note = r.PostFormValue("note")
+	if sent := r.PostFormValue("token"); sent != "" {
+		f.Token = sent // the form keeps its token until it is saved
+	}
 	amount, err := domain.ParseAmount(f.Amount)
-	if err == nil && strings.TrimSpace(f.Amount) == "" {
-		err = store.ErrInvalid
+	if err != nil || strings.TrimSpace(f.Amount) == "" {
+		err = &domain.ValidationError{Field: "amount", Problem: problemAmountUnreadable}
 	}
 	var day domain.Date
 	if err == nil {
 		day, err = domain.ParseDate(f.Date)
 		if err != nil {
-			err = store.ErrInvalid
+			err = &domain.ValidationError{Field: "date", Problem: problemDateMissing}
 		}
 	}
 	if err == nil {
@@ -202,6 +207,7 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 			To:              movementParty(f.To),
 			ExpenseCategory: f.Category,
 			Note:            f.Note,
+			Token:           r.PostFormValue("token"),
 		}
 		if f.SettlementMonth != "" {
 			m, _ := domain.ParseMonth(f.SettlementMonth)
@@ -211,10 +217,17 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		}
 	}
 	if err != nil {
-		f.Error = movementProblem(r, err)
+		f.Bad, f.Error = movementFieldProblem(r, err, f.Type)
+		f.MinDateLabel = ru.Date(a.store.StartMonth().FirstDay().Time())
+		if f.Bad == "date" && strings.HasPrefix(f.Error, "Дата раньше начала") {
+			f.Error += " — не раньше " + f.MinDateLabel
+		}
 		status := http.StatusUnprocessableEntity
 		if errors.Is(err, store.ErrVersionConflict) {
 			status = http.StatusConflict
+			if f.SettlementMonth == "" {
+				f.Error = "Это движение уже сохранено с другими данными — проверьте список движений и откройте форму заново"
+			}
 		}
 		a.formFailedStatus(w, r, status, views.MovementForm(f), views.MovementFormPage(a.navFor(u, f.Back), f))
 		return
@@ -228,6 +241,58 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		separator = "&"
 	}
 	a.navigate(w, r, f.Back+separator+"saved="+saved)
+}
+
+// Reasons a movement form is refused before it reaches the store.
+const (
+	problemAmountUnreadable domain.Problem = "amount_unreadable"
+	problemDateMissing      domain.Problem = "date_missing"
+)
+
+// movementFieldProblem says which field of the movement form is at fault
+// ("" when none is) and what to do about it.
+func movementFieldProblem(r *http.Request, err error, kind string) (field, message string) {
+	var v *domain.ValidationError
+	switch {
+	case errors.Is(err, store.ErrMonthClosed):
+		return "date", "Месяц закрыт — выберите дату в открытом месяце"
+	case !errors.As(err, &v):
+		return "", movementProblem(r, err)
+	}
+	switch v.Problem {
+	case problemAmountUnreadable, domain.ProblemPaymentsMismatch:
+		return "amount", "Укажите сумму, например 100,50"
+	case domain.ProblemNegativeAmount:
+		return "amount", "Сумма должна быть больше €0"
+	case store.ProblemSettlementAmount:
+		return "amount", movementProblem(r, err)
+	case problemDateMissing:
+		return "date", "Укажите дату"
+	case domain.ProblemFutureDate:
+		return "date", "Дата не может быть позже сегодняшней"
+	case domain.ProblemBeforeStartMonth, store.ProblemOpeningDate:
+		return "date", "Дата раньше начала работы приложения"
+	case store.ProblemNoteRequired:
+		if kind == string(domain.Expense) {
+			return "note", "Для расхода нужен комментарий"
+		}
+		return "note", "Укажите комментарий"
+	case store.ProblemUnknownParty:
+		if v.Field == "expenseCategory" {
+			return "expenseCategory", "Выберите категорию расхода из списка"
+		}
+		return "to", "Выберите счёт или сотрудника из списка — этот не найден или в архиве"
+	case domain.ProblemMalformedMovement:
+		if kind == string(domain.Transfer) {
+			return "to", "«Откуда» и «Куда» должны различаться"
+		}
+		return "from", "Проверьте «Откуда» и «Куда» для этого вида движения"
+	case store.ProblemAlreadyVoided:
+		return "", "Это движение уже сохранено, а потом отменено или исправлено — проверьте список движений"
+	case store.ProblemOpeningExists:
+		return "to", "Начальный остаток уже внесён — сначала отмените прежний"
+	}
+	return "", movementProblem(r, err)
 }
 
 func movementProblem(r *http.Request, err error) string {
@@ -443,13 +508,13 @@ func (a *app) movementAction(r *http.Request, u store.User, void bool) (views.Mo
 	}
 	return p, nil
 }
-func actionReadError(w http.ResponseWriter, r *http.Request, err error) bool {
+func (a *app) actionReadError(w http.ResponseWriter, r *http.Request, err error) bool {
 	if errors.Is(err, store.ErrForbidden) {
-		http.Error(w, "Нет доступа", http.StatusForbidden)
+		a.problem(w, r, http.StatusForbidden, "Нет доступа")
 		return true
 	}
 	if errors.Is(err, store.ErrNotFound) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return true
 	}
 	return false
@@ -457,7 +522,7 @@ func actionReadError(w http.ResponseWriter, r *http.Request, err error) bool {
 func (a *app) handleVoidPage(w http.ResponseWriter, r *http.Request, u store.User) {
 	p, err := a.movementAction(r, u, true)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return
@@ -477,13 +542,13 @@ func (a *app) handleVoidMovement(w http.ResponseWriter, r *http.Request, u store
 func (a *app) handleMovementAction(w http.ResponseWriter, r *http.Request, u store.User, void bool) {
 	p, err := a.movementAction(r, u, void)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return
 	}
 	if err = readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	p.Reason = r.PostFormValue("reason")
@@ -507,7 +572,7 @@ func (a *app) handleMovementAction(w http.ResponseWriter, r *http.Request, u sto
 		if void && !u.Actor().Admin && errors.Is(err, store.ErrForbidden) {
 			latest, readErr := a.movementAction(r, u, true)
 			if readErr != nil {
-				if !actionReadError(w, r, readErr) {
+				if !a.actionReadError(w, r, readErr) {
 					a.serverError(w, r, readErr)
 				}
 				return
@@ -548,7 +613,7 @@ func (a *app) recountForm(r *http.Request) (views.RecountFormData, error) {
 func (a *app) handleRecountPage(w http.ResponseWriter, r *http.Request, u store.User) {
 	p, err := a.recountForm(r)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return
@@ -557,12 +622,12 @@ func (a *app) handleRecountPage(w http.ResponseWriter, r *http.Request, u store.
 }
 func (a *app) handleRecount(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	p, err := a.recountForm(r)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return

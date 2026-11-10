@@ -34,8 +34,8 @@ var errProcessed = errors.New("movement already processed")
 func (a *app) editReadError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errProcessed):
-		http.Error(w, "Движение уже обработано — обновите страницу", http.StatusConflict)
-	case !actionReadError(w, r, err):
+		a.problem(w, r, http.StatusConflict, "Движение уже обработано — обновите страницу")
+	case !a.actionReadError(w, r, err):
 		a.serverError(w, r, err)
 	}
 }
@@ -104,7 +104,7 @@ func (a *app) handleEditMovement(w http.ResponseWriter, r *http.Request, u store
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	f.Amount = r.PostFormValue("amount")

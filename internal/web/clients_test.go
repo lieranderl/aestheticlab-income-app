@@ -75,9 +75,11 @@ func TestClientZeroCertificatesValidationAdminAndClosedMonth(t *testing.T) {
 	form.Set("services", "")
 	form.Set("certificatePaid", "")
 	form.Set("serviceCash", "")
+	wantPage(t, "blank is not a client", s.post("/clients", form, z), http.StatusUnprocessableEntity, "пустую запись сохранить нельзя")
+	form.Set("services", "50")
 	zero := s.post("/clients", form, z)
 	if zero.Code != http.StatusSeeOther {
-		t.Fatalf("zero %d %s", zero.Code, zero.Body.String())
+		t.Fatalf("second client %d %s", zero.Code, zero.Body.String())
 	}
 	href := strings.Split(zero.Header().Get("Location"), "?")[0]
 	wantPage(t, "admin can edit", s.get(href, admin), http.StatusOK, "Клиент 2")
@@ -102,7 +104,7 @@ func TestNewLegacyReportIsRefusedAndNotShownAsDailyForm(t *testing.T) {
 	s.withTerms(s.olga, 7000)
 	z := s.login("olga", olgaPass)
 	wantPage(t, "new daily forbidden", s.post("/reports/2026-11-20", url.Values{"version": {"0"}, "r_services": {"100"}, "p_cash": {"100"}}, z), http.StatusUnprocessableEntity, "добавьте клиента")
-	wantPage(t, "no legacy form", s.get("/reports/day?date=2026-11-20", z), http.StatusNotFound, "404")
+	wantPage(t, "no legacy form", s.get("/reports/day?date=2026-11-20", z), http.StatusNotFound, "Страница не найдена")
 	wantPage(t, "new home", s.get("/", z), http.StatusOK, "Добавить клиента")
 }
 
@@ -449,14 +451,20 @@ func TestClientFormExplainsShareAndRemainingContribution(t *testing.T) {
 	page := s.get(saved.Header().Get("Location"), z)
 	wantPage(t, "share rule and outstanding contribution", page, http.StatusOK,
 		"Распределение по вашим условиям", "Ваша доля от услуг — 50%.",
-		"По введённым данным", "Оставьте в кассе €30",
+		"По введённым данным", "По этой записи вы должны салону €30",
+		"Оставляете эти деньги в кассе? Нажмите «Оставляю долю салона наличными»",
+		"Оставляю долю салона наличными</button>", "Клиент оплатил картой салона</button>",
 		"Только по этой записи, без учёта общего баланса.")
+	if strings.Contains(page.Body.String(), "Оставьте в кассе €30") {
+		t.Fatal("an unrecorded contribution is worded as an instruction the record already reflects")
+	}
 	if strings.Contains(page.Body.String(), ">Результат</h2>") {
 		t.Fatal("share rule is presented as a completed result")
 	}
 	admin := s.login("anna", annaPass)
 	wantPage(t, "admin sees employee terms", s.get(saved.Header().Get("Location"), admin), http.StatusOK,
-		"Распределение по условиям сотрудника", "Доля сотрудника от услуг — 50%.")
+		"Распределение по условиям сотрудника", "Доля сотрудника от услуг — 50%.",
+		"По этой записи сотрудник должен салону €30")
 	for _, tc := range []struct {
 		token, deposit, redemption, effect string
 	}{
@@ -791,4 +799,13 @@ func TestAdminBackfillsClientsForDaysBeforeTheAccountsExisted(t *testing.T) {
 		t.Fatalf("save %d %s", res.Code, res.Body.String())
 	}
 	wantPage(t, "Olga's 1 October", s.get("/?date=2026-10-01", s.login("olga", olgaPass)), http.StatusOK, "Клиент 1", "€100")
+}
+
+func TestBlankClientFormIsNotSavedAsAClient(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	z := s.login("olga", olgaPass)
+	form := url.Values{"date": {"2026-11-20"}, "token": {"http-blank-client-token"}, "version": {"0"}, "extrasDestination": {"cash"}}
+	wantPage(t, "blank client", s.post("/clients", form, z), http.StatusUnprocessableEntity, "Укажите стоимость услуг или продажу")
+	wantPage(t, "day stays empty", s.get("/?date=2026-11-20", z), http.StatusOK, "Клиентов за этот день нет")
 }

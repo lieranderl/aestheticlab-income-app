@@ -11,7 +11,7 @@ import (
 func (a *app) handleMovementHistory(w http.ResponseWriter, r *http.Request, u store.User) {
 	f, ok := a.readHistoryFilter(r)
 	if !ok {
-		http.Error(w, "Проверьте период: не больше года, начало не позже конца", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте период: не больше года, начало не позже конца")
 		return
 	}
 	users, err := a.store.Users(r.Context())
@@ -21,7 +21,7 @@ func (a *app) handleMovementHistory(w http.ResponseWriter, r *http.Request, u st
 	}
 	filters, ok := f.view("/admin/history/movements", users, nil)
 	if !ok || f.category != "" || f.entity != "" {
-		http.Error(w, "Проверьте сотрудника и фильтры", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте сотрудника и фильтры")
 		return
 	}
 	filters.Movements = true
@@ -47,7 +47,7 @@ func (a *app) handleMovementHistory(w http.ResponseWriter, r *http.Request, u st
 		}
 	}
 	if !validType || !validStatus {
-		http.Error(w, "Проверьте вид и статус движения", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид и статус движения")
 		return
 	}
 	es, err := a.store.LedgerBetween(r.Context(), f.from, f.to)

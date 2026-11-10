@@ -100,6 +100,7 @@ type request struct {
 	cookies  []*http.Cookie
 	datastar bool
 	from     string // X-Forwarded-For, as Cloud Run passes it on
+	headers  map[string]string
 }
 
 func (s *site) do(r request) *httptest.ResponseRecorder {
@@ -122,6 +123,9 @@ func (s *site) do(r request) *httptest.ResponseRecorder {
 	}
 	for _, c := range r.cookies {
 		req.AddCookie(c)
+	}
+	for name, value := range r.headers {
+		req.Header.Set(name, value)
 	}
 	rec := httptest.NewRecorder()
 	s.h.ServeHTTP(rec, req)

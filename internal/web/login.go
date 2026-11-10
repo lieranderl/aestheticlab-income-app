@@ -48,7 +48,7 @@ func (a *app) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 // source with too many failed logins is refused before any of that.
 func (a *app) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	username := strings.ToLower(strings.TrimSpace(r.PostFormValue("username")))

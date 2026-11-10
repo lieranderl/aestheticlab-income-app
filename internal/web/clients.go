@@ -231,7 +231,11 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 	f.Effect = "По этой записи расчёт с салоном — €0"
 	switch {
 	case show.BalanceDelta < 0:
-		f.Effect = "Оставьте в кассе " + domain.FormatEUR(-show.BalanceDelta)
+		f.Owes = true
+		f.Effect = "По этой записи вы должны салону " + domain.FormatEUR(-show.BalanceDelta)
+		if f.OtherEmployee {
+			f.Effect = "По этой записи сотрудник должен салону " + domain.FormatEUR(-show.BalanceDelta)
+		}
 	case show.BalanceDelta > 0:
 		f.Effect = "По этой записи салон должен вам " + domain.FormatEUR(show.BalanceDelta)
 		if f.OtherEmployee {
@@ -247,7 +251,7 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 
 func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Слишком большой запрос", http.StatusRequestEntityTooLarge)
+		a.problem(w, r, http.StatusRequestEntityTooLarge, "Слишком большой запрос")
 		return
 	}
 	f, err := a.clientForm(r, u)
@@ -263,7 +267,7 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	e.Date, err = domain.ParseDate(f.Date)
 	if err != nil {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	e.Version, err = strconv.ParseInt(r.PostFormValue("version"), 10, 64)
@@ -341,7 +345,7 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 			if f.OtherEmployee && errors.As(err, &ve) && ve.Problem == domain.ProblemMissingTerms {
 				f.Error = otherTermsMissing
 			}
-			if errors.As(err, &ve) {
+			if errors.As(err, &ve) && ve.Problem != domain.ProblemEmptyEntry { // no single field is wrong: the alert says it
 				f.Bad[ve.Field] = true
 				switch ve.Problem {
 				case domain.ProblemPaymentsMismatch:
@@ -454,6 +458,8 @@ func clientProblem(r *http.Request, err error) string {
 			return "Введите сумму от €0 до €9 999 999,99"
 		case domain.ProblemUnknownDestination:
 			return "Выберите, куда внесены дополнительные продажи"
+		case domain.ProblemEmptyEntry:
+			return "Укажите стоимость услуг или продажу — пустую запись сохранить нельзя"
 		}
 	}
 	return problemText(r, err)
@@ -502,7 +508,7 @@ func (a *app) handleRemoveClientPage(w http.ResponseWriter, r *http.Request, u s
 
 func (a *app) handleRemoveClient(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Слишком большой запрос", http.StatusRequestEntityTooLarge)
+		a.problem(w, r, http.StatusRequestEntityTooLarge, "Слишком большой запрос")
 		return
 	}
 	f, err := a.removeClientForm(r, u)
@@ -511,7 +517,7 @@ func (a *app) handleRemoveClient(w http.ResponseWriter, r *http.Request, u store
 		// list without claiming this request removed anything.
 		day, derr := domain.ParseDate(r.PostFormValue("date"))
 		if derr != nil {
-			http.NotFound(w, r)
+			a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 			return
 		}
 		back := "/?date=" + day.String()

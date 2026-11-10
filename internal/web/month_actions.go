@@ -76,7 +76,7 @@ func (a *app) monthConfirmation(r *http.Request, m domain.Month, reopen bool) (v
 func (a *app) handleMonthAction(w http.ResponseWriter, r *http.Request, u store.User) {
 	m, err := domain.ParseMonth(r.PathValue("month"))
 	if err != nil || m.Before(a.store.StartMonth()) || a.store.Today().Month().Before(m) {
-		http.Error(w, "Проверьте месяц", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте месяц")
 		return
 	}
 	reopen := strings.HasSuffix(r.URL.Path, "/reopen")
@@ -90,7 +90,7 @@ func (a *app) handleMonthAction(w http.ResponseWriter, r *http.Request, u store.
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	revision := r.PostFormValue("revision")

@@ -4,6 +4,9 @@ import "strconv"
 
 type MovementFormData struct {
 	Action, Back, Type, Amount, Date, MinDate, MaxDate, From, To, Category, Note, Error string
+	Token                                                                               string // names this form, so sending it twice books the money once
+	Bad                                                                                 string // the field at fault, shown next to it
+	MinDateLabel                                                                        string
 	SettlementMonth, SettlementPerson, SettlementRevision, ContextNotice                string
 	Version                                                                             string // the row being edited
 	Admin, Edit                                                                         bool
@@ -121,6 +124,9 @@ templ MovementForm(f MovementFormData) {
 		</nav>
 		<fieldset class="flex min-w-0 flex-col gap-3" data-attr:disabled="$_movementloading || !$_movementready" data-attr:aria-busy="$_movementloading">
 			<input type="hidden" name="type" value={ f.Type }/>
+			if f.Token != "" && !f.Edit {
+				<input type="hidden" name="token" value={ f.Token }/>
+			}
 			if f.Version != "" {
 				<input type="hidden" name="version" value={ f.Version }/>
 			}
@@ -130,24 +136,30 @@ templ MovementForm(f MovementFormData) {
 				<input type="hidden" name="settlementRevision" value={ f.SettlementRevision }/>
 			}
 			@Field("Дата", "") {
-				<input type="date" name="date" autofocus data-effect="if (!$_movementloading && $_movementready && (!el.closest('dialog') || el.closest('dialog').open)) { el.focus() }" value={ f.Date } min={ f.MinDate } max={ f.MaxDate } class="input input-lg w-full min-w-0 text-base" required/>
+				<input type="date" name="date" aria-invalid={ boolText(f.Bad == "date") } aria-describedby="movement-date-error" autofocus data-effect="if (!$_movementloading && $_movementready && (!el.closest('dialog') || el.closest('dialog').open)) { el.focus() }" value={ f.Date } min={ f.MinDate } max={ f.MaxDate } class={ "input input-lg w-full min-w-0 text-base", templ.KV("input-error", f.Bad == "date") } required/>
+				@movementFieldError(f, "date")
 			}
 			@Field("Сумма, €", "") {
-				<input name="amount" value={ f.Amount } inputmode="decimal" enterkeyhint="next" autocomplete="off" class="input input-lg w-full text-base" required/>
+				<input name="amount" value={ f.Amount } inputmode="decimal" enterkeyhint="next" autocomplete="off" class={ "input input-lg w-full text-base", templ.KV("input-error", f.Bad == "amount") } aria-invalid={ boolText(f.Bad == "amount") } aria-describedby="movement-amount-error" required/>
+				@movementFieldError(f, "amount")
 			}
 			@Field("Откуда", "") {
-				@movementSelect("from", f.From, f.Sources)
+				@movementSelect("from", f.From, f.Sources, f.Bad)
+				@movementFieldError(f, "from")
 			}
 			@Field("Куда", "") {
-				@movementSelect("to", f.To, f.Destinations)
+				@movementSelect("to", f.To, f.Destinations, f.Bad)
+				@movementFieldError(f, "to")
 			}
 			if f.Type == "expense" {
 				@Field("Категория расхода", "") {
-					@movementSelect("expenseCategory", f.Category, f.Categories)
+					@movementSelect("expenseCategory", f.Category, f.Categories, f.Bad)
+					@movementFieldError(f, "expenseCategory")
 				}
 			}
 			@Field(movementCommentLabel(f.Type), "") {
-				<textarea name="note" class="textarea textarea-lg w-full text-base" required?={ f.Type == "expense" }>{ f.Note }</textarea>
+				<textarea name="note" class={ "textarea textarea-lg w-full text-base", templ.KV("textarea-error", f.Bad == "note") } aria-invalid={ boolText(f.Bad == "note") } aria-describedby="movement-note-error" required?={ f.Type == "expense" }>{ f.Note }</textarea>
+				@movementFieldError(f, "note")
 			}
 			@FinancialActionRow() {
 				@SubmitButton("Сохранить")
@@ -202,8 +214,14 @@ func movementNewURL(f MovementFormData, kind string) string {
 	return "/movements/new?type=" + kind
 }
 
-templ movementSelect(name, selected string, options []FilterOption) {
-	<select name={ name } class="select select-lg w-full text-base" required>
+templ movementFieldError(f MovementFormData, name string) {
+	if f.Bad == name {
+		<p id={ "movement-" + name + "-error" } class="text-sm text-error whitespace-normal">{ f.Error }</p>
+	}
+}
+
+templ movementSelect(name, selected string, options []FilterOption, bad string) {
+	<select name={ name } class={ "select select-lg w-full text-base", templ.KV("select-error", bad == name) } aria-invalid={ boolText(bad == name) } aria-describedby={ "movement-" + name + "-error" } required>
 		for _, o := range options {
 			<option value={ o.Value } selected?={ selected == o.Value }>{ o.Label }</option>
 		}

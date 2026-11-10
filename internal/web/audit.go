@@ -25,7 +25,7 @@ var auditEntities = []views.FilterOption{
 func (a *app) handleAudit(w http.ResponseWriter, r *http.Request, u store.User) {
 	f, ok := a.readHistoryFilter(r)
 	if !ok {
-		http.Error(w, "Проверьте период: не больше года, начало не позже конца", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте период: не больше года, начало не позже конца")
 		return
 	}
 	users, err := a.store.Users(r.Context())
@@ -41,7 +41,7 @@ func (a *app) handleAudit(w http.ResponseWriter, r *http.Request, u store.User) 
 	f.category = ""
 	filters, ok := f.view("/admin/audit", users, nil)
 	if !ok {
-		http.Error(w, "Проверьте сотрудника", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте сотрудника")
 		return
 	}
 	filters.Audit, filters.Entities = true, auditEntities
@@ -55,7 +55,7 @@ func (a *app) handleAudit(w http.ResponseWriter, r *http.Request, u store.User) 
 		}
 	}
 	if !valid {
-		http.Error(w, "Проверьте вид изменения", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид изменения")
 		return
 	}
 	rows, err := a.store.AuditBetween(r.Context(), f.from, f.to)

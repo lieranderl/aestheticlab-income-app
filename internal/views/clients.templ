@@ -15,6 +15,7 @@ type ClientForm struct {
 	CanNext                                                                          bool
 	OtherEmployee                                                                    bool
 	Incomplete                                                                       bool
+	Owes                                                                             bool // the saved entry leaves the person owing the salon
 	Version, Number, Pct                                                             int64
 	Values                                                                           map[string]string
 	Self, Salon, Cash, Card, Held, Effect, DayLabel, SharePct                        string
@@ -44,6 +45,29 @@ var clientExtras = `($_cc.creams) + ($_cc.oil) + ($_cc.certificates)`
 var clientCash = `($_cc.serviceCash) + ($_client.extrasDestination === 'cash' ? $_ce : 0)`
 var clientCard = `($_cc.serviceCard) + ($_client.extrasDestination === 'kassa_card' ? $_ce : 0)`
 var clientDelta = `$_cashDeposit + $_cardDeposit + ($_cc.certificatePaid) - (($_cc.services) + $_ce - $_clientSelf)`
+
+// clientFill types an amount into a service contribution field the way a
+// thumb would: the input event updates the bound signal and the draft.
+// Amounts are whole cents, so toFixed(2) is exact.
+const clientFill = `((name, c) => { const f = el.form.elements[name]; f.value = c > 0 ? (c / 100).toFixed(2).replace('.', ',').replace(/,00$/, '') : ''; f.dispatchEvent(new Event('input', {bubbles: true})) })`
+
+// clientFillSalonCash leaves the salon's share of the services in the till:
+// what the entry still owes after the certificate and the card contribution.
+const clientFillSalonCash = clientFill + `('serviceCash', Math.max(($_cc.services) - $_clientSelf - ($_cc.certificatePaid) - (Number.isFinite($_cc.serviceCard) ? $_cc.serviceCard : 0), 0))`
+
+// clientFillCard records services the client paid to the salon's card.
+const clientFillCard = clientFill + `('serviceCash', 0); ` + clientFill + `('serviceCard', ($_cc.services) - ($_cc.certificatePaid))`
+
+// The buttons stay usable while only the contribution fields are wrong:
+// that is what they correct.
+const clientFillDisabled = `Boolean($_clientErrors.services || $_clientErrors.certificatePaid) || !(($_cc.services) - ($_cc.certificatePaid) > 0)`
+
+func ownerOwes(other bool) string {
+	if other {
+		return "По этой записи сотрудник должен салону"
+	}
+	return "По этой записи вы должны салону"
+}
 
 func ownerHeld(other bool) string {
 	if other {
@@ -180,6 +204,11 @@ templ ClientFormView(f ClientForm) {
 				<div class="card-body p-4">
 					<h2 class="font-semibold">Внесено в кассу за услуги</h2>
 					<p class="text-sm text-base-content/70">Без дополнительных продаж.</p>
+					<div class="flex flex-col gap-2 py-2">
+						<button type="button" class="btn btn-outline min-h-11 h-auto py-2" disabled data-attr:disabled={ clientFillDisabled } data-on:click={ clientFillSalonCash }>Оставляю долю салона наличными</button>
+						<button type="button" class="btn btn-outline min-h-11 h-auto py-2" disabled data-attr:disabled={ clientFillDisabled } data-on:click={ clientFillCard }>Клиент оплатил картой салона</button>
+						<p class="text-sm text-base-content/70">Кнопки заполняют поля ниже — сумму можно исправить.</p>
+					</div>
 					@clientField(f, "serviceCash", "За услуги — наличными, € (необязательно)", "Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.")
 					@clientField(f, "serviceCard", "За услуги — на карту салона, € (необязательно)", "Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.")
 				</div>
@@ -207,7 +236,8 @@ templ ClientFormView(f ClientForm) {
 							<p>Касса — карта салона <strong data-text={ jsEUR("$_cardDeposit") }>{ f.Card }</strong></p>
 							<p>{ ownerHeld(f.OtherEmployee) } <strong data-text={ jsEUR("($_cc.services) - ($_cc.certificatePaid) - ($_cc.serviceCash) - ($_cc.serviceCard)") }>{ f.Held }</strong></p>
 							<div class="rounded-box bg-base-200 p-3 mt-2">
-								<p class="font-semibold" data-text={ `$_clientDelta > 0 ? '` + ownerOwed(f.OtherEmployee) + ` ' + ` + jsEUR("$_clientDelta") + ` : $_clientDelta < 0 ? 'Оставьте в кассе ' + ` + jsEUR("-$_clientDelta") + ` : 'По этой записи расчёт с салоном — €0'` }>{ f.Effect }</p>
+								<p class="font-semibold" data-text={ `$_clientDelta > 0 ? '` + ownerOwed(f.OtherEmployee) + ` ' + ` + jsEUR("$_clientDelta") + ` : $_clientDelta < 0 ? '` + ownerOwes(f.OtherEmployee) + ` ' + ` + jsEUR("-$_clientDelta") + ` : 'По этой записи расчёт с салоном — €0'` }>{ f.Effect }</p>
+								<p class={ "text-sm mt-1", templ.KV("hidden", !f.Owes) } data-class:hidden="!($_clientDelta < 0)">Оставляете эти деньги в кассе? Нажмите «Оставляю долю салона наличными» — иначе запись покажет долг.</p>
 								<p class="text-sm text-base-content/70 mt-1">Только по этой записи, без учёта общего баланса.</p>
 							</div>
 						</div>

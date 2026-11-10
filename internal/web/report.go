@@ -44,7 +44,7 @@ func (a *app) handleDaily(w http.ResponseWriter, r *http.Request, u store.User) 
 		return
 	}
 	if dc.report == nil {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	f := dc.form(nil)
@@ -64,11 +64,11 @@ func (a *app) handleSaveReport(w http.ResponseWriter, r *http.Request, u store.U
 func (a *app) saveReportFor(w http.ResponseWriter, r *http.Request, actor, owner store.User, admin bool) {
 	day, err := domain.ParseDate(r.PathValue("date"))
 	if err != nil || (!admin && !owner.SubmitsReports) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Слишком большой запрос", http.StatusRequestEntityTooLarge)
+		a.problem(w, r, http.StatusRequestEntityTooLarge, "Слишком большой запрос")
 		return
 	}
 	dc, err := a.loadDay(r.Context(), owner, day)
@@ -77,7 +77,7 @@ func (a *app) saveReportFor(w http.ResponseWriter, r *http.Request, actor, owner
 		return
 	}
 	if dc.report == nil {
-		http.Error(w, "Отчёт за день отсутствует — добавьте клиента в списке за день", http.StatusUnprocessableEntity)
+		a.problem(w, r, http.StatusUnprocessableEntity, "Отчёт за день отсутствует — добавьте клиента в списке за день")
 		return
 	}
 	dc.admin, dc.name = admin, owner.DisplayName
