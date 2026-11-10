@@ -307,3 +307,14 @@ func TestTheMonthSplitLeavesOutEmptyParts(t *testing.T) {
 		t.Error("with services and sales, only those two parts show")
 	}
 }
+
+// 2026-11-10 review: an empty day showed «Итоги дня» with empty sections.
+func TestAnEmptyDayShowsNoTotals(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 5000)
+	page := s.get("/?date=2026-11-20", s.login("olga", olgaPass))
+	wantPage(t, "empty day", page, http.StatusOK, "Клиентов за этот день нет", "Добавить клиента")
+	if strings.Contains(page.Body.String(), "Итоги дня") {
+		t.Fatal("an empty day shows its totals")
+	}
+}
