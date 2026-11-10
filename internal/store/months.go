@@ -60,8 +60,11 @@ type resultRecord struct {
 	ExpensesByCategory map[string]domain.Cents       `firestore:"expensesByCategory" json:"expensesByCategory"`
 	Salaries           domain.Cents                  `firestore:"salaries"           json:"salaries"`
 	SelfBonuses        domain.Cents                  `firestore:"selfBonuses"        json:"selfBonuses"`
+	KassaDifference    domain.Cents                  `firestore:"kassaDifference"    json:"kassaDifference"`
 	Profit             domain.Cents                  `firestore:"profit"             json:"profit"`
+	LossCarriedIn      domain.Cents                  `firestore:"lossCarriedIn"      json:"lossCarriedIn"`
 	DividendPool       domain.Cents                  `firestore:"dividendPool"       json:"dividendPool"`
+	LossCarriedOut     domain.Cents                  `firestore:"lossCarriedOut"     json:"lossCarriedOut"`
 	WorkingDays        int                           `firestore:"workingDays"        json:"workingDays"`
 	People             map[string]personResultRecord `firestore:"people"             json:"people"`
 }
@@ -105,6 +108,7 @@ func snapshotRecordOf(s Snapshot) *snapshotRecord {
 			Revenue: r.Revenue, RevenueByCategory: nonNil(r.RevenueByCategory), Self: r.Self,
 			CertificateSales: r.CertificateSales, SalonIncome: r.SalonIncome, Expenses: r.Expenses,
 			ExpensesByCategory: nonNil(r.ExpensesByCategory), Salaries: r.Salaries, SelfBonuses: r.SelfBonuses, Profit: r.Profit,
+			KassaDifference: r.KassaDifference, LossCarriedIn: r.LossCarriedIn, LossCarriedOut: r.LossCarriedOut,
 			DividendPool: r.DividendPool, WorkingDays: r.WorkingDays, People: map[string]personResultRecord{},
 		},
 		Balances: balancesRecord{
@@ -132,6 +136,7 @@ func (rec *snapshotRecord) snapshot(m domain.Month) *Snapshot {
 			Month: m, Revenue: r.Revenue, RevenueByCategory: nonNil(r.RevenueByCategory), Self: r.Self,
 			CertificateSales: r.CertificateSales, SalonIncome: r.SalonIncome, Expenses: r.Expenses,
 			ExpensesByCategory: nonNil(r.ExpensesByCategory), Salaries: r.Salaries, SelfBonuses: r.SelfBonuses, Profit: r.Profit,
+			KassaDifference: r.KassaDifference, LossCarriedIn: r.LossCarriedIn, LossCarriedOut: r.LossCarriedOut,
 			DividendPool: r.DividendPool, WorkingDays: r.WorkingDays, People: map[string]domain.PersonResult{},
 		},
 		Balances: domain.Balances{
@@ -352,12 +357,13 @@ func (s *Store) closeMonth(ctx context.Context, actor Actor, m domain.Month, rev
 			return err
 		}
 		opening := domain.Balances{}
+		var carried domain.Cents // a snapshot from before loss carry-forward has none
 		if m != s.start {
 			snap, err := snapshotOf(months, m.Prev())
 			if err != nil {
 				return err
 			}
-			opening = snap.Balances
+			opening, carried = snap.Balances, snap.Result.LossCarriedOut
 		}
 		reports, err := readReports(t, where("month", "==", m.String()))
 		if err != nil {
@@ -379,6 +385,7 @@ func (s *Store) closeMonth(ctx context.Context, actor Actor, m domain.Month, rev
 		}
 		closing, err := domain.CloseMonth(domain.MonthInput{
 			Month: m, Opening: opening, Reports: personReports(reports), Movements: movements(ledger), Terms: terms,
+			CarriedLoss: carried, LegacyProfit: s.legacyProfit(m),
 		})
 		if err != nil {
 			return err
@@ -512,6 +519,17 @@ func (s *Store) Recount(ctx context.Context, actor Actor, accountID string, coun
 		if err != nil {
 			return err
 		}
+		// Money already in the till but not yet confirmed would read as a
+		// surplus, and a recount difference now counts in profit.
+		pending, err := readLedger(t, where("status", "==", string(domain.Pending)))
+		if err != nil {
+			return err
+		}
+		for _, e := range pending {
+			if e.To == domain.Account(accountID) {
+				return &domain.ValidationError{Field: "counted", Problem: ProblemPendingDeposits}
+			}
+		}
 		out = RecountResult{Expected: bal.Accounts[accountID], Counted: counted}
 		diff := counted - out.Expected
 		if diff != 0 && trimmed(note) == "" {
@@ -635,6 +653,7 @@ func (s *Store) SaveImportedMonths(ctx context.Context, actor Actor, months map[
 
 // Reasons a month operation is rejected, beyond the domain's.
 const (
-	ProblemNotHistory   domain.Problem = "not_history"    // imported months come before the start month
-	ProblemMonthNotOver domain.Problem = "month_not_over" // a month closes once it has ended
+	ProblemNotHistory      domain.Problem = "not_history"      // imported months come before the start month
+	ProblemMonthNotOver    domain.Problem = "month_not_over"   // a month closes once it has ended
+	ProblemPendingDeposits domain.Problem = "pending_deposits" // confirm or cancel deposits into the account before recounting it
 )

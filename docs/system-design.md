@@ -110,7 +110,8 @@ Every write path is one Firestore transaction that also appends an `audit` doc.
 3. **Compute the monthly result:**
    - salon income, expenses, salaries;
    - each person's «Себе» bonus: when their month's «Себе» base is above `highSelfFromCents`, `round(base × (highSelfPct − selfPct))`;
-   - profit (after salaries and bonuses), and dividends split by `dividendWeight` using largest-remainder cents.
+   - kassa difference (the month's recount adjustments, ±);
+   - profit (after salaries, bonuses and the kassa difference); the loss carried in from `m−1`'s snapshot (`lossCarriedOut`, 0 in `S` or when absent) comes off it, and the rest, if positive, is split by `dividendWeight` using largest-remainder cents. The snapshot saves `kassaDifference`, `lossCarriedIn` and `lossCarriedOut`.
 4. **Write the accruals:** one `salary` row (salary > 0), one `self_bonus` row (bonus > 0) and one `dividend` row (weight > 0) per person, using those terms, dated the last day of the month, status `confirmed`.
 5. **Compute closing balances as of the end of month `m` only:** start from month `m−1`'s snapshot (or zero plus the `opening` rows when `m` is `S`), then apply reports and `confirmed` ledger rows **with `month == m`**, including the accruals from step 4. The snapshot also records the terms used, for display and audit. Later open months (for example December entries made before November is closed) are never part of `m`'s snapshot; they stay open-month activity in §4.1. Then write `months/{m}` with `status = closed` and the `snapshot`.
 
@@ -406,7 +407,8 @@ Dockerfile, Makefile, .air.toml, .env.web.example, firestore.indexes.json
 - **Settlement, reproducing a reference month laid out like the sheet:**
   - Fictional inputs in the sheet's layout: revenue, salon share, amounts returned, staff-paid expenses, salary, already paid.
   - Expected: dividends 3 × €596.28 (+1 cent to one owner by largest remainder); balances Maria +96.93, Olga +333.28, Vera −88.50, Anna +489.78 (±1 cent).
-- **Dividends:** a loss month pays none; the parts always add up exactly to the total.
+- **Dividends:** a loss month pays none; a carried loss comes off later profit first; the parts always add up exactly to the total.
+- **Kassa difference:** a recount shortage lowers profit, a surplus raises it.
 - **Balances:** combining snapshots with open months; voided and pending rows are ignored.
 - **Outstanding certificates:** opening 500 + sale 100 − redemption 150 = 450. A redemption with no opening amount and no sale shows the «Проверьте сертификаты» warning (negative outstanding).
 

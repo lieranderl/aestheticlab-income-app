@@ -21,6 +21,7 @@ const (
 	ProblemNoteRequired  domain.Problem = "note_required"  // expenses, adjustments and voids need a note
 	ProblemUnknownParty  domain.Problem = "unknown_party"  // the account, person or expense category doesn't exist
 	ProblemOpeningExists domain.Problem = "opening_exists" // a party has one opening; void the wrong one first
+	ProblemKassaNegative domain.Problem = "kassa_negative" // the account would go below €0; Field is its ID
 )
 
 // ReasonMonthReopened is the void reason of accruals when a month reopens.
@@ -31,7 +32,11 @@ type NewMovement struct {
 	// Token names the form this movement was sent from. Sending the same
 	// form again (a lost answer, a second tap) acknowledges the saved row
 	// instead of booking the money twice. Empty means no such protection.
-	Token           string
+	Token string
+	// WarnNegative refuses a movement that would take its source account
+	// below €0 (ProblemKassaNegative, Difference = the balance after), so the
+	// form can ask first. Sent again without it, the movement is saved.
+	WarnNegative    bool
 	Type            domain.MovementType
 	Amount          domain.Cents
 	From, To        domain.Party
@@ -224,6 +229,15 @@ func (s *Store) recordMovement(ctx context.Context, actor Actor, n NewMovement, 
 		category, err := checkParties(t, e.Movement)
 		if err != nil {
 			return err
+		}
+		if n.WarnNegative && e.From.Kind == domain.PartyAccount && e.Type != domain.Deposit {
+			b, err := s.balances(t) // every read before any write
+			if err != nil {
+				return err
+			}
+			if after := b.Accounts[e.From.ID] - e.Amount; after < 0 {
+				return &domain.ValidationError{Field: e.From.ID, Problem: ProblemKassaNegative, Difference: after}
+			}
 		}
 		if category != nil {
 			before := *category
@@ -518,6 +532,19 @@ func (s *Store) EditMovement(ctx context.Context, actor Actor, id string, versio
 		category, err := checkParties(t, e.Movement) // every read before any write
 		if err != nil {
 			return err
+		}
+		if n.WarnNegative && before.Status == domain.Confirmed && e.From.Kind == domain.PartyAccount {
+			b, err := s.balances(t)
+			if err != nil {
+				return err
+			}
+			balance := b.Accounts[e.From.ID]
+			if before.From == e.From {
+				balance += before.Amount // the old row is voided by this edit
+			}
+			if after := balance - e.Amount; after < 0 {
+				return &domain.ValidationError{Field: e.From.ID, Problem: ProblemKassaNegative, Difference: after}
+			}
 		}
 		if category != nil && e.ExpenseCategory != before.ExpenseCategory {
 			was := *category

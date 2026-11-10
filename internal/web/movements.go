@@ -209,6 +209,7 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 			Note:            f.Note,
 			Token:           r.PostFormValue("token"),
 		}
+		n.WarnNegative = r.PostFormValue("allowNegative") != "1"
 		if f.SettlementMonth != "" {
 			m, _ := domain.ParseMonth(f.SettlementMonth)
 			_, err = a.store.RecordSettlementMovement(r.Context(), u.Actor(), m, f.SettlementPerson, f.SettlementRevision, n)
@@ -218,6 +219,13 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 	}
 	if err != nil {
 		f.Bad, f.Error = movementFieldProblem(r, err, f.Type)
+		var v *domain.ValidationError
+		if errors.As(err, &v) && v.Problem == store.ProblemKassaNegative {
+			f.NegativeWarning = f.Error
+		}
+		if errors.As(err, &v) && v.Problem == store.ProblemAlreadyVoided { // this form's row, saved and then cancelled
+			f.Error = "Это движение уже сохранено, а потом отменено или исправлено — проверьте список движений"
+		}
 		f.MinDateLabel = ru.Date(a.store.StartMonth().FirstDay().Time())
 		if f.Bad == "date" && strings.HasPrefix(f.Error, "Дата раньше начала") {
 			f.Error += " — не раньше " + f.MinDateLabel
@@ -287,8 +295,8 @@ func movementFieldProblem(r *http.Request, err error, kind string) (field, messa
 			return "to", "«Откуда» и «Куда» должны различаться"
 		}
 		return "from", "Проверьте «Откуда» и «Куда» для этого вида движения"
-	case store.ProblemAlreadyVoided:
-		return "", "Это движение уже сохранено, а потом отменено или исправлено — проверьте список движений"
+	case store.ProblemKassaNegative:
+		return "amount", kassaName(v.Field) + ": после этого остаток " + domain.FormatEUR(v.Difference) + " — меньше €0. Проверьте сумму или отметьте «Всё равно сохранить»."
 	case store.ProblemOpeningExists:
 		return "to", "Начальный остаток уже внесён — сначала отмените прежний"
 	}
@@ -308,6 +316,8 @@ func movementProblem(r *http.Request, err error) string {
 			return "Укажите комментарий или причину отмены"
 		case store.ProblemNotPending:
 			return "Движение уже обработано — обновите страницу"
+		case store.ProblemPendingDeposits:
+			return "В эту кассу есть внесения, которые ждут подтверждения — сначала подтвердите или отмените их, потом пересчитайте"
 		case store.ProblemAlreadyVoided:
 			return "Движение уже отменено"
 		default:
@@ -646,4 +656,15 @@ func (a *app) handleRecount(w http.ResponseWriter, r *http.Request, u store.User
 		return
 	}
 	a.navigate(w, r, "/admin/kassa?saved=1")
+}
+
+// kassaName names a kassa account in a warning.
+func kassaName(id string) string {
+	switch id {
+	case domain.KassaCash:
+		return "Касса — наличные"
+	case domain.KassaCard:
+		return "Касса — карта салона"
+	}
+	return "Счёт"
 }

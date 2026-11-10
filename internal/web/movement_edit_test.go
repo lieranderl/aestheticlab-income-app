@@ -14,7 +14,7 @@ import (
 func (s *site) adminExpense(amount, day, note string, cookies []*http.Cookie) store.Entry {
 	s.t.Helper()
 	*s.clock = s.clock.Add(time.Minute)
-	form := url.Values{"type": {"expense"}, "amount": {amount}, "date": {day}, "from": {"account:kassa_cash"}, "to": {"outside"}, "expenseCategory": {"rent"}, "note": {note}}
+	form := url.Values{"type": {"expense"}, "amount": {amount}, "date": {day}, "from": {"account:kassa_cash"}, "to": {"outside"}, "expenseCategory": {"rent"}, "note": {note}, "allowNegative": {"1"}} // spending from an empty test kassa
 	wantRedirect(s.t, note, s.post("/admin/movements", form, cookies), "/admin/kassa?saved=1")
 	es, err := s.st.LedgerBetween(ctx, s.st.StartMonth().FirstDay(), s.st.Today())
 	if err != nil {
@@ -88,6 +88,8 @@ func TestAdminEditsAnExpenseInPlaceOfVoidingIt(t *testing.T) {
 	wantPage(t, "edit form", s.get("/movements/"+old.ID+"/edit", j), http.StatusOK, "Изменить расход", `value="100"`, `value="2026-11-03"`, "аренда гаража")
 
 	form := url.Values{"version": {"1"}, "type": {"expense"}, "amount": {"120,50"}, "date": {"2026-11-04"}, "from": {"account:kassa_card"}, "to": {"outside"}, "expenseCategory": {"rent"}, "note": {"аренда гаража, ноябрь"}}
+	wantPage(t, "edit empties the card", s.post("/movements/"+old.ID+"/edit", form, j), http.StatusUnprocessableEntity, "Касса — карта салона: после этого остаток −€120,50", `name="allowNegative"`)
+	form.Set("allowNegative", "1")
 	wantRedirect(t, "edit", s.post("/movements/"+old.ID+"/edit", form, j), "/admin/kassa?saved=1")
 	wantPage(t, "stale edit", s.post("/movements/"+old.ID+"/edit", form, j), http.StatusUnprocessableEntity, "Движение уже отменено")
 	wantPage(t, "after edit", s.get("/admin/kassa", j), http.StatusOK, "€120,50", "аренда гаража, ноябрь")

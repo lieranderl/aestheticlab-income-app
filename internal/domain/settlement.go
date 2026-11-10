@@ -24,6 +24,14 @@ type MonthInput struct {
 	Reports   []PersonReport
 	Movements []Movement
 	Terms     map[string]TermsHistory // every person who may earn this month
+	// CarriedLoss is the loss earlier months have not yet recovered (the
+	// previous month's LossCarriedOut; 0 in the start month). It is taken
+	// off this month's profit before any dividend is paid.
+	CarriedLoss Cents
+	// LegacyProfit settles a month from before the 2026-11-10 decision the
+	// way the Google Sheet does: recount differences stay out of profit and
+	// no loss is carried in or out.
+	LegacyProfit bool
 }
 
 // PersonResult is one person's month.
@@ -66,8 +74,11 @@ type MonthResult struct {
 	ExpensesByCategory map[string]Cents
 	Salaries           Cents
 	SelfBonuses        Cents
-	Profit             Cents
-	DividendPool       Cents
+	KassaDifference    Cents // recount adjustments: + surplus, − shortage; part of profit
+	Profit             Cents // this month alone: income − expenses − salaries − bonuses + kassa difference
+	LossCarriedIn      Cents // unrecovered loss from earlier months
+	DividendPool       Cents // max(0, profit − loss carried in)
+	LossCarriedOut     Cents // what is still unrecovered after this month
 	WorkingDays        int
 	People             map[string]PersonResult
 }
@@ -133,6 +144,9 @@ func PreviewMonth(in MonthInput) (MonthResult, error) {
 
 // settle computes a month from rows already known to belong to it.
 func settle(in MonthInput) (Closing, error) {
+	if in.CarriedLoss < 0 {
+		return Closing{}, invalid("carriedLoss", ProblemNegativeAmount)
+	}
 	terms := make(map[string]Terms, len(in.Terms))
 	for _, p := range slices.Sorted(maps.Keys(in.Terms)) {
 		t, ok := in.Terms[p].For(in.Month)
@@ -213,9 +227,17 @@ func settle(in MonthInput) (Closing, error) {
 	}
 	res.WorkingDays = len(days)
 	for _, m := range in.Movements {
-		if m.Status == Confirmed && m.Type == Expense {
+		if m.Status != Confirmed {
+			continue
+		}
+		switch {
+		case m.Type == Expense:
 			res.Expenses += m.Amount
 			res.ExpensesByCategory[m.ExpenseCategory] += m.Amount
+		case m.Type == Adjustment && m.To.Kind == PartyAccount:
+			res.KassaDifference += m.Amount // more counted than expected
+		case m.Type == Adjustment:
+			res.KassaDifference -= m.Amount // less counted than expected
 		}
 	}
 
@@ -227,8 +249,17 @@ func settle(in MonthInput) (Closing, error) {
 		bonuses[p] = SelfBonusFor(res.People[p].SelfBase, bonusBase[p], t)
 		res.SelfBonuses += bonuses[p]
 	}
-	res.Profit = res.SalonIncome - res.Expenses - res.Salaries - res.SelfBonuses
-	res.DividendPool = max(0, res.Profit)
+	carried := in.CarriedLoss
+	if in.LegacyProfit {
+		res.KassaDifference, carried = 0, 0
+	}
+	res.Profit = res.SalonIncome - res.Expenses - res.Salaries - res.SelfBonuses + res.KassaDifference
+	res.LossCarriedIn = carried
+	net := res.Profit - carried
+	res.DividendPool = max(0, net)
+	if !in.LegacyProfit {
+		res.LossCarriedOut = max(0, -net)
+	}
 	dividends := SplitByWeight(res.DividendPool, weights)
 
 	last := in.Month.LastDay()

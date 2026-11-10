@@ -1,5 +1,14 @@
 # Progress
 
+## Profit: recount differences and loss carry-forward (2026-11-10)
+Owner decisions 2026-11-10, from November 2026 (`store.ProfitRulesFrom`; October closes like the sheet):
+- **Recount differences count in profit:** a shortage lowers profit and dividends, a surplus raises them («Расхождение кассы» on the result). A recount waits for pending deposits into that account.
+- **Loss carry-forward:** a loss is saved in the snapshot (`lossCarriedOut`) and taken off later profit before dividends («Убыток прошлых месяцев», «Убыток на следующий месяц»). Previews follow it through open months in between.
+- **Negative kassa:** a payout, expense, transfer or expense edit that would take an account below €0 asks first («Всё равно сохранить»); it is not forbidden.
+- **Export:** «Итоги месяца» gains «Доплата «Себе»», «Расхождение кассы» and both carried-loss columns.
+- Kept as they are (decision): the whole-month higher «Себе» rate, staff back-dating, no certificate write-off.
+- Verified: `make ci`; Playwright iPhone SE / iPhone 15 (Pixel 7 runs in CI); result card and the negative-kassa warning at 375 pt; money audit (findings fixed). Store contract tests ran on memory here; the CI store job runs them on the emulator.
+
 ## Entry guards and refusal pages (2026-11-10)
 From a review of logic and phone use:
 - **Blank client refused:** a client with no services and no sales is rejected («пустую запись сохранить нельзя»); it used to save a €0 record that counted as a client and a working day. Earlier €0 clients stay; they can be removed with a reason.

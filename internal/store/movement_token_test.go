@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
@@ -51,5 +52,51 @@ func TestAMovementSentTwiceWithItsTokenIsRecordedOnce(t *testing.T) {
 			_, err = s.RecordMovement(ctx, s.admin, n)
 			wantErr(t, "token "+bad, err, store.ErrInvalid)
 		}
+	})
+}
+
+func TestAMovementCanAskBeforeTakingAnAccountBelowZero(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		nov12 := date(t, "2026-11-12")
+		pay := store.NewMovement{WarnNegative: true, Type: domain.Payout, Amount: 4000, From: domain.Account(domain.KassaCash), To: domain.Person(s.olga), Date: nov12}
+		_, err := s.RecordMovement(ctx, s.admin, pay)
+		wantProblem(t, "below zero", err, store.ProblemKassaNegative)
+		var v *domain.ValidationError
+		if !errors.As(err, &v) || v.Field != domain.KassaCash || v.Difference != -4000 {
+			t.Fatalf("warning %+v, want kassa_cash at −4000", v)
+		}
+		pay.WarnNegative = false
+		_, err = s.RecordMovement(ctx, s.admin, pay)
+		must(t, err)
+		bad := store.NewMovement{WarnNegative: true, Type: domain.Payout, Amount: 4000, From: domain.Account(domain.KassaCash), To: domain.Person(s.olga), Date: date(t, "2026-12-01")}
+		_, err = s.RecordMovement(ctx, s.admin, bad)
+		wantProblem(t, "other checks come first", err, domain.ProblemFutureDate)
+	})
+}
+
+func TestEditingAnExpenseAsksBeforeTakingTheKassaBelowZero(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		nov12 := date(t, "2026-11-12")
+		_, err := s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Opening, Amount: 10000, From: domain.Salon, To: domain.Account(domain.KassaCash), Date: s.StartMonth().FirstDay()})
+		must(t, err)
+		old, err := s.RecordMovement(ctx, s.admin, store.NewMovement{Type: domain.Expense, Amount: 5000, From: domain.Account(domain.KassaCash), To: domain.Outside, ExpenseCategory: "rent", Date: nov12, Note: "аренда"})
+		must(t, err)
+		fix := store.NewMovement{WarnNegative: true, Type: domain.Expense, Amount: 10000, From: domain.Account(domain.KassaCash), To: domain.Outside, ExpenseCategory: "rent", Date: nov12, Note: "аренда"}
+		_, err = s.EditMovement(ctx, s.admin, old.ID, old.Version, fix)
+		must(t, err) // €100 in, the €50 expense becomes €100: exactly €0
+		es, err := s.Ledger(ctx, month(t, "2026-11"))
+		must(t, err)
+		var current store.Entry
+		for _, e := range es {
+			if e.Type == domain.Expense && e.Status == domain.Confirmed {
+				current = e
+			}
+		}
+		fix.Amount = 10001
+		_, err = s.EditMovement(ctx, s.admin, current.ID, current.Version, fix)
+		wantProblem(t, "one cent below zero", err, store.ProblemKassaNegative)
+		fix.WarnNegative = false
+		_, err = s.EditMovement(ctx, s.admin, current.ID, current.Version, fix)
+		must(t, err)
 	})
 }

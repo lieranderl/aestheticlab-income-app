@@ -69,7 +69,17 @@ test("admin records a settlement payout or deposit", async ({ page }) => {
   await expect(sheet.locator('input[name="amount"]')).not.toHaveValue("");
   expect(await phoneRules(page)).toEqual([]);
   await tapSave(sheet.getByRole("button", { name: "Сохранить" }));
-  await expect(page.getByText("Сохранено ✓")).toBeVisible();
+  // The phones share one kassa: by the third, a payout can take it below €0,
+  // and the app asks before saving.
+  const anyway = sheet.getByRole("checkbox", { name: "Всё равно сохранить" });
+  const saved = page.getByText("Сохранено ✓");
+  await expect(anyway.or(saved)).toBeVisible();
+  if (await anyway.isVisible()) {
+    await anyway.check();
+    expect(await phoneRules(page)).toEqual([]);
+    await tapSave(sheet.getByRole("button", { name: "Сохранить" }));
+  }
+  await expect(saved).toBeVisible();
 });
 
 test("admin edits one category at a time", async ({ page }) => {

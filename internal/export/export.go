@@ -277,6 +277,7 @@ func writeMonthResultsSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 		"Доход салона", "Расходы салона", "Зарплаты",
 		"Прибыль", "Дивиденды", "Касса наличные, остаток на конец",
 		"Касса карта, остаток на конец", "Клиентов всего",
+		"Доплата «Себе»", "Расхождение кассы", "Убыток прошлых месяцев", "Убыток на следующий месяц",
 	}
 	writeHeaderRow(f, sheet, headers, hStyle)
 
@@ -316,6 +317,10 @@ func writeMonthResultsSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 			_ = f.SetCellValue(sheet, cell(10, row), unknown)
 		}
 		setCount(f, sheet, 11, row, res.Clients, res.StatsVersion > 0)
+		setCur(f, sheet, 12, row, res.SelfBonuses, cStyle)
+		setCur(f, sheet, 13, row, res.KassaDifference, cStyle)
+		setCur(f, sheet, 14, row, res.LossCarriedIn, cStyle)
+		setCur(f, sheet, 15, row, res.LossCarriedOut, cStyle)
 	}
 }
 
