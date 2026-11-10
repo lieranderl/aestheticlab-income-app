@@ -35,7 +35,7 @@ func settlementFigures(result domain.MonthResult) []views.MoneyRow {
 	}
 	rows = append(rows, views.MoneyRow{Name: "Дивиденды", Value: domain.FormatEUR(result.DividendPool)})
 	if result.LossCarriedOut > 0 {
-		rows = append(rows, views.MoneyRow{Name: "Убыток к покрытию", Value: domain.FormatEUR(result.LossCarriedOut)})
+		rows = append(rows, views.MoneyRow{Name: "Убыток на следующий месяц", Value: domain.FormatEUR(result.LossCarriedOut)})
 	}
 	return rows
 }
