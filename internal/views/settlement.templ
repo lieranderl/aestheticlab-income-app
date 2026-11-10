@@ -10,7 +10,7 @@ type SettlementPerson struct {
 }
 type SettlementData struct {
 	Key, Month, Prev, Next, Notice, AsOf string
-	Closed                         bool
+	Closed, Running                bool // Running: the month has not ended yet
 	Figures, Expenses              []MoneyRow
 	People                         []SettlementPerson
 	Blockers                       []string
@@ -48,7 +48,14 @@ templ SettlementPage(nav Nav, p SettlementData) {
 			if p.Closed {
 				<p class="alert alert-soft" role="status">Месяц закрыт. Итоги и условия зафиксированы.</p>
 			} else {
-				<p class="alert alert-info alert-soft" role="status">Предварительный расчёт. Зарплаты, доплата «Себе» и дивиденды ещё не начислены.</p>
+				<div class="alert alert-info alert-soft" role="status">
+					<p>
+						Предварительный расчёт. Зарплаты, доплата «Себе» и дивиденды ещё не начислены.
+						if p.Running {
+							До конца месяца прибыль ниже итоговой: зарплаты учтены за весь месяц, а доход — только за прошедшие дни.
+						}
+					</p>
+				</div>
 			}
 			@adminFigures(p.Figures)
 			@breakdown("Расходы по категориям", p.Expenses)
