@@ -82,3 +82,19 @@ func TestARecountWaitsForPendingDepositsIntoThatAccount(t *testing.T) {
 		}
 	})
 }
+
+func TestAPreviewCarriesTheLossOfOpenMonthsInBetween(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		// November (open) loses Anna's €1 000 salary; December, still open,
+		// earns €1 500 at Olga's 70% less the same salary: €500, all of it
+		// recovering November's loss once both close.
+		*s.clock = time.Date(2027, 1, 2, 12, 0, 0, 0, time.UTC)
+		_, err := s.SaveReport(ctx, s.actor(s.olga), store.ReportEntry{Person: s.olga, Date: date(t, "2026-12-01"), Revenue: map[string]domain.Cents{"services": 500000}, Payments: map[string]domain.Cents{"cash": 500000}})
+		must(t, err)
+		dec, err := s.Settlement(ctx, month(t, "2026-12"))
+		must(t, err)
+		if r := dec.Result; r.Profit != 50000 || r.LossCarriedIn != 100000 || r.DividendPool != 0 || r.LossCarriedOut != 50000 {
+			t.Fatalf("December preview: profit %d in %d pool %d out %d", r.Profit, r.LossCarriedIn, r.DividendPool, r.LossCarriedOut)
+		}
+	})
+}
