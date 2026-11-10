@@ -188,14 +188,14 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		f.Token = sent // the form keeps its token until it is saved
 	}
 	amount, err := domain.ParseAmount(f.Amount)
-	if err == nil && strings.TrimSpace(f.Amount) == "" {
-		err = store.ErrInvalid
+	if err != nil || strings.TrimSpace(f.Amount) == "" {
+		err = &domain.ValidationError{Field: "amount", Problem: problemAmountUnreadable}
 	}
 	var day domain.Date
 	if err == nil {
 		day, err = domain.ParseDate(f.Date)
 		if err != nil {
-			err = store.ErrInvalid
+			err = &domain.ValidationError{Field: "date", Problem: problemDateMissing}
 		}
 	}
 	if err == nil {
@@ -217,7 +217,11 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		}
 	}
 	if err != nil {
-		f.Error = movementProblem(r, err)
+		f.Bad, f.Error = movementFieldProblem(r, err, f.Type)
+		f.MinDateLabel = ru.Date(a.store.StartMonth().FirstDay().Time())
+		if f.Bad == "date" && strings.HasPrefix(f.Error, "Дата раньше начала") {
+			f.Error += " — не раньше " + f.MinDateLabel
+		}
 		status := http.StatusUnprocessableEntity
 		if errors.Is(err, store.ErrVersionConflict) {
 			status = http.StatusConflict
@@ -237,6 +241,56 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		separator = "&"
 	}
 	a.navigate(w, r, f.Back+separator+"saved="+saved)
+}
+
+// Reasons a movement form is refused before it reaches the store.
+const (
+	problemAmountUnreadable domain.Problem = "amount_unreadable"
+	problemDateMissing      domain.Problem = "date_missing"
+)
+
+// movementFieldProblem says which field of the movement form is at fault
+// ("" when none is) and what to do about it.
+func movementFieldProblem(r *http.Request, err error, kind string) (field, message string) {
+	var v *domain.ValidationError
+	switch {
+	case errors.Is(err, store.ErrMonthClosed):
+		return "date", "Месяц закрыт — выберите дату в открытом месяце"
+	case !errors.As(err, &v):
+		return "", movementProblem(r, err)
+	}
+	switch v.Problem {
+	case problemAmountUnreadable, domain.ProblemPaymentsMismatch:
+		return "amount", "Укажите сумму, например 100,50"
+	case domain.ProblemNegativeAmount:
+		return "amount", "Сумма должна быть больше €0"
+	case store.ProblemSettlementAmount:
+		return "amount", movementProblem(r, err)
+	case problemDateMissing:
+		return "date", "Укажите дату"
+	case domain.ProblemFutureDate:
+		return "date", "Дата не может быть позже сегодняшней"
+	case domain.ProblemBeforeStartMonth, store.ProblemOpeningDate:
+		return "date", "Дата раньше начала работы приложения"
+	case store.ProblemNoteRequired:
+		if kind == string(domain.Expense) {
+			return "note", "Для расхода нужен комментарий"
+		}
+		return "note", "Укажите комментарий"
+	case store.ProblemUnknownParty:
+		if v.Field == "expenseCategory" {
+			return "expenseCategory", "Выберите категорию расхода из списка"
+		}
+		return "to", "Выберите счёт или сотрудника из списка — этот не найден или в архиве"
+	case domain.ProblemMalformedMovement:
+		if kind == string(domain.Transfer) {
+			return "to", "«Откуда» и «Куда» должны различаться"
+		}
+		return "from", "Проверьте «Откуда» и «Куда» для этого вида движения"
+	case store.ProblemOpeningExists:
+		return "to", "Начальный остаток уже внесён — сначала отмените прежний"
+	}
+	return "", movementProblem(r, err)
 }
 
 func movementProblem(r *http.Request, err error) string {
