@@ -223,6 +223,9 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		if errors.As(err, &v) && v.Problem == store.ProblemKassaNegative {
 			f.NegativeWarning = f.Error
 		}
+		if errors.As(err, &v) && v.Problem == store.ProblemAlreadyVoided { // this form's row, saved and then cancelled
+			f.Error = "Это движение уже сохранено, а потом отменено или исправлено — проверьте список движений"
+		}
 		f.MinDateLabel = ru.Date(a.store.StartMonth().FirstDay().Time())
 		if f.Bad == "date" && strings.HasPrefix(f.Error, "Дата раньше начала") {
 			f.Error += " — не раньше " + f.MinDateLabel
@@ -292,8 +295,6 @@ func movementFieldProblem(r *http.Request, err error, kind string) (field, messa
 			return "to", "«Откуда» и «Куда» должны различаться"
 		}
 		return "from", "Проверьте «Откуда» и «Куда» для этого вида движения"
-	case store.ProblemAlreadyVoided:
-		return "", "Это движение уже сохранено, а потом отменено или исправлено — проверьте список движений"
 	case store.ProblemKassaNegative:
 		return "amount", kassaName(v.Field) + ": после этого остаток " + domain.FormatEUR(v.Difference) + " — меньше €0. Проверьте сумму или отметьте «Всё равно сохранить»."
 	case store.ProblemOpeningExists:
