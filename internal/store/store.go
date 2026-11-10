@@ -42,6 +42,7 @@ type Store struct {
 	loc                   *time.Location
 	start                 domain.Month
 	financialWritesPaused bool
+	profitRulesFrom       domain.Month
 }
 
 // Option configures a Store.
@@ -72,8 +73,19 @@ func (s *Store) SetFinancialWritesPaused(paused bool) { s.financialWritesPaused 
 // DefaultStartMonth is production's go-live month.
 var DefaultStartMonth = domain.Month{Year: 2026, Mon: time.November}
 
+// ProfitRulesFrom is the first month whose profit counts recount differences
+// and carries losses forward (owner decision 2026-11-10). Earlier months —
+// October 2026 runs in parallel with the Google Sheet — settle like the sheet.
+var ProfitRulesFrom = domain.Month{Year: 2026, Mon: time.November}
+
+// WithProfitRulesFrom moves ProfitRulesFrom, for tests.
+func WithProfitRulesFrom(m domain.Month) Option { return func(s *Store) { s.profitRulesFrom = m } }
+
+// legacyProfit says whether month m settles like the sheet.
+func (s *Store) legacyProfit(m domain.Month) bool { return m.Before(s.profitRulesFrom) }
+
 func newStore(db backend, opts []Option) *Store {
-	s := &Store{db: db, now: time.Now, start: DefaultStartMonth}
+	s := &Store{db: db, now: time.Now, start: DefaultStartMonth, profitRulesFrom: ProfitRulesFrom}
 	for _, o := range opts {
 		o(s)
 	}

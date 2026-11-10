@@ -28,6 +28,10 @@ type MonthInput struct {
 	// previous month's LossCarriedOut; 0 in the start month). It is taken
 	// off this month's profit before any dividend is paid.
 	CarriedLoss Cents
+	// LegacyProfit settles a month from before the 2026-11-10 decision the
+	// way the Google Sheet does: recount differences stay out of profit and
+	// no loss is carried in or out.
+	LegacyProfit bool
 }
 
 // PersonResult is one person's month.
@@ -245,11 +249,17 @@ func settle(in MonthInput) (Closing, error) {
 		bonuses[p] = SelfBonusFor(res.People[p].SelfBase, bonusBase[p], t)
 		res.SelfBonuses += bonuses[p]
 	}
+	carried := in.CarriedLoss
+	if in.LegacyProfit {
+		res.KassaDifference, carried = 0, 0
+	}
 	res.Profit = res.SalonIncome - res.Expenses - res.Salaries - res.SelfBonuses + res.KassaDifference
-	res.LossCarriedIn = in.CarriedLoss
-	net := res.Profit - in.CarriedLoss
+	res.LossCarriedIn = carried
+	net := res.Profit - carried
 	res.DividendPool = max(0, net)
-	res.LossCarriedOut = max(0, -net)
+	if !in.LegacyProfit {
+		res.LossCarriedOut = max(0, -net)
+	}
 	dividends := SplitByWeight(res.DividendPool, weights)
 
 	last := in.Month.LastDay()

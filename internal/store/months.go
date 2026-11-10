@@ -385,7 +385,7 @@ func (s *Store) closeMonth(ctx context.Context, actor Actor, m domain.Month, rev
 		}
 		closing, err := domain.CloseMonth(domain.MonthInput{
 			Month: m, Opening: opening, Reports: personReports(reports), Movements: movements(ledger), Terms: terms,
-			CarriedLoss: carried,
+			CarriedLoss: carried, LegacyProfit: s.legacyProfit(m),
 		})
 		if err != nil {
 			return err

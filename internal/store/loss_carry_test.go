@@ -51,3 +51,16 @@ func TestALossAndARecountShortageCarryIntoTheNextClose(t *testing.T) {
 		}
 	})
 }
+
+func TestMonthsBeforeTheNewProfitRulesSettleLikeTheSheet(t *testing.T) {
+	clock := time.Date(2026, 12, 2, 12, 0, 0, 0, time.UTC)
+	st := store.NewMemory(store.WithClock(func() time.Time { return clock }), store.WithProfitRulesFrom(month(t, "2026-12")))
+	admin, err := st.SetUp(ctx, defaultSetup())
+	must(t, err)
+	must(t, st.SetTerms(ctx, admin.Actor(), admin.ID, month(t, "2026-11"), domain.Terms{SelfPct: 5000, SalaryCents: 100000, DividendWeight: 1}, "старт"))
+	closed, err := st.CloseMonth(ctx, admin.Actor(), month(t, "2026-11"))
+	must(t, err)
+	if r := closed.Snapshot.Result; r.Profit != -100000 || r.LossCarriedOut != 0 {
+		t.Fatalf("a month before the rules carried a loss: profit %d out %d", r.Profit, r.LossCarriedOut)
+	}
+}

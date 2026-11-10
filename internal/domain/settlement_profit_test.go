@@ -83,3 +83,42 @@ func TestACarriedLossMustNotBeNegative(t *testing.T) {
 		t.Fatalf("a negative carried loss was accepted: %v", err)
 	}
 }
+
+func TestAMonthBeforeTheNewRulesSettlesLikeTheSheet(t *testing.T) {
+	in := sheetSeptember(t)
+	in.LegacyProfit = true
+	in.CarriedLoss = 50000
+	in.Movements = append(in.Movements, dated(confirmed(domain.Adjustment, 3000, cash, domain.Outside), date(t, "2026-11-28")))
+	extra := confirmed(domain.Expense, referenceProfit+5000, card, domain.Outside)
+	extra.ExpenseCategory = "equipment"
+	loss := in
+	loss.Movements = append(append([]domain.Movement(nil), in.Movements...), dated(extra, date(t, "2026-11-20")))
+	for name, tc := range map[string]struct {
+		in                        domain.MonthInput
+		profit, pool, in_, out, k domain.Cents
+	}{
+		"a recount and a carried loss are ignored": {in, referenceProfit, referenceProfit, 0, 0, 0},
+		"a loss is not carried out":                {loss, -5000, 0, 0, 0, 0},
+	} {
+		c, err := domain.CloseMonth(tc.in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := c.Result
+		if r.Profit != tc.profit || r.DividendPool != tc.pool || r.LossCarriedIn != tc.in_ || r.LossCarriedOut != tc.out || r.KassaDifference != tc.k {
+			t.Fatalf("%s: profit %d pool %d in %d out %d kassa %d", name, r.Profit, r.DividendPool, r.LossCarriedIn, r.LossCarriedOut, r.KassaDifference)
+		}
+	}
+}
+
+func TestAThirtyEuroShortageAloneLowersTheReferenceProfit(t *testing.T) {
+	in := sheetSeptember(t)
+	in.Movements = append(in.Movements, dated(confirmed(domain.Adjustment, 3000, cash, domain.Outside), date(t, "2026-11-28")))
+	c, err := domain.CloseMonth(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Result.Profit != 175885 || c.Result.DividendPool != 175885 {
+		t.Fatalf("profit %d pool %d, want 1758.85", c.Result.Profit, c.Result.DividendPool)
+	}
+}

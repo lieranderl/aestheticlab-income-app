@@ -117,7 +117,7 @@ func (s *Store) settlement(t tx, m domain.Month) (SettlementMonth, error) {
 	}
 	moves := movements(ledger)
 	moves = slices.DeleteFunc(moves, func(e domain.Movement) bool { return domain.IsAccrual(e.Type) })
-	in := domain.MonthInput{Month: m, Opening: opening, Reports: personReports(reports), Movements: moves, Terms: terms, CarriedLoss: carried}
+	in := domain.MonthInput{Month: m, Opening: opening, Reports: personReports(reports), Movements: moves, Terms: terms, CarriedLoss: carried, LegacyProfit: s.legacyProfit(m)}
 	if out.State.Snapshot != nil {
 		out.Result = out.State.Snapshot.Result
 		closing := out.State.Snapshot.Balances
