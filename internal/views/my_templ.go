@@ -261,7 +261,7 @@ func MyPage(nav Nav, m MyMonth) templ.Component {
 				}
 			}
 			for _, r := range m.Reports {
-				templ_7745c5c3_Err = myReportCard(r, true).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = myReportCard(r, false).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

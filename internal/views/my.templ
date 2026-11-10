@@ -57,7 +57,7 @@ templ MyPage(nav Nav, m MyMonth) {
 					<p class="rounded-box bg-base-100 p-4 text-base-content/60">Отчётов за этот месяц нет.</p>
 				}
 				for _, r := range m.Reports {
-					@myReportCard(r, true)
+					@myReportCard(r, false)
 				}
 			</section>
 		</div>
