@@ -231,7 +231,11 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 	f.Effect = "По этой записи расчёт с салоном — €0"
 	switch {
 	case show.BalanceDelta < 0:
-		f.Effect = "Оставьте в кассе " + domain.FormatEUR(-show.BalanceDelta)
+		f.Owes = true
+		f.Effect = "По этой записи вы должны салону " + domain.FormatEUR(-show.BalanceDelta)
+		if f.OtherEmployee {
+			f.Effect = "По этой записи сотрудник должен салону " + domain.FormatEUR(-show.BalanceDelta)
+		}
 	case show.BalanceDelta > 0:
 		f.Effect = "По этой записи салон должен вам " + domain.FormatEUR(show.BalanceDelta)
 		if f.OtherEmployee {

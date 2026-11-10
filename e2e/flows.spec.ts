@@ -24,6 +24,21 @@ test("staff enter a client", async ({ page }) => {
   await expect(page.getByText("Сохранено ✓")).toBeVisible();
 });
 
+test("one tap leaves the salon's share in the till", async ({ page }) => {
+  await signIn(page, "olga");
+  await page.goto("/clients/new");
+  await page.locator('input[name="services"]').fill("85");
+  await expect(page.getByText("По этой записи вы должны салону €29,75")).toBeVisible();
+  await page.getByRole("button", { name: "Оставляю долю салона наличными" }).click();
+  await expect(page.locator('input[name="serviceCash"]')).toHaveValue("29,75");
+  await expect(page.getByText("По этой записи расчёт с салоном — €0")).toBeVisible();
+  await page.getByRole("button", { name: "Клиент оплатил картой салона" }).click();
+  await expect(page.locator('input[name="serviceCash"]')).toHaveValue("");
+  await expect(page.locator('input[name="serviceCard"]')).toHaveValue("85");
+  await expect(page.getByText("По этой записи салон должен вам €55,25")).toBeVisible();
+  expect(await phoneRules(page)).toEqual([]);
+});
+
 test("staff record a deposit in the movement sheet", async ({ page }) => {
   await signIn(page, "olga");
   await page.goto("/my");

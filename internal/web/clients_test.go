@@ -451,14 +451,20 @@ func TestClientFormExplainsShareAndRemainingContribution(t *testing.T) {
 	page := s.get(saved.Header().Get("Location"), z)
 	wantPage(t, "share rule and outstanding contribution", page, http.StatusOK,
 		"Распределение по вашим условиям", "Ваша доля от услуг — 50%.",
-		"По введённым данным", "Оставьте в кассе €30",
+		"По введённым данным", "По этой записи вы должны салону €30",
+		"Оставляете эти деньги в кассе? Нажмите «Оставляю долю салона наличными»",
+		"Оставляю долю салона наличными</button>", "Клиент оплатил картой салона</button>",
 		"Только по этой записи, без учёта общего баланса.")
+	if strings.Contains(page.Body.String(), "Оставьте в кассе €30") {
+		t.Fatal("an unrecorded contribution is worded as an instruction the record already reflects")
+	}
 	if strings.Contains(page.Body.String(), ">Результат</h2>") {
 		t.Fatal("share rule is presented as a completed result")
 	}
 	admin := s.login("anna", annaPass)
 	wantPage(t, "admin sees employee terms", s.get(saved.Header().Get("Location"), admin), http.StatusOK,
-		"Распределение по условиям сотрудника", "Доля сотрудника от услуг — 50%.")
+		"Распределение по условиям сотрудника", "Доля сотрудника от услуг — 50%.",
+		"По этой записи сотрудник должен салону €30")
 	for _, tc := range []struct {
 		token, deposit, redemption, effect string
 	}{
