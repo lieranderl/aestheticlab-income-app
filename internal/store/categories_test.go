@@ -54,6 +54,43 @@ func TestCategoryIDsAndFlagsAreValidated(t *testing.T) {
 	})
 }
 
+// Client entries have a fixed shape (services, creams, oil, certificates;
+// cash, card, certificate), so a new revenue category or payment method
+// could never be entered. Only expense categories are added by hand.
+func TestOnlyExpenseCategoriesCanBeAdded(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		_, err := s.CreateCategory(ctx, s.admin, store.Category{ID: "candles", Name: "Свечи", Kind: store.KindRevenue})
+		wantProblem(t, "a new revenue category", err, store.ProblemFixedList)
+		_, err = s.CreateCategory(ctx, s.admin, store.Category{ID: "voucher", Name: "Ваучер", Kind: store.KindPayment, Destination: domain.ToCash})
+		wantProblem(t, "a new payment method", err, store.ProblemFixedList)
+		_, err = s.CreateCategory(ctx, s.admin, store.Category{ID: "cleaning", Name: "Уборка", Kind: store.KindExpense})
+		must(t, err)
+
+		// Oil still appears by itself with its first sale.
+		sale := store.ClientEntry{ // #nosec G101 -- idempotency token, not credentials
+			Person: s.olga, Date: date(t, "2026-11-12"), Token: "oil-first-sale-entry-0001",
+			Input: domain.ClientInput{Extras: map[string]domain.Cents{"oil": 1500}, ExtrasDestination: domain.ToCash},
+		}
+		_, err = s.SaveClientReport(ctx, s.actor(s.olga), sale)
+		must(t, err)
+		cats, err := s.Categories(ctx)
+		must(t, err)
+		var oil bool
+		for _, c := range cats {
+			oil = oil || c.ID == "oil"
+		}
+		if !oil {
+			t.Fatal("the first oil sale did not add the oil category")
+		}
+		// A leftover from the old daily form can still be archived.
+		for _, c := range cats {
+			if c.ID == "goods" {
+				must(t, s.SetCategoryActive(ctx, s.admin, c.ID, c.Version, false))
+			}
+		}
+	})
+}
+
 func TestCategoryEditsKeepSavedMoneyAndFlags(t *testing.T) {
 	eachSalon(t, func(t *testing.T, s *salon) {
 		e := store.ReportEntry{Person: s.anna, Date: date(t, "2026-11-10"), Revenue: map[string]domain.Cents{"services": 60000, "creams": 5000, "certificates": 10000}, Payments: map[string]domain.Cents{"card": 60000, "cash": 15000}}

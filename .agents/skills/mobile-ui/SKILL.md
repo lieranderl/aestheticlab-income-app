@@ -40,7 +40,9 @@ Source: `docs/system-design.md` §6–7. Every screen is designed at **375 pt wi
 | **Себе** | The person's share of their revenue. |
 | **Салону** | The salon's share (Total − Себе). Never call this «В кассу». |
 | **Касса** | The salon's money: «Касса — наличные» (the till) and «Касса — карта салона». |
-| **Оставьте в кассе** | The salon's part of the day's cash on the daily form: «Наличными в кассу» (left in the till) and «Переводом на карту салона» (transferred to the kassa card). |
+| **Оставьте в кассе** | Legacy daily form only: the salon's part of the day's cash, «Наличными в кассу» and «Переводом на карту салона». The client form does not use it as an instruction (2026-11-10): an unrecorded share reads «По этой записи вы должны салону €X», and «Оставляю долю салона наличными» / «Клиент оплатил картой салона» fill the contribution fields. |
+| **Расхождение кассы** | A month's recount differences (+ surplus, − shortage), part of profit from November 2026. |
+| **Убыток прошлых месяцев / Убыток на следующий месяц** | The loss carried into a month and the part still unrecovered after it. |
 | **Салон должен вам / Вы должны салону** | The person's balance (+ / −). |
 | **Внесение** | Deposit: a person puts money into the kassa. |
 | **Выплата** | Payout: kassa → person. |

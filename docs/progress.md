@@ -1,5 +1,10 @@
 # Progress
 
+## Fixed revenue and payment lists (2026-11-10)
+- **Only expense categories can be added.** Client entries count services, creams, oil and certificates, paid in cash, on the salon's card or by certificate, so a revenue category or payment method added by hand could never be entered. «Выручка» and «Оплата» say «Список постоянный»; renaming stays, and leftovers of the daily form («Другие товары», «Прочее») can be archived. Oil is still added by its first sale.
+- The `mobile-ui` glossary now marks «Оставьте в кассе» as legacy and lists the new result terms.
+- Verified: `make ci`; Playwright iPhone SE / iPhone 15 (Pixel 7 runs in CI).
+
 ## Balance replay and quieter screens (2026-11-10)
 From the same review:
 - **One replay:** a person's balance and the settlement suggestion fold the same rows through one function (`replayPerson`) instead of two copies.

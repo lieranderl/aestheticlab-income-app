@@ -138,3 +138,24 @@ func TestCategoryFlagsSayTheyOnlyApplyToLegacyDayReports(t *testing.T) {
 		t.Error("the list doesn't name the services setting as a day-report one")
 	}
 }
+
+func TestRevenueAndPaymentListsOfferNoNewCategory(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	for _, kind := range []string{"revenue", "payment"} {
+		list := s.get("/admin/categories?kind="+kind, admin)
+		wantPage(t, kind+" list", list, http.StatusOK, "Список постоянный")
+		if strings.Contains(list.Body.String(), "Добавить категорию") {
+			t.Errorf("%s list offers to add a category", kind)
+		}
+		wantPage(t, kind+" new form", s.get("/admin/categories/new?kind="+kind, admin), http.StatusBadRequest, "добавить можно только категорию расходов", "На главную")
+		form := url.Values{"kind": {kind}, "name": {"Свечи"}}
+		if kind == "payment" {
+			form.Set("destination", "cash")
+		}
+		wantPage(t, kind+" post", s.post("/admin/categories", form, admin), http.StatusUnprocessableEntity, "добавить можно только категорию расходов")
+	}
+	wantPage(t, "expenses", s.get("/admin/categories?kind=expense", admin), http.StatusOK, "Добавить категорию")
+	wantPage(t, "new form without a kind", s.get("/admin/categories/new", admin), http.StatusOK, `name="kind" value="expense"`)
+	wantRedirect(t, "new expense category", s.post("/admin/categories", url.Values{"kind": {"expense"}, "name": {"Уборка"}}, admin), "/admin/categories?kind=expense")
+}
