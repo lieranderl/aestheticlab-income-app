@@ -73,6 +73,7 @@ func (s *Store) settlement(t tx, m domain.Month) (SettlementMonth, error) {
 		}
 	}
 	opening := domain.Balances{}
+	var carried domain.Cents
 	from := s.start
 	var earlier *domain.Month
 	for month, rec := range months {
@@ -87,6 +88,9 @@ func (s *Store) settlement(t tx, m domain.Month) (SettlementMonth, error) {
 			return SettlementMonth{}, e
 		}
 		opening = snap.Balances
+		// Exact when the previous month is closed (always so at close time);
+		// with open months in between, a preview from the last known figure.
+		carried = snap.Result.LossCarriedOut
 		from = earlier.Next()
 	}
 	if from.Before(m) {
@@ -113,7 +117,7 @@ func (s *Store) settlement(t tx, m domain.Month) (SettlementMonth, error) {
 	}
 	moves := movements(ledger)
 	moves = slices.DeleteFunc(moves, func(e domain.Movement) bool { return domain.IsAccrual(e.Type) })
-	in := domain.MonthInput{Month: m, Opening: opening, Reports: personReports(reports), Movements: moves, Terms: terms}
+	in := domain.MonthInput{Month: m, Opening: opening, Reports: personReports(reports), Movements: moves, Terms: terms, CarriedLoss: carried}
 	if out.State.Snapshot != nil {
 		out.Result = out.State.Snapshot.Result
 		closing := out.State.Snapshot.Balances
