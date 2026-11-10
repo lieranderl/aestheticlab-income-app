@@ -303,6 +303,14 @@ func (s *Store) ReportsBetween(ctx context.Context, from, to domain.Date) ([]Sav
 	return s.queryReports(ctx, where("date", ">=", from.String()), where("date", "<=", to.String()))
 }
 
+// PersonReportsOn are one person's reports for a day.
+func (s *Store) PersonReportsOn(ctx context.Context, uid string, d domain.Date) ([]SavedReport, error) {
+	if err := checkID("user", uid); err != nil {
+		return nil, err
+	}
+	return s.queryReports(ctx, where("userId", "==", uid), where("date", "==", d.String()))
+}
+
 // PersonReportsIn are one person's reports in a month, by date.
 func (s *Store) PersonReportsIn(ctx context.Context, uid string, m domain.Month) ([]SavedReport, error) {
 	return s.queryReports(ctx, where("userId", "==", uid), where("month", "==", m.String()))
