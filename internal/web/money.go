@@ -77,13 +77,24 @@ func splitFact(v *views.MoneyView, s domain.Summary, who audience) {
 	if who == salonMoney {
 		kept = "Наличными у сотрудников"
 	}
+	// Parts that are €0 are left out, and the parts altogether when the
+	// money paid for one thing only: the total then says it all.
 	split := func(name string, m domain.MoneySplit, newGroup bool) []views.MoneyLine {
-		return []views.MoneyLine{
-			{Name: name + " (услуги)", Value: domain.FormatEUR(m.Services), NewGroup: newGroup},
-			{Name: name + " (сертификаты)", Value: domain.FormatEUR(m.Certificates)},
-			{Name: name + " (продажи)", Value: domain.FormatEUR(m.Sales)},
-			{Name: name, Value: domain.FormatEUR(m.Total()), Strong: true},
+		var parts []views.MoneyLine
+		for _, p := range []struct {
+			label string
+			v     domain.Cents
+		}{{" (услуги)", m.Services}, {" (сертификаты)", m.Certificates}, {" (продажи)", m.Sales}} {
+			if p.v != 0 {
+				parts = append(parts, views.MoneyLine{Name: name + p.label, Value: domain.FormatEUR(p.v)})
+			}
 		}
+		if len(parts) < 2 {
+			parts = nil
+		}
+		parts = append(parts, views.MoneyLine{Name: name, Value: domain.FormatEUR(m.Total()), Strong: true})
+		parts[0].NewGroup = newGroup
+		return parts
 	}
 	fact := split("Получено от клиентов", s.Received, false)
 	fact = append(fact, split("Внесено в кассу", s.Deposited, true)...)

@@ -279,3 +279,31 @@ func TestTheMonthSplitsMoneyIntoServicesCertificatesAndSales(t *testing.T) {
 		t.Error("the day page grew the month's split")
 	}
 }
+
+// 2026-11-10 review: a month of services only showed six «€0» split rows per
+// card. A part shows only when it is not €0, and the split only when the
+// money paid for more than one thing.
+func TestTheMonthSplitLeavesOutEmptyParts(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 5000)
+	olga := s.login("olga", olgaPass)
+	v := url.Values{"date": {"2026-11-20"}, "services": {"85"}, "serviceCash": {"40"}, "extrasDestination": {"cash"}, "token": {"services-only-month-token"}, "version": {"0"}}
+	if res := s.post("/clients", v, olga); res.Code != http.StatusSeeOther {
+		t.Fatalf("save: %d", res.Code)
+	}
+	month := s.get("/admin/month?m=2026-11", s.login("anna", annaPass)).Body.String()
+	for _, absent := range []string{"(услуги)", "(сертификаты)", "(продажи)"} {
+		if strings.Contains(month, absent) {
+			t.Errorf("a services-only month shows %q", absent)
+		}
+	}
+	wantPage(t, "totals stay", s.get("/admin/month?m=2026-11", s.login("anna", annaPass)), http.StatusOK, "Получено от клиентов", "€85", "Внесено в кассу", "€40")
+	v = url.Values{"date": {"2026-11-20"}, "creams": {"20"}, "extrasDestination": {"cash"}, "token": {"services-only-cream-token"}, "version": {"0"}}
+	if res := s.post("/clients", v, olga); res.Code != http.StatusSeeOther {
+		t.Fatalf("save: %d", res.Code)
+	}
+	month = s.get("/admin/month?m=2026-11", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(month, "Получено от клиентов (продажи)") || strings.Contains(month, "(сертификаты)") {
+		t.Error("with services and sales, only those two parts show")
+	}
+}
