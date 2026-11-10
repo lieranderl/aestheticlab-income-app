@@ -5,6 +5,7 @@ import (
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -396,4 +397,28 @@ func TestLoadedMovementTypePatchesFormBeforeEnablingInput(t *testing.T) {
 	}
 	wantPage(t, "no-JS expense page", s.get("/movements/new?type=expense", z), http.StatusOK, `action="/movements"`, `name="type" value="expense"`, `href="/movements/new?type=deposit"`)
 	wantPage(t, "unknown type never enables", s.do(request{method: http.MethodGet, path: "/movements/new?type=opening", cookies: z, datastar: true}), http.StatusBadRequest, "Проверьте вид движения")
+}
+
+func TestRepeatedMovementFormIsRecordedOnce(t *testing.T) {
+	s := newSite(t)
+	z := s.login("olga", olgaPass)
+	page := s.get("/movements/new", z)
+	token := regexp.MustCompile(`name="token" value="([a-z0-9]{20,64})"`).FindStringSubmatch(page.Body.String())
+	if token == nil {
+		t.Fatal("the movement form carries no repeat-protection token")
+	}
+	form := url.Values{"type": {"deposit"}, "amount": {"100"}, "date": {"2026-11-20"}, "from": {"person:" + s.olga.ID}, "to": {"account:kassa_cash"}, "token": {token[1]}}
+	wantRedirect(t, "deposit", s.post("/movements", form, z), "/my?saved=pending")
+	wantRedirect(t, "the same form again", s.post("/movements", form, z), "/my?saved=pending")
+	es, err := s.st.PersonMovementsIn(ctx, s.olga.ID, s.st.StartMonth())
+	if err != nil || len(es) != 1 {
+		t.Fatalf("a repeated form made %d rows (%v), want 1", len(es), err)
+	}
+	form.Set("amount", "150")
+	wantPage(t, "a changed repeat", s.post("/movements", form, z), http.StatusConflict, "уже сохранено с другими данными")
+	form.Set("token", "../../users/x")
+	wantPage(t, "a forged token", s.post("/movements", form, z), http.StatusUnprocessableEntity, "Проверьте поля формы")
+	if es, _ := s.st.PersonMovementsIn(ctx, s.olga.ID, s.st.StartMonth()); len(es) != 1 {
+		t.Fatalf("rejected repeats made rows: %d", len(es))
+	}
 }

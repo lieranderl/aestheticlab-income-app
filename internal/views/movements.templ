@@ -4,6 +4,7 @@ import "strconv"
 
 type MovementFormData struct {
 	Action, Back, Type, Amount, Date, MinDate, MaxDate, From, To, Category, Note, Error string
+	Token                                                                               string // names this form, so sending it twice books the money once
 	SettlementMonth, SettlementPerson, SettlementRevision, ContextNotice                string
 	Version                                                                             string // the row being edited
 	Admin, Edit                                                                         bool
@@ -121,6 +122,9 @@ templ MovementForm(f MovementFormData) {
 		</nav>
 		<fieldset class="flex min-w-0 flex-col gap-3" data-attr:disabled="$_movementloading || !$_movementready" data-attr:aria-busy="$_movementloading">
 			<input type="hidden" name="type" value={ f.Type }/>
+			if f.Token != "" && !f.Edit {
+				<input type="hidden" name="token" value={ f.Token }/>
+			}
 			if f.Version != "" {
 				<input type="hidden" name="version" value={ f.Version }/>
 			}

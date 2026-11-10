@@ -3,7 +3,9 @@ package store
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -26,6 +28,10 @@ const ReasonMonthReopened = "месяц открыт заново"
 
 // NewMovement is a movement of money as someone records it.
 type NewMovement struct {
+	// Token names the form this movement was sent from. Sending the same
+	// form again (a lost answer, a second tap) acknowledges the saved row
+	// instead of booking the money twice. Empty means no such protection.
+	Token string
 	Type            domain.MovementType
 	Amount          domain.Cents
 	From, To        domain.Party
@@ -188,6 +194,18 @@ func (s *Store) recordMovement(ctx context.Context, actor Actor, n NewMovement, 
 		return Entry{}, err
 	}
 	err = s.db.run(ctx, false, func(t tx) error {
+		if n.Token != "" {
+			saved, err := readEntry(t, e.ID)
+			switch {
+			case err == nil && sameMovement(saved, e):
+				e = saved // the same form again: answer with the saved row
+				return nil
+			case err == nil:
+				return ErrVersionConflict
+			case !errors.Is(err, ErrNotFound):
+				return err
+			}
+		}
 		if err := requireOpen(t, n.Date.Month()); err != nil {
 			return err
 		}
@@ -219,9 +237,28 @@ func (s *Store) recordMovement(ctx context.Context, actor Actor, n NewMovement, 
 
 // newEntry checks a movement as someone records it, before any read: who
 // may record it, its date, note and shape.
+// movementTokenPattern keeps a form's token usable as a ledger document ID.
+var movementTokenPattern = regexp.MustCompile(`^[a-z0-9]{20,64}$`)
+
+// sameMovement says whether a saved row is what this form would have
+// written: then sending it again is a repeat, not a second movement. A
+// voided row is never acknowledged as saved.
+func sameMovement(saved, sent Entry) bool {
+	return saved.Status != domain.Voided && saved.CreatedBy == sent.CreatedBy && saved.Type == sent.Type &&
+		saved.Amount == sent.Amount && saved.From == sent.From && saved.To == sent.To &&
+		saved.ExpenseCategory == sent.ExpenseCategory && saved.Date == sent.Date && saved.Note == sent.Note
+}
+
 func (s *Store) newEntry(actor Actor, n NewMovement) (Entry, error) {
+	id := newID()
+	if n.Token != "" {
+		if !movementTokenPattern.MatchString(n.Token) {
+			return Entry{}, fmt.Errorf("%w: movement token", ErrInvalid)
+		}
+		id = n.Token
+	}
 	e := Entry{
-		ID: newID(),
+		ID: id,
 		Movement: domain.Movement{
 			Type: n.Type, Amount: n.Amount, From: n.From, To: n.To,
 			ExpenseCategory: n.ExpenseCategory, Date: n.Date, Status: domain.Confirmed,
@@ -268,6 +305,7 @@ func (s *Store) RecordOpenings(ctx context.Context, actor Actor, ns []NewMovemen
 		if n.Type != domain.Opening {
 			return nil, fmt.Errorf("%w: row %d is a %s, not an opening", ErrInvalid, i+1, n.Type)
 		}
+		n.Token = "" // openings are guarded by one-per-party, not by a form token
 		e, err := s.newEntry(actor, n)
 		if err != nil {
 			return nil, err
@@ -447,6 +485,7 @@ func (s *Store) EditMovement(ctx context.Context, actor Actor, id string, versio
 	if n.Type != domain.Expense {
 		return Entry{}, ErrForbidden
 	}
+	n.Token = "" // the row's version guards an edit; the corrected row gets its own ID
 	e, err := s.newEntry(actor, n)
 	if err != nil {
 		return Entry{}, err

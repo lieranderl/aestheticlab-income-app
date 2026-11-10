@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/rand"
 	"errors"
 	"net/http"
 	"slices"
@@ -57,6 +58,7 @@ func (a *app) movementForm(r *http.Request, u store.User, admin bool, kind strin
 	if admin {
 		f.Action = "/admin/movements"
 	}
+	f.Token = strings.ToLower(rand.Text())
 	accounts, err := a.store.Accounts(r.Context())
 	if err != nil {
 		return f, err
@@ -182,6 +184,9 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 	f.To = r.PostFormValue("to")
 	f.Category = r.PostFormValue("expenseCategory")
 	f.Note = r.PostFormValue("note")
+	if sent := r.PostFormValue("token"); sent != "" {
+		f.Token = sent // the form keeps its token until it is saved
+	}
 	amount, err := domain.ParseAmount(f.Amount)
 	if err == nil && strings.TrimSpace(f.Amount) == "" {
 		err = store.ErrInvalid
@@ -202,6 +207,7 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 			To:              movementParty(f.To),
 			ExpenseCategory: f.Category,
 			Note:            f.Note,
+			Token:           r.PostFormValue("token"),
 		}
 		if f.SettlementMonth != "" {
 			m, _ := domain.ParseMonth(f.SettlementMonth)
@@ -215,6 +221,9 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		status := http.StatusUnprocessableEntity
 		if errors.Is(err, store.ErrVersionConflict) {
 			status = http.StatusConflict
+			if f.SettlementMonth == "" {
+				f.Error = "Это движение уже сохранено с другими данными — проверьте список движений и откройте форму заново"
+			}
 		}
 		a.formFailedStatus(w, r, status, views.MovementForm(f), views.MovementFormPage(a.navFor(u, f.Back), f))
 		return
