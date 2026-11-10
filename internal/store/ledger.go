@@ -31,7 +31,7 @@ type NewMovement struct {
 	// Token names the form this movement was sent from. Sending the same
 	// form again (a lost answer, a second tap) acknowledges the saved row
 	// instead of booking the money twice. Empty means no such protection.
-	Token string
+	Token           string
 	Type            domain.MovementType
 	Amount          domain.Cents
 	From, To        domain.Party

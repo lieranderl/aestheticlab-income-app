@@ -165,7 +165,9 @@ func New(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /admin/export", a.adminOnly(a.handleExport))
 	mux.HandleFunc("GET /admin/export/download", a.adminOnly(a.handleExportDownload))
 	// Anything else under /admin/ is the admin's too: 403 before 404.
-	mux.HandleFunc("/admin/", a.adminOnly(func(w http.ResponseWriter, r *http.Request, _ store.User) { a.problem(w, r, http.StatusNotFound, "Страница не найдена") }))
+	mux.HandleFunc("/admin/", a.adminOnly(func(w http.ResponseWriter, r *http.Request, _ store.User) {
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
+	}))
 
 	secure := strings.HasPrefix(cfg.BaseURL, "https://")
 	protected := http.NewCrossOriginProtection().Handler(withTheme(mux))

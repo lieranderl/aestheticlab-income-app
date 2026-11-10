@@ -3,9 +3,9 @@ package web
 import (
 	"context"
 	"errors"
-	"net/url"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/a-h/templ"
