@@ -204,6 +204,7 @@ For month `m`:
 - **Dividends:**
   - **Loss carry-forward** (decision 2026-11-10, unlike the sheet): a loss is carried in the month snapshot and taken off later profit until recovered. Total = `max(0, profit − loss carried in)`; loss carried out = `max(0, loss carried in − profit)`. The start month carries nothing in; snapshots closed before this rule carry nothing out.
   - A month with a loss, or whose profit does not cover the carried loss, pays no dividends.
+  - **From November 2026** (`store.ProfitRulesFrom`): October 2026 runs in parallel with the sheet and closes like it — no kassa difference in profit, nothing carried in or out.
   - Split between Anna, Olga and Maria by dividend share (1 : 1 : 1). Leftover cents are spread by the largest-remainder method, so the parts add up exactly.
 - **Per person:** revenue, «Себе», salary, dividend, «Итого заработано» (= «Себе» + «Себе» bonus + salary + dividend), plus their balance at the start and end of the month.
 
@@ -211,7 +212,7 @@ For month `m`:
 1. **Before closing**, the admin checks the month screen:
    - Missing daily reports (a warning).
    - Pending deposits and expenses: **closing is blocked** until each one is confirmed or voided.
-   - A kassa recount («Пересчёт кассы»): enter the cash actually counted; any difference becomes an adjustment entry.
+   - A kassa recount («Пересчёт кассы»): enter the cash actually counted; any difference becomes an adjustment entry. A recount waits until deposits into that account are confirmed or cancelled, so money already in the till is not read as a surplus.
 2. **«Закрыть месяц»** in one transaction:
    - Only allowed when the previous month is already closed (the first tracked month, the start month — October 2026 in production — has none).
    - Locks the month for everyone, the admin included.

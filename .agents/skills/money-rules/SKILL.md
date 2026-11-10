@@ -56,7 +56,7 @@ balanceDelta     = kassaCredit − salonShare
 - **`kassa_card`:** opening + Σ `cardIn` + Σ `transferToCard` + ledger rows in − ledger rows out.
 - **`kassa_cash`:** opening + Σ `cashToKassa` + ledger rows in − ledger rows out.
 - **Transfers** (cash ↔ card) move money between the two accounts and change neither the kassa total nor any person.
-- **Adjustments** (from «Пересчёт кассы») change one account only, and count in the month's profit as the kassa difference.
+- **Adjustments** (from «Пересчёт кассы») change one account only, and count in the month's profit as the kassa difference. A recount is refused while deposits into that account are pending.
 - **A movement taking an account below €0** is asked about first («уйдёт в минус», «Всё равно сохранить»); it is not forbidden.
 - **Outstanding certificates** = opening outstanding (sold before the start month, not yet used) + Σ certificate sales − Σ prepaid redemptions. Below zero → warning «Проверьте сертификаты».
 - **Starting point:** the snapshot of the latest closed month. Then apply the open months. Ignore `pending` and `voided` rows.
@@ -75,6 +75,7 @@ profit(m)      = salonIncome − expenses − salaries − Σ selfBonus + kassaD
 carriedIn(m)   = lossCarriedOut of m−1's snapshot (0 in the start month or when absent)
 dividendPool   = max(0, profit − carriedIn)                          (loss carry-forward, decision 2026-11-10)
 lossCarriedOut = max(0, carriedIn − profit)
+(months before store.ProfitRulesFrom = 2026-11 settle like the sheet: kassaDiff 0, nothing carried)
 dividend[p]    = largest-remainder split of dividendPool by terms(p, m).dividendWeight   (Σ == pool exactly)
 terms(p, m)    = users/{p}/terms doc with the greatest ID ≤ m      (effective-dated; never today's values;
                  a new terms doc can't start where p already has reports in a month it would cover)

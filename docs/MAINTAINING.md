@@ -350,3 +350,6 @@ Then disable the old version.
 7. To correct a closed month, use «Открыть заново» on the newest closed month. Reopen later months first if necessary. Reopening voids its accruals and removes its snapshot; correct the records and close again in chronological order.
 
 October is the first real month: close it like any other once its records match the sheet.
+
+## Recounts and profit (2026-11-10)
+From November 2026 a recount difference counts in the month's profit and dividends. Recount the card against the bank only for money the bank has received: card payments still on their way would book as a shortage this month and a surplus the next. A recount waits for pending deposits into that account.

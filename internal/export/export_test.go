@@ -443,3 +443,20 @@ func TestExportMarksOpenMonthsAsPreliminary(t *testing.T) {
 		}
 	}
 }
+
+func TestExportMonthResultsExplainTheGapBetweenProfitAndDividends(t *testing.T) {
+	data := sampleExportData()
+	nov := domain.Month{Year: 2026, Mon: 11}
+	r := data.MonthResults[nov]
+	r.SelfBonuses, r.KassaDifference, r.LossCarriedIn, r.LossCarriedOut = 4000, -3000, 100000, 53000
+	data.MonthResults[nov] = r
+	f := openXLSX(t, data)
+	for ref, want := range map[string]string{
+		"L1": "Доплата «Себе»", "M1": "Расхождение кассы", "N1": "Убыток прошлых месяцев", "O1": "Убыток на следующий месяц",
+		"L2": "40", "M2": "-30", "N2": "1000", "O2": "530",
+	} {
+		if got := rawCell(t, f, "Итоги месяца", ref); got != want {
+			t.Errorf("%s = %q, want %q", ref, got, want)
+		}
+	}
+}
