@@ -193,8 +193,7 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 						views.MoneyRow{Name: "Касса — карта салона", Value: domain.FormatEUR(card + transfer)})
 				}
 				if created, err := time.Parse(time.RFC3339Nano, auditString(after, "createdAt")); err == nil {
-					loc, _ := time.LoadLocation("Europe/Brussels")
-					p.Subject += " · " + created.In(loc).Format("15:04")
+					p.Subject += " · " + created.In(salonLocation).Format("15:04")
 				}
 			}
 		}

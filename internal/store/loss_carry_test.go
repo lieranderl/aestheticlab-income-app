@@ -98,3 +98,19 @@ func TestAPreviewCarriesTheLossOfOpenMonthsInBetween(t *testing.T) {
 		}
 	})
 }
+
+func TestOnePersonsReportsForADayLeaveOutOtherDaysAndPeople(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		for _, r := range []struct {
+			person, day string
+		}{{s.olga, "2026-11-10"}, {s.olga, "2026-11-11"}, {s.maria, "2026-11-10"}} {
+			_, err := s.SaveReport(ctx, s.actor(r.person), store.ReportEntry{Person: r.person, Date: date(t, r.day), Revenue: map[string]domain.Cents{"services": 1000}, Payments: map[string]domain.Cents{"card": 1000}})
+			must(t, err)
+		}
+		got, err := s.PersonReportsOn(ctx, s.olga, date(t, "2026-11-10"))
+		must(t, err)
+		if len(got) != 1 || got[0].Person != s.olga || got[0].Date != date(t, "2026-11-10") {
+			t.Fatalf("got %+v", got)
+		}
+	})
+}

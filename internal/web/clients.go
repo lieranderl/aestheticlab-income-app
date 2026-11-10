@@ -17,17 +17,25 @@ import (
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 )
 
+// salonLocation is the salon's timezone, loaded once (time/tzdata is embedded).
+var salonLocation = func() *time.Location {
+	loc, err := time.LoadLocation("Europe/Brussels")
+	if err != nil {
+		panic(err)
+	}
+	return loc
+}()
+
 func clientLabel(rep store.SavedReport) string {
 	if !rep.Client {
 		return "Отчёт за день"
 	}
-	loc, _ := time.LoadLocation("Europe/Brussels")
-	return "Клиент " + strconv.FormatInt(rep.ClientNumber, 10) + " · " + rep.CreatedAt.In(loc).Format("15:04")
+	return "Клиент " + strconv.FormatInt(rep.ClientNumber, 10) + " · " + rep.CreatedAt.In(salonLocation).Format("15:04")
 }
 
 func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.User) {
 	day := a.reportDay(r)
-	rows, err := a.store.PersonReportsIn(r.Context(), u.ID, day.Month())
+	rows, err := a.store.PersonReportsOn(r.Context(), u.ID, day)
 	if err != nil {
 		a.serverError(w, r, err)
 		return
@@ -35,9 +43,6 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 	var selected []store.SavedReport
 	var cards []views.MyReport
 	for _, rep := range rows {
-		if rep.Date != day {
-			continue
-		}
 		selected = append(selected, rep)
 		href := "/reports/day?date=" + day.String()
 		if rep.Client {
@@ -117,11 +122,13 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		}
 	}
 	f := views.ClientForm{Action: "/clients", User: u.ID, Date: day.String(), Values: map[string]string{"services": "", "creams": "", "oil": "", "certificates": "", "certificatePaid": "", "serviceCash": "", "serviceCard": ""}, Number: 1}
+	show := domain.Report{}
 	if id := r.PathValue("id"); id != "" {
 		rep, err := a.store.ClientReport(r.Context(), u.Actor(), id)
 		if err != nil {
 			return f, err
 		}
+		show = rep.Report
 		owner, err = a.store.User(r.Context(), rep.Person)
 		if err != nil {
 			return f, err
@@ -215,14 +222,6 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 		f.Back = "/admin/day?date=" + day.String()
 	}
 	f.DayLabel = ru.Date(day.Time())
-	show := domain.Report{}
-	if r.PathValue("id") != "" {
-		saved, err := a.store.ClientReport(r.Context(), u.Actor(), r.PathValue("id"))
-		if err != nil {
-			return f, err
-		}
-		show = saved.Report
-	}
 	f.Self = domain.FormatEUR(show.SelfAmount)
 	f.Salon = domain.FormatEUR(show.SalonShare)
 	f.Cash = domain.FormatEUR(show.CashToKassa)

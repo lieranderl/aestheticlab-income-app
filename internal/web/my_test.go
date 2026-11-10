@@ -24,7 +24,7 @@ func TestMyRecordsShowTheMonthsFiguresAndReports(t *testing.T) {
 	page := s.get("/my", olga)
 	wantPage(t, "Olga's November", page, http.StatusOK,
 		"Ноябрь 2026", "Выручка", "€600", "«Себе»", "€350", "«Салону»", "€250", "Рабочие дни", ">2</dd>",
-		"пт, 20.11", "чт, 19.11", `href="/reports/day?date=2026-11-20"`, "Салон должен вам €210", "Расчёт с салоном: €0",
+		"пт, 20.11", "чт, 19.11", `href="/reports/day?date=2026-11-20"`, "Салон должен вам €210",
 		"80%", "€4\u202f500,01") // «До 80% осталось €4 500,01»: base 500 of 5 000
 	if strings.Contains(page.Body.String(), "€999") {
 		t.Fatal("Olga sees Maria's report")
@@ -96,9 +96,12 @@ func TestPersonalPagesExplainHowCashKeptMakesUpSelf(t *testing.T) {
 		"«Себе» €213,50 = €100 у вас + €113,50 от салона",
 		"Факт: в кассу €427 · у вас €100", "Ожидается: «Себе» €213,50 · «Салону» €313,50")
 	page := s.get("/my", olga)
+	if strings.Contains(page.Body.String(), "Вы должны салону €182,50") {
+		t.Fatal("each record repeats a debt beside the month's and the balance")
+	}
 	wantPage(t, "month", page, http.StatusOK,
 		"Итог месяца по записям", "Вы должны салону €69", "€465", "€396", "«Себе» €396 = €465 у вас − €69 салону",
-		"Вы должны салону €182,50", "Факт: в кассу €0 · у вас €365",
+		"Факт: в кассу €0 · у вас €365",
 		"Услуги за месяц €792 из €3 000", "€2 208,01")
 	for _, confusing := range []string{"База «Себе»", "У вас остаётся"} {
 		if strings.Contains(page.Body.String(), confusing) {

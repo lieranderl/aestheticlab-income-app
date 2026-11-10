@@ -1,5 +1,15 @@
 # Progress
 
+## Balance replay and quieter screens (2026-11-10)
+From the same review:
+- **One replay:** a person's balance and the settlement suggestion fold the same rows through one function (`replayPerson`) instead of two copies.
+- **Lighter reads:** the staff day reads that day's reports, not the month; the client edit form reads the client once; the timezone loads once.
+- **Month split:** «Получено от клиентов» / «Внесено в кассу» leave out €0 parts, and the parts altogether when the money paid for one thing.
+- **«Мои записи»:** record cards no longer repeat a debt line beside the month total and the balance.
+- **Running month:** the preliminary result says why profit is low before the month ends (whole-month salaries, income so far).
+- **Staff day:** the install hint wraps instead of cutting off at 375 pt; an empty day shows no «Итоги дня».
+- Verified: `make ci`; Playwright iPhone SE / iPhone 15 in light and dark (Pixel 7 runs in CI). The mobile reviewer agent hit a usage limit, so the screen review rests on the Playwright phone rules.
+
 ## Profit: recount differences and loss carry-forward (2026-11-10)
 Owner decisions 2026-11-10, from November 2026 (`store.ProfitRulesFrom`; October closes like the sheet):
 - **Recount differences count in profit:** a shortage lowers profit and dividends, a surplus raises them («Расхождение кассы» on the result). A recount waits for pending deposits into that account.

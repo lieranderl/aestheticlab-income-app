@@ -316,3 +316,12 @@ func TestOversizedSettlementFormPreservesAmountWithActionablePlainAndSSEErrors(t
 		})
 	}
 }
+
+// 2026-11-10 review: mid-month the full salary sits against ten days of
+// income without saying so.
+func TestARunningMonthExplainsItsProfit(t *testing.T) {
+	s := newSite(t)
+	cookie := s.login("anna", annaPass)
+	page := s.get("/admin/month?m=2026-11&tab=settlement", cookie)
+	wantPage(t, "running month", page, http.StatusOK, "Месяц ещё не закончился", "зарплаты учтены за весь месяц, а доход — только за прошедшие дни")
+}

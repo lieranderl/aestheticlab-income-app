@@ -34,32 +34,11 @@ func (s *Store) SettlementSuggestion(ctx context.Context, uid string, m domain.M
 }
 
 func (s *Store) settlementSuggestion(t tx, uid string, m domain.Month) (SettlementPayment, error) {
-	months, err := readMonths(t)
+	replay, err := s.replayPerson(t, uid)
 	if err != nil {
 		return SettlementPayment{}, err
 	}
-	from := s.start
-	start := domain.Balances{Persons: map[string]domain.Cents{}}
-	if newest := newestClosed(months); newest != nil {
-		snap, e := snapshotOf(months, *newest)
-		if e != nil {
-			return SettlementPayment{}, e
-		}
-		start.Persons[uid] = snap.Balances.Persons[uid]
-		from = newest.Next()
-	}
-	reports, err := readReports(t, where("userId", "==", uid), where("date", ">=", from.FirstDay().String()), where("date", "<=", s.Today().String()))
-	if err != nil {
-		return SettlementPayment{}, err
-	}
-	ledger, err := readLedger(t, where("personId", "==", uid), where("date", ">=", from.FirstDay().String()), where("date", "<=", s.Today().String()))
-	if err != nil {
-		return SettlementPayment{}, err
-	}
-	bal, err := domain.Fold(start, personReports(reports), movements(ledger))
-	if err != nil {
-		return SettlementPayment{}, err
-	}
+	months, reports, ledger := replay.months, replay.reports, replay.ledger
 	slices.SortFunc(reports, compareReport)
 	slices.SortFunc(ledger, func(a, b Entry) int { return strings.Compare(a.ID, b.ID) })
 	monthKeys := map[string]monthRecord{}
@@ -77,7 +56,7 @@ func (s *Store) settlementSuggestion(t tx, uid string, m domain.Month) (Settleme
 		return SettlementPayment{}, err
 	}
 	hash := sha256.Sum256(bytes)
-	return SettlementPayment{Balance: bal.Persons[uid], Revision: hex.EncodeToString(hash[:])}, nil
+	return SettlementPayment{Balance: replay.balance, Revision: hex.EncodeToString(hash[:])}, nil
 }
 
 // RecordSettlementMovement rechecks the actual suggestion in the same audited movement transaction.
