@@ -21,7 +21,7 @@ An internal web app (PWA) that **replaces the «Aesthetic Lab Finance» Google S
 | Split base | New client entries split **services only**. Creams, oil and certificate sales go entirely to the salon. Certificate sales are liabilities until used for services; redemption earns the service share without another cash/card deposit. Legacy saved daily figures remain frozen. |
 | Kassa | Two kassa accounts: **«Касса — наличные»** (the salon till) and **«Касса — карта салона»**. **Card payments always land in the kassa card.** Cash varies: each day the master records how much cash they left in the till. |
 | Who pays whom | **Everything goes through the kassa; nobody pays another person directly.** Each person has a running balance with the salon. At month close the app suggests **one** payout (salon → person) or **one** deposit (person → kassa). Anything unpaid carries over. See §5. |
-| Monthly settlement | Replaces the sheet's Debit Credit tab: salon income, expenses, manager salary (Anna €1,200), and **owner dividends = max(0, profit) split 1/3 between Anna, Olga and Maria**. These are added at month close. |
+| Monthly settlement | Replaces the sheet's Debit Credit tab: salon income, expenses, manager salary (Anna €1,200), and **owner dividends = max(0, profit − loss carried from earlier months) split 1/3 between Anna, Olga and Maria**. These are added at month close. |
 | History | The sheet's monthly figures for **April–September 2026** will be imported (milestone M10) as read-only monthly records marked «импорт», so trends start with data. Daily records start on **1 October 2026** (decision 2026-10-14), the first month the app tracks; nothing can be dated earlier. |
 | Timezone | `Europe/Brussels`. |
 | Domain | `<app-host>`. |
@@ -199,9 +199,11 @@ For month `m`:
   - A day whose «Себе» was set by hand counts toward the threshold but is left out of the bonus base: it keeps exactly the «Себе» it was given.
   - Closing refuses a month whose reports were saved at another «Себе» rate than its terms (it cannot happen through the app, since terms never change inside a month with reports).
   - Threshold and rates are part of the effective-dated terms, so they can differ from month to month.
-- **Profit** = salon income − expenses − salaries − «Себе» bonuses.
+- **Kassa difference** (decision 2026-11-10): the month's recount adjustments, + for a surplus, − for a shortage. Shown as «Расхождение кассы»; it is not an expense category.
+- **Profit** = salon income − expenses − salaries − «Себе» bonuses + kassa difference.
 - **Dividends:**
-  - Total = `max(0, profit)`, as in the sheet. A loss pays no dividends and is not carried over.
+  - **Loss carry-forward** (decision 2026-11-10, unlike the sheet): a loss is carried in the month snapshot and taken off later profit until recovered. Total = `max(0, profit − loss carried in)`; loss carried out = `max(0, loss carried in − profit)`. The start month carries nothing in; snapshots closed before this rule carry nothing out.
+  - A month with a loss, or whose profit does not cover the carried loss, pays no dividends.
   - Split between Anna, Olga and Maria by dividend share (1 : 1 : 1). Leftover cents are spread by the largest-remainder method, so the parts add up exactly.
 - **Per person:** revenue, «Себе», salary, dividend, «Итого заработано» (= «Себе» + «Себе» bonus + salary + dividend), plus their balance at the start and end of the month.
 
