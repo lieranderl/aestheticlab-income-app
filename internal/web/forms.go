@@ -141,6 +141,12 @@ func (a *app) problem(w http.ResponseWriter, r *http.Request, status int, messag
 		sse := datastar.NewSSE(w, r)
 		if err := sse.PatchElementTempl(views.ProblemToast(message)); err != nil {
 			slog.ErrorContext(r.Context(), "patch problem", "error", logError(err))
+			return
+		}
+		// The toast's own initializer runs once: after someone closes it, a
+		// morph leaves it hidden, so every refusal shows it again.
+		if err := sse.MarshalAndPatchSignals(map[string]any{"_problem": true}); err != nil {
+			slog.ErrorContext(r.Context(), "show problem", "error", logError(err))
 		}
 		return
 	}

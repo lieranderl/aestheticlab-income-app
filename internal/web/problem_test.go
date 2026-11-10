@@ -37,6 +37,6 @@ func TestRefusedRequestsKeepTheNavigation(t *testing.T) {
 		t.Fatal("a foreign referrer became the way back")
 	}
 	sse := s.do(request{method: http.MethodPost, path: "/admin/movements", form: url.Values{"type": {"bogus"}}, cookies: admin, datastar: true})
-	wantPage(t, "in-page request", sse, http.StatusOK, "datastar-patch-elements", `id="problem-toast"`, "Проверьте вид движения")
+	wantPage(t, "in-page request", sse, http.StatusOK, "datastar-patch-elements", `id="problem-toast"`, "Проверьте вид движения", "datastar-patch-signals", `"_problem":true`)
 	wantPage(t, "unknown page", s.get("/admin/nowhere", admin), http.StatusNotFound, "Страница не найдена", `aria-label="Навигация"`)
 }
