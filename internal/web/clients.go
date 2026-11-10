@@ -341,7 +341,7 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 			if f.OtherEmployee && errors.As(err, &ve) && ve.Problem == domain.ProblemMissingTerms {
 				f.Error = otherTermsMissing
 			}
-			if errors.As(err, &ve) {
+			if errors.As(err, &ve) && ve.Problem != domain.ProblemEmptyEntry { // no single field is wrong: the alert says it
 				f.Bad[ve.Field] = true
 				switch ve.Problem {
 				case domain.ProblemPaymentsMismatch:
@@ -454,6 +454,8 @@ func clientProblem(r *http.Request, err error) string {
 			return "Введите сумму от €0 до €9 999 999,99"
 		case domain.ProblemUnknownDestination:
 			return "Выберите, куда внесены дополнительные продажи"
+		case domain.ProblemEmptyEntry:
+			return "Укажите стоимость услуг или продажу — пустую запись сохранить нельзя"
 		}
 	}
 	return problemText(r, err)

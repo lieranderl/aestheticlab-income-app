@@ -43,6 +43,9 @@ func NewClientReport(person string, day Date, in ClientInput, pct BasisPoints) (
 		extras += amount
 		cat.Revenue[id] = RevenueCategory{IsCertificateSale: id == "certificates"}
 	}
+	if in.Services == 0 && extras == 0 { // a blank form is a slip of the thumb, not a client
+		return PersonReport{}, invalid("services", ProblemEmptyEntry)
+	}
 	var extraCash, extraCard Cents
 	switch in.ExtrasDestination {
 	case ToCash:

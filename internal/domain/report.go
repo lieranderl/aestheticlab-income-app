@@ -84,6 +84,7 @@ const (
 	ProblemSelfOutOfRange        Problem = "self_out_of_range"
 	ProblemPercentOutOfRange     Problem = "percent_out_of_range"
 	ProblemUnknownDestination    Problem = "unknown_destination"
+	ProblemEmptyEntry            Problem = "empty_entry" // a client with no services and no sales
 )
 
 // ValidationError is a rejected input: which field, why, and for a payment

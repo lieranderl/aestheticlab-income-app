@@ -75,9 +75,11 @@ func TestClientZeroCertificatesValidationAdminAndClosedMonth(t *testing.T) {
 	form.Set("services", "")
 	form.Set("certificatePaid", "")
 	form.Set("serviceCash", "")
+	wantPage(t, "blank is not a client", s.post("/clients", form, z), http.StatusUnprocessableEntity, "пустую запись сохранить нельзя")
+	form.Set("services", "50")
 	zero := s.post("/clients", form, z)
 	if zero.Code != http.StatusSeeOther {
-		t.Fatalf("zero %d %s", zero.Code, zero.Body.String())
+		t.Fatalf("second client %d %s", zero.Code, zero.Body.String())
 	}
 	href := strings.Split(zero.Header().Get("Location"), "?")[0]
 	wantPage(t, "admin can edit", s.get(href, admin), http.StatusOK, "Клиент 2")
@@ -791,4 +793,13 @@ func TestAdminBackfillsClientsForDaysBeforeTheAccountsExisted(t *testing.T) {
 		t.Fatalf("save %d %s", res.Code, res.Body.String())
 	}
 	wantPage(t, "Olga's 1 October", s.get("/?date=2026-10-01", s.login("olga", olgaPass)), http.StatusOK, "Клиент 1", "€100")
+}
+
+func TestBlankClientFormIsNotSavedAsAClient(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	z := s.login("olga", olgaPass)
+	form := url.Values{"date": {"2026-11-20"}, "token": {"http-blank-client-token"}, "version": {"0"}, "extrasDestination": {"cash"}}
+	wantPage(t, "blank client", s.post("/clients", form, z), http.StatusUnprocessableEntity, "Укажите стоимость услуг или продажу")
+	wantPage(t, "day stays empty", s.get("/?date=2026-11-20", z), http.StatusOK, "Клиентов за этот день нет")
 }
