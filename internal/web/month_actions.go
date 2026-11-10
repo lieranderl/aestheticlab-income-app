@@ -11,15 +11,33 @@ import (
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 )
 
+// settlementFigures is the month's result, top to bottom: income less costs
+// is the month's profit; an unrecovered earlier loss comes off it before
+// dividends. Lines that are zero this month and rarely used are left out.
 func settlementFigures(result domain.MonthResult) []views.MoneyRow {
-	return []views.MoneyRow{
+	rows := []views.MoneyRow{
 		{Name: "Доход салона", Value: domain.FormatEUR(result.SalonIncome)},
 		{Name: "Расходы", Value: domain.FormatEUR(result.Expenses)},
 		{Name: "Зарплаты", Value: domain.FormatEUR(result.Salaries)},
 		{Name: "Доплата «Себе»", Value: domain.FormatEUR(result.SelfBonuses)},
-		{Name: "Прибыль", Value: domain.FormatEUR(result.Profit)},
-		{Name: "Дивиденды", Value: domain.FormatEUR(result.DividendPool)},
 	}
+	if result.KassaDifference != 0 {
+		rows = append(rows, views.MoneyRow{Name: "Расхождение кассы", Value: signedMoney(result.KassaDifference)})
+	}
+	if result.LossCarriedIn == 0 && result.LossCarriedOut == 0 {
+		return append(rows,
+			views.MoneyRow{Name: "Прибыль", Value: domain.FormatEUR(result.Profit)},
+			views.MoneyRow{Name: "Дивиденды", Value: domain.FormatEUR(result.DividendPool)})
+	}
+	rows = append(rows, views.MoneyRow{Name: "Прибыль за месяц", Value: domain.FormatEUR(result.Profit)})
+	if result.LossCarriedIn > 0 {
+		rows = append(rows, views.MoneyRow{Name: "Убыток прошлых месяцев", Value: domain.FormatEUR(-result.LossCarriedIn)})
+	}
+	rows = append(rows, views.MoneyRow{Name: "Дивиденды", Value: domain.FormatEUR(result.DividendPool)})
+	if result.LossCarriedOut > 0 {
+		rows = append(rows, views.MoneyRow{Name: "Убыток к покрытию", Value: domain.FormatEUR(result.LossCarriedOut)})
+	}
+	return rows
 }
 
 func (a *app) settlementBlockers(selected store.SettlementMonth, m domain.Month) []string {
