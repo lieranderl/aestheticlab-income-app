@@ -30,12 +30,12 @@ func withTheme(next http.Handler) http.Handler {
 // «Как в системе» forgets the cookie.
 func (a *app) handleSetTheme(w http.ResponseWriter, r *http.Request, _ store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	t, ok := views.ParseTheme(r.PostFormValue("theme"))
 	if !ok {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	age := themeMaxAge

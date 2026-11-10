@@ -251,7 +251,7 @@ func (a *app) clientForm(r *http.Request, u store.User) (views.ClientForm, error
 
 func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Слишком большой запрос", http.StatusRequestEntityTooLarge)
+		a.problem(w, r, http.StatusRequestEntityTooLarge, "Слишком большой запрос")
 		return
 	}
 	f, err := a.clientForm(r, u)
@@ -267,7 +267,7 @@ func (a *app) handleSaveClient(w http.ResponseWriter, r *http.Request, u store.U
 	}
 	e.Date, err = domain.ParseDate(f.Date)
 	if err != nil {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	e.Version, err = strconv.ParseInt(r.PostFormValue("version"), 10, 64)
@@ -508,7 +508,7 @@ func (a *app) handleRemoveClientPage(w http.ResponseWriter, r *http.Request, u s
 
 func (a *app) handleRemoveClient(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Слишком большой запрос", http.StatusRequestEntityTooLarge)
+		a.problem(w, r, http.StatusRequestEntityTooLarge, "Слишком большой запрос")
 		return
 	}
 	f, err := a.removeClientForm(r, u)
@@ -517,7 +517,7 @@ func (a *app) handleRemoveClient(w http.ResponseWriter, r *http.Request, u store
 		// list without claiming this request removed anything.
 		day, derr := domain.ParseDate(r.PostFormValue("date"))
 		if derr != nil {
-			http.NotFound(w, r)
+			a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 			return
 		}
 		back := "/?date=" + day.String()

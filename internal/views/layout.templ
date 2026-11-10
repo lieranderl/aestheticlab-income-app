@@ -92,6 +92,7 @@ templ Layout(title string, nav Nav) {
 		>
 			<div class="hidden" data-effect={ redirectEffect }></div>
 			<div class="hidden" data-init={ swInit }></div>
+			@ProblemToast("")
 			if len(nav.Items) > 0 {
 				@sidebar(nav)
 			}

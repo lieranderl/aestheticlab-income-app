@@ -139,7 +139,7 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 func (a *app) adminReportOwner(w http.ResponseWriter, r *http.Request) (store.User, bool) {
 	u, err := a.store.User(r.Context(), r.PathValue("uid"))
 	if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrInvalid) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return u, false
 	}
 	if err != nil {
@@ -156,7 +156,7 @@ func (a *app) handleAdminReport(w http.ResponseWriter, r *http.Request, admin st
 	}
 	day, err := domain.ParseDate(r.PathValue("date"))
 	if err != nil || a.store.Today().Before(day) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	dc, err := a.loadDay(r.Context(), owner, day)
@@ -165,7 +165,7 @@ func (a *app) handleAdminReport(w http.ResponseWriter, r *http.Request, admin st
 		return
 	}
 	if dc.report == nil {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	dc.admin, dc.name = true, owner.DisplayName

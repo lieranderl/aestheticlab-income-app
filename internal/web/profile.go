@@ -40,7 +40,7 @@ func (a *app) handleProfile(w http.ResponseWriter, r *http.Request, u store.User
 // is logged out; this one gets a fresh session.
 func (a *app) handleChangePassword(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	current, next, repeat := r.PostFormValue("current"), r.PostFormValue("new"), r.PostFormValue("repeat")

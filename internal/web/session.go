@@ -166,9 +166,10 @@ func (a *app) signedIn(h userHandler) http.HandlerFunc {
 			return
 		case err != nil:
 			slog.ErrorContext(r.Context(), "load session user", "error", logError(err))
-			http.Error(w, "Сервис временно недоступен, попробуйте ещё раз", http.StatusServiceUnavailable)
+			a.problem(w, r, http.StatusServiceUnavailable, "Сервис временно недоступен, попробуйте ещё раз")
 			return
 		}
+		r = withSignedIn(r, u)
 		if u.MustChangePassword && !strings.HasPrefix(r.URL.Path, "/profile") {
 			a.navigate(w, r, "/profile")
 			return

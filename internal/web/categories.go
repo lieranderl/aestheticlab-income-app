@@ -30,7 +30,7 @@ func categoryBack(k store.CategoryKind) string { return "/admin/categories?kind=
 func (a *app) handleCategories(w http.ResponseWriter, r *http.Request, u store.User) {
 	k := categoryKind(r)
 	if !validCategoryKind(k) {
-		http.Error(w, "Проверьте вид категории", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид категории")
 		return
 	}
 	cats, err := a.store.Categories(r.Context())
@@ -50,7 +50,7 @@ func (a *app) handleCategories(w http.ResponseWriter, r *http.Request, u store.U
 func (a *app) handleNewCategory(w http.ResponseWriter, r *http.Request, u store.User) {
 	k := categoryKind(r)
 	if !validCategoryKind(k) {
-		http.Error(w, "Проверьте вид категории", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид категории")
 		return
 	}
 	f := views.CategoryFormData{Category: store.Category{Kind: k, CountsTowardSelf: k == store.KindRevenue}, Action: "/admin/categories", New: true}
@@ -60,7 +60,7 @@ func (a *app) handleNewCategory(w http.ResponseWriter, r *http.Request, u store.
 func (a *app) handleCategory(w http.ResponseWriter, r *http.Request, u store.User) {
 	c, err := a.store.CategoryByID(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrInvalid) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	if err != nil {
@@ -72,7 +72,7 @@ func (a *app) handleCategory(w http.ResponseWriter, r *http.Request, u store.Use
 
 func (a *app) handleSaveCategory(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	isNew := r.PathValue("id") == ""
@@ -81,14 +81,14 @@ func (a *app) handleSaveCategory(w http.ResponseWriter, r *http.Request, u store
 	if isNew {
 		kind := store.CategoryKind(r.PostFormValue("kind"))
 		if !validCategoryKind(kind) {
-			http.Error(w, "Проверьте вид категории", http.StatusBadRequest)
+			a.problem(w, r, http.StatusBadRequest, "Проверьте вид категории")
 			return
 		}
 		c = store.Category{ID: "c_" + strings.ToLower(rand.Text()[:20]), Kind: kind}
 	} else {
 		c, err = a.store.CategoryByID(r.Context(), r.PathValue("id"))
 		if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrInvalid) {
-			http.NotFound(w, r)
+			a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 			return
 		}
 		if err != nil {
@@ -135,12 +135,12 @@ func (a *app) handleSaveCategory(w http.ResponseWriter, r *http.Request, u store
 
 func (a *app) handleCategoryAction(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	c, err := a.store.CategoryByID(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) || errors.Is(err, store.ErrInvalid) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	if err != nil {
@@ -171,7 +171,7 @@ func (a *app) handleCategoryAction(w http.ResponseWriter, r *http.Request, u sto
 				err = a.store.ReorderCategory(r.Context(), u.Actor(), c.ID, version, r.PostFormValue("neighbor"), nv)
 			}
 		default:
-			http.NotFound(w, r)
+			a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 			return
 		}
 	}

@@ -173,7 +173,7 @@ func (a *app) adminBookings(ctx context.Context, u store.User, users []store.Use
 // A repeat of the link it already has is answered by the store alone.
 func (a *app) handleLinkClient(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Слишком большой запрос", http.StatusRequestEntityTooLarge)
+		a.problem(w, r, http.StatusRequestEntityTooLarge, "Слишком большой запрос")
 		return
 	}
 	rep, err := a.store.ClientReport(r.Context(), u.Actor(), r.PathValue("id"))
@@ -188,7 +188,7 @@ func (a *app) handleLinkClient(w http.ResponseWriter, r *http.Request, u store.U
 	event := r.PostFormValue("booking")
 	cal, ok := a.cfg.Bookings.CalendarFor(rep.Person)
 	if !ok {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return
 	}
 	ref := domain.BookingRef{Calendar: cal, Event: event}
@@ -214,7 +214,7 @@ func (a *app) handleLinkClient(w http.ResponseWriter, r *http.Request, u store.U
 // handleUnlinkClient removes an entry's booking link; it never asks Calendar.
 func (a *app) handleUnlinkClient(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Слишком большой запрос", http.StatusRequestEntityTooLarge)
+		a.problem(w, r, http.StatusRequestEntityTooLarge, "Слишком большой запрос")
 		return
 	}
 	rep, err := a.store.ClientReport(r.Context(), u.Actor(), r.PathValue("id"))

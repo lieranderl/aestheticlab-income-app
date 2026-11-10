@@ -124,7 +124,7 @@ func (f historyFilter) paging(path string, count int) (views.Paging, int, int) {
 func (a *app) handleHistory(w http.ResponseWriter, r *http.Request, u store.User) {
 	f, ok := a.readHistoryFilter(r)
 	if !ok {
-		http.Error(w, "Проверьте период: не больше года, начало не позже конца", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте период: не больше года, начало не позже конца")
 		return
 	}
 	users, err := a.store.Users(r.Context())
@@ -139,7 +139,7 @@ func (a *app) handleHistory(w http.ResponseWriter, r *http.Request, u store.User
 	}
 	filters, ok := f.view("/admin/history", users, cats)
 	if !ok {
-		http.Error(w, "Проверьте сотрудника и категорию", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте сотрудника и категорию")
 		return
 	}
 	reports, err := a.store.ReportsBetween(r.Context(), f.from, f.to)

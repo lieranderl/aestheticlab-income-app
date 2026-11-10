@@ -68,7 +68,7 @@ func (a *app) handleNewStaffPage(w http.ResponseWriter, r *http.Request, admin s
 
 func (a *app) handleCreateStaff(w http.ResponseWriter, r *http.Request, admin store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	f := views.NewStaffForm{
@@ -163,7 +163,7 @@ func (a *app) staffEdit(r *http.Request, admin, u store.User) (views.StaffEdit, 
 func (a *app) staffTarget(w http.ResponseWriter, r *http.Request) (store.User, bool) {
 	u, err := a.store.User(r.Context(), r.PathValue("uid"))
 	if errors.Is(err, store.ErrNotFound) || (err == nil && u.Removed) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return store.User{}, false
 	}
 	if err != nil {
@@ -193,7 +193,7 @@ func (a *app) handleUpdateStaff(w http.ResponseWriter, r *http.Request, admin st
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	f := views.AccountForm{
@@ -242,7 +242,7 @@ func (a *app) handleResetPassword(w http.ResponseWriter, r *http.Request, admin 
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	fail := func(msg string) {
@@ -285,7 +285,7 @@ func (a *app) handleRenameStaff(w http.ResponseWriter, r *http.Request, admin st
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	f := views.UsernameForm{Username: strings.ToLower(strings.TrimSpace(r.PostFormValue("username")))}
@@ -311,7 +311,7 @@ func (a *app) handleRemoveStaff(w http.ResponseWriter, r *http.Request, admin st
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	fail := func(msg string) {
@@ -319,7 +319,7 @@ func (a *app) handleRemoveStaff(w http.ResponseWriter, r *http.Request, admin st
 		a.staffFormFailed(w, r, admin, u, views.RemoveFormView(u.ID, u.DisplayName, f), func(s *views.StaffEdit) { s.Remove = f })
 	}
 	if u.ID == admin.ID { // the screen never offers it
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		a.problem(w, r, http.StatusForbidden, "Нет доступа")
 		return
 	}
 	if r.PostFormValue("confirm") != "1" {
@@ -339,7 +339,7 @@ func (a *app) handleSetTerms(w http.ResponseWriter, r *http.Request, admin store
 		return
 	}
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	months, err := a.termsMonths(r, u)

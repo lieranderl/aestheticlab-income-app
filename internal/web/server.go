@@ -165,7 +165,7 @@ func New(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /admin/export", a.adminOnly(a.handleExport))
 	mux.HandleFunc("GET /admin/export/download", a.adminOnly(a.handleExportDownload))
 	// Anything else under /admin/ is the admin's too: 403 before 404.
-	mux.HandleFunc("/admin/", a.adminOnly(func(w http.ResponseWriter, r *http.Request, _ store.User) { http.NotFound(w, r) }))
+	mux.HandleFunc("/admin/", a.adminOnly(func(w http.ResponseWriter, r *http.Request, _ store.User) { a.problem(w, r, http.StatusNotFound, "Страница не найдена") }))
 
 	secure := strings.HasPrefix(cfg.BaseURL, "https://")
 	protected := http.NewCrossOriginProtection().Handler(withTheme(mux))
@@ -210,5 +210,12 @@ func (a *app) handleReady(w http.ResponseWriter, r *http.Request) {
 // serverError logs an unexpected error and shows a short Russian message.
 func (a *app) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	slog.ErrorContext(r.Context(), "request failed", "path", logValue(r.URL.Path), "error", logError(err))
-	http.Error(w, "Что-то пошло не так, попробуйте ещё раз", http.StatusInternalServerError)
+	const message = "Что-то пошло не так, попробуйте ещё раз"
+	if isDatastar(r) {
+		// The failing status is what makes a financial form say the outcome
+		// is unknown and must be checked before sending it again.
+		http.Error(w, message, http.StatusInternalServerError)
+		return
+	}
+	a.problem(w, r, http.StatusInternalServerError, message)
 }

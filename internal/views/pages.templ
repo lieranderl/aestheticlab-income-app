@@ -50,3 +50,38 @@ templ ForbiddenPage(nav Nav) {
 		</section>
 	}
 }
+
+// ProblemPage tells someone a request was refused and keeps the navigation
+// around it: the installed app has no back button. back is "" when there is
+// no safe page to return to.
+templ ProblemPage(nav Nav, message, back string) {
+	@Layout("Не получилось", nav) {
+		@PageHeader("Не получилось", "")
+		<section class="card bg-base-100 shadow-sm">
+			<div class="card-body items-center gap-3 py-10 text-center">
+				@Icon("circle-alert", "size-8 text-error")
+				<p role="alert" class="[overflow-wrap:anywhere]">{ message }</p>
+				if back != "" {
+					<a href={ templ.SafeURL(back) } class="btn btn-primary btn-lg">Назад</a>
+					<a href="/" class="btn btn-ghost btn-lg">На главную</a>
+				} else {
+					<a href="/" class="btn btn-primary btn-lg">На главную</a>
+				}
+			</div>
+		</section>
+	}
+}
+
+// ProblemToast fills the layout's problem slot when a refused request came
+// from inside a page (a Datastar request), which has no page to replace.
+templ ProblemToast(message string) {
+	<div id="problem-toast" class="toast toast-top toast-center z-50 w-full max-w-md px-4" data-signals:_problem="true" data-show="$_problem">
+		if message != "" {
+			<div role="alert" class="alert alert-error w-full whitespace-normal">
+				@Icon("circle-alert", "size-5 shrink-0")
+				<span class="[overflow-wrap:anywhere]">{ message }</span>
+				<button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label="Закрыть" data-on:click="$_problem = false">✕</button>
+			</div>
+		}
+	</div>
+}

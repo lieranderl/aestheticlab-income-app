@@ -121,7 +121,7 @@ func (a *app) handleMovementPage(w http.ResponseWriter, r *http.Request, u store
 		kind = "deposit"
 	}
 	if !movementKind(kind, admin) {
-		http.Error(w, "Проверьте вид движения", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид движения")
 		return
 	}
 	f, err := a.movementForm(r, u, admin, kind)
@@ -130,7 +130,7 @@ func (a *app) handleMovementPage(w http.ResponseWriter, r *http.Request, u store
 		return
 	}
 	if err := a.prefillSettlement(r, &f); err != nil {
-		http.Error(w, "Проверьте месяц, сотрудника и текущий остаток — обновите расчёт", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте месяц, сотрудника и текущий остаток — обновите расчёт")
 		return
 	}
 	if isDatastar(r) {
@@ -148,24 +148,24 @@ func (a *app) handleMovementPage(w http.ResponseWriter, r *http.Request, u store
 }
 func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	admin := strings.HasPrefix(r.URL.Path, "/admin/")
 	kind := r.PostFormValue("type")
 	if !movementKind(kind, admin) {
-		http.Error(w, "Проверьте вид движения", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте вид движения")
 		return
 	}
 	if !admin {
 		for _, key := range []string{"person", "personId", "uid"} {
 			if v := r.PostFormValue(key); v != "" && v != u.ID {
-				http.Error(w, "Нет доступа", http.StatusForbidden)
+				a.problem(w, r, http.StatusForbidden, "Нет доступа")
 				return
 			}
 		}
 		if movementParty(r.PostFormValue("from")) != domain.Person(u.ID) {
-			http.Error(w, "Нет доступа", http.StatusForbidden)
+			a.problem(w, r, http.StatusForbidden, "Нет доступа")
 			return
 		}
 	}
@@ -175,7 +175,7 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 		return
 	}
 	if err := settlementContext(r, &f); err != nil {
-		http.Error(w, "Проверьте контекст расчёта", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте контекст расчёта")
 		return
 	}
 	f.Amount = r.PostFormValue("amount")
@@ -452,13 +452,13 @@ func (a *app) movementAction(r *http.Request, u store.User, void bool) (views.Mo
 	}
 	return p, nil
 }
-func actionReadError(w http.ResponseWriter, r *http.Request, err error) bool {
+func (a *app) actionReadError(w http.ResponseWriter, r *http.Request, err error) bool {
 	if errors.Is(err, store.ErrForbidden) {
-		http.Error(w, "Нет доступа", http.StatusForbidden)
+		a.problem(w, r, http.StatusForbidden, "Нет доступа")
 		return true
 	}
 	if errors.Is(err, store.ErrNotFound) {
-		http.NotFound(w, r)
+		a.problem(w, r, http.StatusNotFound, "Страница не найдена")
 		return true
 	}
 	return false
@@ -466,7 +466,7 @@ func actionReadError(w http.ResponseWriter, r *http.Request, err error) bool {
 func (a *app) handleVoidPage(w http.ResponseWriter, r *http.Request, u store.User) {
 	p, err := a.movementAction(r, u, true)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return
@@ -486,13 +486,13 @@ func (a *app) handleVoidMovement(w http.ResponseWriter, r *http.Request, u store
 func (a *app) handleMovementAction(w http.ResponseWriter, r *http.Request, u store.User, void bool) {
 	p, err := a.movementAction(r, u, void)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return
 	}
 	if err = readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	p.Reason = r.PostFormValue("reason")
@@ -516,7 +516,7 @@ func (a *app) handleMovementAction(w http.ResponseWriter, r *http.Request, u sto
 		if void && !u.Actor().Admin && errors.Is(err, store.ErrForbidden) {
 			latest, readErr := a.movementAction(r, u, true)
 			if readErr != nil {
-				if !actionReadError(w, r, readErr) {
+				if !a.actionReadError(w, r, readErr) {
 					a.serverError(w, r, readErr)
 				}
 				return
@@ -557,7 +557,7 @@ func (a *app) recountForm(r *http.Request) (views.RecountFormData, error) {
 func (a *app) handleRecountPage(w http.ResponseWriter, r *http.Request, u store.User) {
 	p, err := a.recountForm(r)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return
@@ -566,12 +566,12 @@ func (a *app) handleRecountPage(w http.ResponseWriter, r *http.Request, u store.
 }
 func (a *app) handleRecount(w http.ResponseWriter, r *http.Request, u store.User) {
 	if err := readForm(w, r); err != nil {
-		http.Error(w, "Проверьте поля формы", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте поля формы")
 		return
 	}
 	p, err := a.recountForm(r)
 	if err != nil {
-		if !actionReadError(w, r, err) {
+		if !a.actionReadError(w, r, err) {
 			a.serverError(w, r, err)
 		}
 		return

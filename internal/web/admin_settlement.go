@@ -162,7 +162,7 @@ func (a *app) handleAdminSettlement(w http.ResponseWriter, r *http.Request, u st
 		err = nil
 	}
 	if err != nil || m.Before(a.store.StartMonth()) || a.store.Today().Month().Before(m) {
-		http.Error(w, "Проверьте месяц", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте месяц")
 		return
 	}
 	p, err := a.settlementPage(r, m)

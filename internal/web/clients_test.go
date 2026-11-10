@@ -104,7 +104,7 @@ func TestNewLegacyReportIsRefusedAndNotShownAsDailyForm(t *testing.T) {
 	s.withTerms(s.olga, 7000)
 	z := s.login("olga", olgaPass)
 	wantPage(t, "new daily forbidden", s.post("/reports/2026-11-20", url.Values{"version": {"0"}, "r_services": {"100"}, "p_cash": {"100"}}, z), http.StatusUnprocessableEntity, "добавьте клиента")
-	wantPage(t, "no legacy form", s.get("/reports/day?date=2026-11-20", z), http.StatusNotFound, "404")
+	wantPage(t, "no legacy form", s.get("/reports/day?date=2026-11-20", z), http.StatusNotFound, "Страница не найдена")
 	wantPage(t, "new home", s.get("/", z), http.StatusOK, "Добавить клиента")
 }
 

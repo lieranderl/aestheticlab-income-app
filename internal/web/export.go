@@ -43,27 +43,27 @@ func (a *app) handleExportDownload(w http.ResponseWriter, r *http.Request, _ sto
 		format = "xlsx"
 	}
 	if format != "xlsx" && format != "csv_records" && format != "csv_movements" {
-		http.Error(w, "Проверьте формат файла", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте формат файла")
 		return
 	}
 
 	fromDate, err := domain.ParseDate(fromStr)
 	if err != nil {
-		http.Error(w, "Проверьте дату начала", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте дату начала")
 		return
 	}
 	toDate, err := domain.ParseDate(toStr)
 	if err != nil {
-		http.Error(w, "Проверьте дату окончания", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Проверьте дату окончания")
 		return
 	}
 	if toDate.Before(fromDate) {
-		http.Error(w, "Начало периода не может быть позже окончания", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Начало периода не может быть позже окончания")
 		return
 	}
 	// Limit to at most 366 days (1 year)
 	if toDate.Time().Sub(fromDate.Time()) > 366*24*time.Hour {
-		http.Error(w, "Период не может превышать 12 месяцев", http.StatusBadRequest)
+		a.problem(w, r, http.StatusBadRequest, "Период не может превышать 12 месяцев")
 		return
 	}
 
