@@ -156,5 +156,6 @@ func TestRevenueAndPaymentListsOfferNoNewCategory(t *testing.T) {
 		wantPage(t, kind+" post", s.post("/admin/categories", form, admin), http.StatusUnprocessableEntity, "добавить можно только категорию расходов")
 	}
 	wantPage(t, "expenses", s.get("/admin/categories?kind=expense", admin), http.StatusOK, "Добавить категорию")
+	wantPage(t, "new form without a kind", s.get("/admin/categories/new", admin), http.StatusOK, `name="kind" value="expense"`)
 	wantRedirect(t, "new expense category", s.post("/admin/categories", url.Values{"kind": {"expense"}, "name": {"Уборка"}}, admin), "/admin/categories?kind=expense")
 }

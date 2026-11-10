@@ -53,6 +53,9 @@ func (a *app) handleNewCategory(w http.ResponseWriter, r *http.Request, u store.
 		a.problem(w, r, http.StatusBadRequest, "Проверьте вид категории")
 		return
 	}
+	if r.URL.Query().Get("kind") == "" {
+		k = store.KindExpense // the only kind that can be added
+	}
 	if k != store.KindExpense {
 		a.problem(w, r, http.StatusBadRequest, "Виды выручки и способы оплаты постоянные — добавить можно только категорию расходов")
 		return

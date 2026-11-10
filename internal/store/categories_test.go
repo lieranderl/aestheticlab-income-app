@@ -67,7 +67,11 @@ func TestOnlyExpenseCategoriesCanBeAdded(t *testing.T) {
 		must(t, err)
 
 		// Oil still appears by itself with its first sale.
-		_, err = s.SaveClientReport(ctx, s.actor(s.olga), store.ClientEntry{Person: s.olga, Date: date(t, "2026-11-12"), Token: "fixed-list-oil-token", Input: domain.ClientInput{Extras: map[string]domain.Cents{"oil": 1500}, ExtrasDestination: domain.ToCash}})
+		sale := store.ClientEntry{ // #nosec G101 -- idempotency token, not credentials
+			Person: s.olga, Date: date(t, "2026-11-12"), Token: "oil-first-sale-entry-0001",
+			Input: domain.ClientInput{Extras: map[string]domain.Cents{"oil": 1500}, ExtrasDestination: domain.ToCash},
+		}
+		_, err = s.SaveClientReport(ctx, s.actor(s.olga), sale)
 		must(t, err)
 		cats, err := s.Categories(ctx)
 		must(t, err)
