@@ -519,6 +519,17 @@ func (s *Store) Recount(ctx context.Context, actor Actor, accountID string, coun
 		if err != nil {
 			return err
 		}
+		// Money already in the till but not yet confirmed would read as a
+		// surplus, and a recount difference now counts in profit.
+		pending, err := readLedger(t, where("status", "==", string(domain.Pending)))
+		if err != nil {
+			return err
+		}
+		for _, e := range pending {
+			if e.To == domain.Account(accountID) {
+				return &domain.ValidationError{Field: "counted", Problem: ProblemPendingDeposits}
+			}
+		}
 		out = RecountResult{Expected: bal.Accounts[accountID], Counted: counted}
 		diff := counted - out.Expected
 		if diff != 0 && trimmed(note) == "" {
@@ -642,6 +653,7 @@ func (s *Store) SaveImportedMonths(ctx context.Context, actor Actor, months map[
 
 // Reasons a month operation is rejected, beyond the domain's.
 const (
-	ProblemNotHistory   domain.Problem = "not_history"    // imported months come before the start month
-	ProblemMonthNotOver domain.Problem = "month_not_over" // a month closes once it has ended
+	ProblemNotHistory      domain.Problem = "not_history"      // imported months come before the start month
+	ProblemMonthNotOver    domain.Problem = "month_not_over"   // a month closes once it has ended
+	ProblemPendingDeposits domain.Problem = "pending_deposits" // confirm or cancel deposits into the account before recounting it
 )

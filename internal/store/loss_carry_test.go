@@ -64,3 +64,21 @@ func TestMonthsBeforeTheNewProfitRulesSettleLikeTheSheet(t *testing.T) {
 		t.Fatalf("a month before the rules carried a loss: profit %d out %d", r.Profit, r.LossCarriedOut)
 	}
 }
+
+func TestARecountWaitsForPendingDepositsIntoThatAccount(t *testing.T) {
+	eachSalon(t, func(t *testing.T, s *salon) {
+		dep, err := s.RecordMovement(ctx, s.actor(s.olga), store.NewMovement{Type: domain.Deposit, Amount: 10000, From: domain.Person(s.olga), To: domain.Account(domain.KassaCash), Date: date(t, "2026-11-12")})
+		must(t, err)
+		_, err = s.Recount(ctx, s.admin, domain.KassaCash, 10000, "пересчёт")
+		wantProblem(t, "a pending deposit into the till", err, store.ProblemPendingDeposits)
+		_, err = s.Recount(ctx, s.admin, domain.KassaCard, 0, "")
+		must(t, err) // the card account has nothing waiting
+		_, err = s.ConfirmMovement(ctx, s.admin, dep.ID, dep.Version)
+		must(t, err)
+		got, err := s.Recount(ctx, s.admin, domain.KassaCash, 10000, "")
+		must(t, err)
+		if got.Adjustment != nil {
+			t.Fatalf("a confirmed deposit still made an adjustment: %+v", got.Adjustment)
+		}
+	})
+}

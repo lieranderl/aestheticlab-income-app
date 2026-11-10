@@ -315,6 +315,8 @@ func movementProblem(r *http.Request, err error) string {
 			return "Укажите комментарий или причину отмены"
 		case store.ProblemNotPending:
 			return "Движение уже обработано — обновите страницу"
+		case store.ProblemPendingDeposits:
+			return "В эту кассу есть внесения, которые ждут подтверждения — сначала подтвердите или отмените их, потом пересчитайте"
 		case store.ProblemAlreadyVoided:
 			return "Движение уже отменено"
 		default:
