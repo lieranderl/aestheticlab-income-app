@@ -388,7 +388,7 @@ templ AccountFormView(id string, self bool, f AccountForm) {
 				<p class="label whitespace-normal">Если выключить, сотрудник сразу выйдет на всех устройствах. Записи и расчёты сохранятся.</p>
 			}
 			<div class="pt-4">
-				@SubmitButton("Сохранить")
+				@SubmitButton("Сохранить учётную запись")
 			</div>
 		</div>
 	</form>
@@ -449,13 +449,13 @@ templ UsernameFormView(id string, f UsernameForm) {
 		data-on:submit={ sendForm("/admin/users/" + id + "/username") }
 	>
 		<div class="card-body gap-2">
-			<h2 class="card-title">Имя пользователя</h2>
+			<h2 class="card-title">Вход</h2>
 			@Alert(f.Error, "")
 			@Field("Имя пользователя", "Для входа: латиница и цифры, например olga. Пароль останется прежним.") {
 				<input type="text" name="username" value={ f.Username } class="input input-lg w-full text-base" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" required/>
 			}
 			<div class="pt-4">
-				@SubmitButton("Сохранить")
+				@SubmitButton("Сохранить имя пользователя")
 			</div>
 		</div>
 	</form>

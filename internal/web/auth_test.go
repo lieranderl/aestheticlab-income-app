@@ -706,3 +706,18 @@ func TestWrongCurrentPasswordsInTheProfileLockLikeWrongLogins(t *testing.T) {
 		t.Fatalf("after a good change: %+v, %v", u, err)
 	}
 }
+
+// 2026-11-15 design review: each save button on the staff page names what
+// it saves, and the sign-in card does not repeat its field label as a title.
+func TestStaffPageSaveButtonsNameWhatTheySave(t *testing.T) {
+	s := newSite(t)
+	body := s.get("/admin/users/"+s.olga.ID, s.login("anna", annaPass)).Body.String()
+	for _, want := range []string{"Сохранить условия", "Сохранить учётную запись", "Сохранить имя пользователя", `card-title">Вход</h2>`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("staff page lacks %q", want)
+		}
+	}
+	if strings.Contains(body, `card-title">Имя пользователя</h2>`) {
+		t.Error("the sign-in card repeats «Имя пользователя» as its title")
+	}
+}
