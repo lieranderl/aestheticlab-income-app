@@ -45,3 +45,32 @@ func TestMovementListIsATableOnDesktopWithoutDuplicates(t *testing.T) {
 		t.Errorf("the pending movement has %d void dialogs, want 1", n)
 	}
 }
+
+// 2026-11-15 production review: 36 of 50 change-log cards were empty. A
+// client save bumps each category's usage counter, which is not a change
+// anyone made; and a booking link is a real change the card did not show.
+func TestChangeLogHasNoEmptyCards(t *testing.T) {
+	s := newSite(t)
+	if err := s.st.SetTerms(ctx, s.anna.Actor(), s.olga.ID, s.st.StartMonth(), domain.Terms{SelfPct: 5000, DividendWeight: 1}, ""); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := s.st.SaveClientReport(ctx, s.anna.Actor(), store.ClientEntry{
+		Token: "test-client-token-change-log", Person: s.olga.ID, Date: domain.Date{Year: 2026, Mon: 11, Day: 20},
+		Input: domain.ClientInput{Services: 10000, ServiceCash: 5000, Extras: map[string]domain.Cents{"creams": 1200}, ExtrasDestination: domain.ToCash},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.st.LinkClientBooking(ctx, s.anna.Actor(), saved.ID, saved.Version, domain.BookingRef{Calendar: "cal", Event: "ev"}); err != nil {
+		t.Fatal(err)
+	}
+	body := s.get("/admin/audit?from=2026-11-20&to=2026-11-20", s.login("anna", annaPass)).Body.String()
+	for _, card := range regexp.MustCompile(`(?s)<article\b.*?</article>`).FindAllString(body, -1) {
+		if !strings.Contains(card, "<dl") && !strings.Contains(card, "<details") {
+			t.Errorf("empty change-log card: %s", regexp.MustCompile(`<[^>]+>`).ReplaceAllString(card, " "))
+		}
+	}
+	if !strings.Contains(body, "Запись в календаре") {
+		t.Error("the booking link is not shown")
+	}
+}
