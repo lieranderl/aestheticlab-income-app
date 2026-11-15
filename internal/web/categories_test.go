@@ -139,8 +139,8 @@ func TestCategoryFlagsSayTheyOnlyApplyToLegacyDayReports(t *testing.T) {
 		t.Error("the list doesn't name the services setting as a legacy day-report one")
 	}
 	// The long explanation is folded so the list starts near the top.
-	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !regexp.MustCompile(`<details[^>]*>\s*<summary[^>]*>\s*Записи клиентов считаются по постоянным правилам`).MatchString(body) {
-		t.Error("the revenue explanation is not folded behind its summary")
+	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !regexp.MustCompile(`<details[^>]*>\s*<summary[^>]*>\s*Настройки ниже — только для старых отчётов за день`).MatchString(body) {
+		t.Error("the legacy-only rule is not the visible summary of the folded explanation")
 	}
 }
 

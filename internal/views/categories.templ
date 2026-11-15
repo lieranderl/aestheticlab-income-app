@@ -69,7 +69,7 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 			if kind == store.KindExpense {
 				<a href={ templ.SafeURL("/admin/categories/new?kind=" + string(kind)) } class="btn btn-primary btn-lg w-full">Добавить категорию</a>
 			} else {
-				<p class="text-sm text-base-content/70">Список постоянный: в записи клиента вносятся только эти виды. Название можно изменить.</p>
+				<p class="text-sm text-base-content/70">Список постоянный: новые виды не добавляются. Название можно изменить.</p>
 			}
 			<ul class="flex flex-col gap-3">
 				for i, c := range rows {
@@ -130,17 +130,13 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 templ categoryFlagsScope(kind store.CategoryKind) {
 	<details class="collapse collapse-arrow rounded-box bg-base-200 text-sm text-base-content/70">
 		<summary class="collapse-title min-h-11 py-3 pe-10 font-medium text-base-content">
-			if kind == store.KindRevenue {
-				Записи клиентов считаются по постоянным правилам
-			} else {
-				В записях клиентов кассу выбирают в каждой записи
-			}
+			Настройки ниже — только для старых отчётов за день
 		</summary>
 		<div class="collapse-content">
 			if kind == store.KindRevenue {
-				В «Себе» входят только услуги, а кремы, масло и сертификаты целиком идут в кассу, выбранную в записи («Касса — наличные» или «Касса — карта салона»). Категории и настройки ниже нужны только для исправления старых отчётов за день; строки, уже сохранённые в отчёте, не меняются. Новые категории в записях клиентов не появятся.
+				Записи клиентов считаются по постоянным правилам: в «Себе» входят только услуги, а кремы, масло и сертификаты целиком идут в кассу, выбранную в записи («Касса — наличные» или «Касса — карта салона»). Строки, уже сохранённые в отчёте, не меняются.
 			} else {
-				В записях клиентов кассу («Касса — наличные» или «Касса — карта салона») выбирают в каждой записи. Способы оплаты ниже нужны только для исправления старых отчётов за день; строки, уже сохранённые в отчёте, не меняются.
+				В записях клиентов кассу («Касса — наличные» или «Касса — карта салона») выбирают в каждой записи. Строки, уже сохранённые в отчёте, не меняются.
 			}
 		</div>
 	</details>
