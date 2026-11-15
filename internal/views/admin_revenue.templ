@@ -4,7 +4,7 @@ type MoneyRow struct{ Name, Value string }
 type AdminReport struct {
 	Client                      bool
 	Name, Day, Href, Total      string
-	Status                      string // «Салон должен €113,50»
+	Status                      string // «Салон должен сотруднику €113,50»
 	Tone                        int    // +1 the salon owes the person, −1 the person owes the salon
 	Fact, Expected              string // «Факт: в кассу …», «Ожидается: «Себе» …»
 	CashToKassa, TransferToCard string

@@ -67,8 +67,8 @@ func TestDashboardSeparatesPeriodContributionsFromCurrentSettlementBalance(t *te
 	}
 	// The admin reads about other people: third person, as on День and Месяц
 	// (2026-11-15 design review).
-	if !strings.Contains(body, "Салон должен €20") {
-		t.Error("the person card does not say «Салон должен €20»")
+	if !strings.Contains(body, "Салон должен сотруднику €20") {
+		t.Error("the person card does not say «Салон должен сотруднику €20»")
 	}
 	for _, second := range []string{"Салон должен вам", "Вы должны салону"} {
 		if strings.Contains(settlement.Body.String(), second) {
@@ -215,10 +215,10 @@ func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
 	res = s.get("/admin/day?date=2026-11-19", anna)
 	day := res.Body.String()
 	row(day, "Наличными у сотрудника", "€100")
-	wantPage(t, "day", res, http.StatusOK, "Салон должен сотрудникам €113,50", "Салон должен €113,50",
+	wantPage(t, "day", res, http.StatusOK, "Салон должен сотрудникам €113,50", "Салон должен сотруднику €113,50",
 		"Факт: в кассу €427 · у сотрудника €100", "Ожидается: «Себе» €213,50 · «Салону» €313,50")
 	wantPage(t, "redeemed", s.get("/admin/day?date=2026-11-18", anna), http.StatusOK,
-		"Факт: в кассу €0 · у сотрудника €0 · сертификатом €100", "Салон должен €50")
+		"Факт: в кассу €0 · у сотрудника €0 · сертификатом €100", "Салон должен сотруднику €50")
 }
 
 func TestTheSalonHeadlineNeverNetsOppositeDebts(t *testing.T) {

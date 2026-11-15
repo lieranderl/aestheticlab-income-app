@@ -151,7 +151,7 @@ func statusText(delta domain.Cents, who audience) (string, int) {
 	}
 	switch {
 	case delta > 0:
-		return "Салон должен " + domain.FormatEUR(delta), 1
+		return "Салон должен сотруднику " + domain.FormatEUR(delta), 1
 	case delta < 0:
 		return "Долг перед салоном " + domain.FormatEUR(-delta), -1
 	}

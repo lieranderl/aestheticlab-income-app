@@ -44,6 +44,7 @@ Source: `docs/system-design.md` §6–7. Every screen is designed at **375 pt wi
 | **Расхождение кассы** | A month's recount differences (+ surplus, − shortage), part of profit from November 2026. |
 | **Убыток прошлых месяцев / Убыток на следующий месяц** | The loss carried into a month and the part still unrecovered after it. |
 | **Салон должен вам / Вы должны салону** | The person's balance (+ / −). |
+| **Салон должен сотруднику / Долг перед салоном / Без долга** | The same balance as the admin reads it about someone else (cards, badges, settlement): third person, gender-neutral. Never «вам/вы» on admin views of other people. |
 | **Внесение** | Deposit: a person puts money into the kassa. |
 | **Выплата** | Payout: kassa → person. |
 | **Расход** | Expense; «Расход за свой счёт» when a person paid it themselves. |
