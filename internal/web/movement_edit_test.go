@@ -49,9 +49,14 @@ func TestMovementListsShowNewestEnteredFirstAndHideVoided(t *testing.T) {
 	s.adminExpense("20", "2026-11-03", "второй-расход", j)
 	wantRedirect(t, "void", s.post("/movements/"+gone.ID+"/void", url.Values{"version": {"1"}, "reason": {"дубль"}}, j), "/admin/kassa?saved=1")
 
-	for _, path := range []string{"/admin/kassa", "/admin/history/movements"} {
+	// История lists in entry order; Касса by date, newest first (owner,
+	// 2026-11-15).
+	for path, order := range map[string][]string{
+		"/admin/history/movements": {"второй-расход", "первый-расход"},
+		"/admin/kassa":             {"первый-расход", "второй-расход"},
+	} {
 		body := s.get(path, j).Body.String()
-		wantOrder(t, path, body, "второй-расход", "первый-расход")
+		wantOrder(t, path, body, order...)
 		if strings.Contains(body, "отменённый-расход") {
 			t.Fatalf("%s shows a voided movement", path)
 		}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -316,5 +317,59 @@ func TestAdminEntersAClientFromAnEmployeesBooking(t *testing.T) {
 	}
 	if body := s.get("/admin/day?date=2026-11-20", admin).Body.String(); strings.Contains(body, "person="+s.maria.ID) {
 		t.Fatal("offers a client for someone who does not report")
+	}
+}
+
+// Owner, 2026-11-15: «Не сдали отчёт» counts only days the person had a
+// customer in their calendar, on «Итоги и расчёт» and on «День». When a
+// calendar can't be read, the page says so instead of guessing.
+func TestMissingReportsCountOnlyDaysWithACustomer(t *testing.T) {
+	s, src := bookedSite(t)
+	// Olga has a customer on the 20th; Maria has none; Anna has no calendar.
+	src.Put(olgaCal, timely("b1", "2026-11-20", "10:00", "Wax Price: €10.00 with Olga Test (Confirmed)"))
+	admin := s.login("anna", annaPass)
+
+	month := s.get("/admin/month?m=2026-11&tab=settlement", admin).Body.String()
+	if !strings.Contains(month, "Не сдали отчёт: Ольга — 1 дн.<") && !regexp.MustCompile(`Не сдали отчёт: Ольга — 1 дн\.\s*<`).MatchString(month) {
+		t.Errorf("summary is not just Olga's booked day: %s", regexp.MustCompile(`Не сдали отчёт:[^<]*`).FindString(month))
+	}
+	if !strings.Contains(month, "20.11.2026 · Ольга") {
+		t.Error("the booked day without a report is not listed")
+	}
+	for _, unbooked := range []string{"· Мария", "· Анна"} {
+		if strings.Contains(month, unbooked) {
+			t.Errorf("a day without a customer is listed: %s", unbooked)
+		}
+	}
+	noClientData(t, "settlement", month)
+
+	day := s.get("/admin/day?date=2026-11-20", admin).Body.String()
+	missing := regexp.MustCompile(`(?s)Не сдали отчёт</h2>.*?</ul>`).FindString(day)
+	if !strings.Contains(missing, "Ольга") || strings.Contains(missing, "Мария") || strings.Contains(missing, "Анна") {
+		t.Errorf("«День» missing list is not just Olga: %q", missing)
+	}
+
+	src.Fail(errors.New("calendar down"))
+	down := s.get("/admin/month?m=2026-11&tab=settlement", admin).Body.String()
+	if !strings.Contains(down, "Календарь недоступен — пропущенные отчёты не проверены.") {
+		t.Error("a calendar outage is not said on «Итоги и расчёт»")
+	}
+	if day := s.get("/admin/day?date=2026-11-20", admin).Body.String(); !strings.Contains(day, "Календарь недоступен — пропущенные отчёты не проверены.") {
+		t.Error("a calendar outage is not said on «День»")
+	}
+}
+
+// Review (PR 62): removing someone later must not erase the reports they
+// missed on booked days while they were on staff.
+func TestMissingReportsSurviveALaterRemoval(t *testing.T) {
+	s, src := bookedSite(t)
+	src.Put(olgaCal, timely("b1", "2026-11-20", "10:00", "Wax Price: €10.00 with Olga Test (Confirmed)"))
+	*s.clock = s.clock.AddDate(0, 0, 1) // the 21st: the 20th has passed
+	if err := s.st.RemoveUser(ctx, s.anna.Actor(), s.olga.ID); err != nil {
+		t.Fatal(err)
+	}
+	month := s.get("/admin/month?m=2026-11&tab=settlement", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(month, "20.11.2026 · Ольга") {
+		t.Error("a removed employee's missed booked day disappeared")
 	}
 }

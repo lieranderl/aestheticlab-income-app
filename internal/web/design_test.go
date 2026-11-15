@@ -100,20 +100,23 @@ func TestAdminMovementFormMakesYouChooseThePerson(t *testing.T) {
 	}
 }
 
-// 2026-11-15 production review: «Последние движения» read out of date order
-// because it lists what was entered last. It says so, a backfilled
-// movement shows when it was entered, and opening balances stay in История.
-func TestRecentKassaMovementsSayWhenTheyWereEntered(t *testing.T) {
+// Owner, 2026-11-15: Касса's recent movements are sorted by date, newest
+// first, whatever order they were entered in; a backfill still shows when it
+// was entered.
+func TestRecentKassaMovementsAreSortedByDate(t *testing.T) {
 	s := newSite(t)
-	if _, err := s.st.RecordMovement(ctx, s.anna.Actor(), store.NewMovement{Type: domain.Expense, Amount: 1000, From: domain.Account(domain.KassaCash), To: domain.Outside, Date: domain.Date{Year: 2026, Mon: 11, Day: 3}, Note: "кофе", ExpenseCategory: "materials"}); err != nil {
-		t.Fatal(err)
+	for _, day := range []int{10, 3} { // the older one is entered last
+		if _, err := s.st.RecordMovement(ctx, s.anna.Actor(), store.NewMovement{Type: domain.Expense, Amount: 1000, From: domain.Account(domain.KassaCash), To: domain.Outside, Date: domain.Date{Year: 2026, Mon: 11, Day: day}, Note: "кофе", ExpenseCategory: "materials"}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	body := s.get("/admin/kassa", s.login("anna", annaPass)).Body.String()
-	if !strings.Contains(body, "Последние записанные") {
-		t.Error("the recent list does not say it is in entry order")
+	recent := body[strings.Index(body, "Последние движения"):]
+	if i, j := strings.Index(recent, "10.11.2026"), strings.Index(recent, "03.11.2026"); i < 0 || j < 0 || i > j {
+		t.Errorf("recent movements are not newest date first (10.11 at %d, 03.11 at %d)", i, j)
 	}
 	if !strings.Contains(body, "записано 20.11.2026") {
-		t.Error("a movement dated 03.11 does not show it was entered on 20.11")
+		t.Error("a backfilled movement does not show when it was entered")
 	}
 }
 

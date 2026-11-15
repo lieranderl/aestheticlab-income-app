@@ -240,7 +240,12 @@ func (a *app) handleAdminDay(w http.ResponseWriter, r *http.Request, u store.Use
 			a.serverError(w, r, err)
 			return
 		}
+		filter := a.missingFilter(r.Context(), users, day, day)
+		p.MissingUnavailable = filter.unavailable
 		for _, id := range domain.MissingReporters(expected, personReports(reports)) {
+			if filter.unavailable || !filter.counts(id, day) {
+				continue
+			}
 			p.Missing = append(p.Missing, personName(users, id))
 		}
 	}

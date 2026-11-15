@@ -492,7 +492,7 @@ func (a *app) handleKassa(w http.ResponseWriter, r *http.Request, u store.User) 
 		return
 	}
 	// Openings are setup, not kassa movements; they stay in История.
-	es = newestEntered(slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending || e.Type == domain.Opening }))
+	es = newestDated(slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending || e.Type == domain.Opening }))
 	if len(es) > 10 {
 		es = es[:10]
 	}

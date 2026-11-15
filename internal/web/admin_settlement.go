@@ -113,7 +113,9 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 		return p, err
 	}
 	missingDays := map[string]int{}
-	for day := m.FirstDay(); !lastElapsed.Before(day); day = day.AddDays(1) {
+	filter := a.missingFilter(r.Context(), users, m.FirstDay(), lastElapsed)
+	p.MissingUnavailable, p.MissingByCalendar = filter.unavailable, filter.on
+	for day := m.FirstDay(); !lastElapsed.Before(day) && !filter.unavailable; day = day.AddDays(1) {
 		expected := rosters[day]
 		var rs []domain.PersonReport
 		for _, rep := range reports {
@@ -122,6 +124,9 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 			}
 		}
 		for _, id := range domain.MissingReporters(expected, rs) {
+			if !filter.counts(id, day) {
+				continue
+			}
 			p.Missing = append(p.Missing, views.SettlementWarning{Text: ru.Date(day.Time()) + " · " + personName(users, id), Href: "/admin/reports/" + id + "/" + day.String()})
 			missingDays[personName(users, id)]++
 		}
