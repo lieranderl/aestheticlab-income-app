@@ -1586,7 +1586,7 @@ func movementCards(cards []MovementCard) templ.Component {
 
 // movementGrid is the desktop column layout shared by the header and rows:
 // date, the movement (title, parties, status, note), amount, actions.
-const movementGrid = "lg:grid-cols-[6rem_minmax(0,1fr)_6rem_18rem] lg:items-start lg:gap-x-4 lg:gap-y-1 lg:px-4 lg:py-3"
+const movementGrid = "lg:grid-cols-[6rem_minmax(0,1fr)_6rem_12rem] lg:items-start lg:gap-x-4 lg:gap-y-1 lg:px-4 lg:py-3"
 
 func movementCard(c MovementCard) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -2393,7 +2393,7 @@ func movementItem(c MovementCard, row bool) templ.Component {
 			}
 		}
 		if c.EditURL != "" || c.VoidURL != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, "  <div class=\"flex flex-wrap gap-2 lg:flex-nowrap\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, "  <div class=\"flex flex-wrap gap-2 lg:justify-end\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

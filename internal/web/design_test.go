@@ -115,7 +115,7 @@ func TestRecentKassaMovementsAreSortedByDate(t *testing.T) {
 	if i, j := strings.Index(recent, "10.11.2026"), strings.Index(recent, "03.11.2026"); i < 0 || j < 0 || i > j {
 		t.Errorf("recent movements are not newest date first (10.11 at %d, 03.11 at %d)", i, j)
 	}
-	if !strings.Contains(body, "записано 20.11.2026") {
+	if !strings.Contains(body, "записано 20.11 · ") || strings.Contains(body, "записано 20.11.2026") {
 		t.Error("a backfilled movement does not show when it was entered")
 	}
 }

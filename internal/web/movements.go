@@ -702,5 +702,5 @@ func enteredNote(entered time.Time, date domain.Date) string {
 	if entered.IsZero() || (domain.Date{Year: entered.Year(), Mon: entered.Month(), Day: entered.Day()}) == date {
 		return ""
 	}
-	return "записано " + entered.Format("02.01.2006 · 15:04")
+	return "записано " + entered.Format("02.01 · 15:04") // short: it sits in the date column
 }
