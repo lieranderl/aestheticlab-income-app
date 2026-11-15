@@ -54,7 +54,7 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 	}
 	p := views.SettlementData{Key: m.String(), Month: monthLabel(m), AsOf: ru.Date(a.store.Today().Time()), Closed: selected.State.Status == domain.MonthClosed, Running: !m.Before(a.store.Today().Month()), Blockers: slices.DeleteFunc(a.settlementBlockers(selected, m), func(b string) bool { return b == monthNotOver }), KassaLink: selected.Pending > 0 && selected.State.Status != domain.MonthClosed}
 	if !m.Prev().Before(a.store.StartMonth()) {
-		p.Prev = settlementURL(m.Prev())
+		p.Prev, p.PrevLabel = settlementURL(m.Prev()), monthLabel(m.Prev())
 	}
 	if !a.store.Today().Month().Before(m.Next()) {
 		p.Next = settlementURL(m.Next())

@@ -2,6 +2,7 @@ package web
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
@@ -35,5 +36,22 @@ func TestNoTermsLineFitsWhetherThePersonReports(t *testing.T) {
 	}
 	if got := noTermsLine(store.User{SubmitsReports: true}); got != "Условия не заданы" {
 		t.Errorf("reporter: %q", got)
+	}
+}
+
+// Third production review: «Откуда»/«Куда» listed the owner (who doesn't
+// report or hold money) among staff. Reporters come first, others last.
+func TestMovementPeopleListReportersFirst(t *testing.T) {
+	got := movementPeople([]store.User{
+		{ID: "owner", DisplayName: "Evgenii"},
+		{ID: "j", DisplayName: "Julia", SubmitsReports: true},
+		{ID: "l", DisplayName: "Lera", SubmitsReports: true},
+	})
+	var labels []string
+	for _, o := range got {
+		labels = append(labels, o.Label)
+	}
+	if strings.Join(labels, ",") != "Julia,Lera,Evgenii" {
+		t.Errorf("order = %v", labels)
 	}
 }

@@ -8,17 +8,18 @@ type SettlementPerson struct {
 }
 type SettlementData struct {
 	Key, Month, Prev, Next, Notice, AsOf string
-	Closed, Running                bool // Running: the month has not ended yet
-	Figures, Expenses              []MoneyRow
-	People                         []SettlementPerson
-	Blockers                       []string
-	KassaLink                      bool // movements wait for confirmation
-	Warnings, Missing              []SettlementWarning
-	MissingSummary                 string // «Lera — 12 дн. · Zara — 15 дн.»
-	MissingUnavailable             bool   // a calendar could not be read
-	MissingByCalendar              bool   // only days with a customer in the calendar count
-	Action                         MonthActionData
-	MovementForm                   MovementFormData
+	PrevLabel                            string // «Ноябрь 2026», for the «close the previous month» link
+	Closed, Running                      bool   // Running: the month has not ended yet
+	Figures, Expenses                    []MoneyRow
+	People                               []SettlementPerson
+	Blockers                             []string
+	KassaLink                            bool // movements wait for confirmation
+	Warnings, Missing                    []SettlementWarning
+	MissingSummary                       string // «Lera — 12 дн. · Zara — 15 дн.»
+	MissingUnavailable                   bool   // a calendar could not be read
+	MissingByCalendar                    bool   // only days with a customer in the calendar count
+	Action                               MonthActionData
+	MovementForm                         MovementFormData
 }
 
 templ MonthTabs(key string, settlement bool) {
@@ -50,14 +51,20 @@ templ SettlementPage(nav Nav, p SettlementData) {
 			if p.Closed {
 				<p class="alert alert-soft" role="status">Месяц закрыт. Итоги и условия зафиксированы.</p>
 			} else {
-				<div class="alert alert-info alert-soft" role="status">
+				// One visible sentence; the why is folded (third production review).
+				<div class="alert alert-info alert-soft flex flex-col items-start gap-1" role="status">
 					<p>
 						Предварительный расчёт. Зарплаты, доплата «Себе» и дивиденды ещё не начислены.
 						if p.Running {
-							До конца месяца прибыль ниже итоговой: зарплаты учтены за весь месяц, а доход — только за прошедшие дни.
 							Закрыть месяц можно после его окончания.
 						}
 					</p>
+					if p.Running {
+						<details>
+							<summary class="min-h-11 cursor-pointer py-2 font-medium">Почему прибыль ниже</summary>
+							<p>До конца месяца прибыль ниже итоговой: зарплаты учтены за весь месяц, а доход — только за прошедшие дни.</p>
+						</details>
+					}
 				</div>
 			}
 			@adminFigures(p.Figures)
@@ -66,6 +73,9 @@ templ SettlementPage(nav Nav, p SettlementData) {
 				<p class="alert alert-error alert-soft" role="alert">
 					{ b }
 				</p>
+				if b == "Сначала закройте предыдущий месяц" && p.Prev != "" {
+					<a class="btn min-h-11" href={ templ.SafeURL(p.Prev) }>Открыть: { p.PrevLabel }</a>
+				}
 			}
 			if p.KassaLink {
 				<a class="btn min-h-11" href="/admin/kassa">Открыть кассу</a>
@@ -140,7 +150,8 @@ templ SettlementPage(nav Nav, p SettlementData) {
 							</p>
 							<details class="collapse collapse-arrow">
 								<summary class="collapse-title min-h-14">Из чего складывается итог месяца</summary>
-								<div class="collapse-content">@moneyRows(c.Breakdown)</div>
+								<div class="collapse-content">@moneyRows(c.Breakdown)
+</div>
 							</details>
 						</section>
 					</div>

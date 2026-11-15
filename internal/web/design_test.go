@@ -115,7 +115,7 @@ func TestRecentKassaMovementsAreSortedByDate(t *testing.T) {
 	if i, j := strings.Index(recent, "10.11.2026"), strings.Index(recent, "03.11.2026"); i < 0 || j < 0 || i > j {
 		t.Errorf("recent movements are not newest date first (10.11 at %d, 03.11 at %d)", i, j)
 	}
-	if !strings.Contains(body, "записано 20.11.2026") {
+	if !strings.Contains(body, "записано 20.11 · ") || strings.Contains(body, "записано 20.11.2026") {
 		t.Error("a backfilled movement does not show when it was entered")
 	}
 }
@@ -194,5 +194,33 @@ func TestKassaRecentLeavesOutOpenings(t *testing.T) {
 	body := s.get("/admin/kassa", s.login("anna", annaPass)).Body.String()
 	if strings.Contains(body, "Начальный остаток") {
 		t.Error("an opening balance is listed among recent kassa movements")
+	}
+}
+
+// Third production review: «Отчёт · Изменение» cards were empty when an edit
+// changed nothing the card lists. Such an edit says «Суммы не изменились».
+func TestARecordEditWithoutNewAmountsSaysSo(t *testing.T) {
+	s := newSite(t)
+	if err := s.st.SetTerms(ctx, s.anna.Actor(), s.olga.ID, s.st.StartMonth(), domain.Terms{SelfPct: 5000, DividendWeight: 1}, ""); err != nil {
+		t.Fatal(err)
+	}
+	entry := store.ClientEntry{Token: "test-client-token-resave", Person: s.olga.ID, Date: domain.Date{Year: 2026, Mon: 11, Day: 20},
+		Input: domain.ClientInput{Services: 10000, ServiceCash: 5000, ExtrasDestination: domain.ToCash}}
+	saved, err := s.st.SaveClientReport(ctx, s.anna.Actor(), entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry.Version = saved.Version
+	if _, err := s.st.SaveClientReport(ctx, s.anna.Actor(), entry); err != nil {
+		t.Fatal(err)
+	}
+	body := s.get("/admin/audit?from=2026-11-20&to=2026-11-20&entity=report", s.login("anna", annaPass)).Body.String()
+	for _, card := range regexp.MustCompile(`(?s)<article\b.*?</article>`).FindAllString(body, -1) {
+		if !strings.Contains(card, "<dl") && !strings.Contains(card, "<details") {
+			t.Errorf("empty card: %s", regexp.MustCompile(`<[^>]+>`).ReplaceAllString(card, " "))
+		}
+	}
+	if !strings.Contains(body, "Суммы") || !strings.Contains(body, "не изменились") {
+		t.Error("an edit without new amounts does not say so")
 	}
 }
