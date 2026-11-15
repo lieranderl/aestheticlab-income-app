@@ -308,11 +308,19 @@ templ movementCard(c MovementCard) {
 					/><button class="btn btn-primary min-h-11 w-full">Подтвердить</button>
 				</form>
 			}
-			if c.EditURL != "" {
-				<a class="btn min-h-11" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
+			if c.EditURL != "" || c.VoidURL != "" {
+				// Secondary actions share one row so a pending card is not three
+				// stacked full-width buttons (2026-11-15 design review).
+				<div class="flex flex-wrap gap-2">
+					if c.EditURL != "" {
+						<a class="btn min-h-11 flex-1 basis-32" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
+					}
+					if c.VoidURL != "" {
+						<a class="btn btn-ghost min-h-11 flex-1 basis-32 text-error" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger" aria-label="Отменить движение">Отменить</a>
+					}
+				</div>
 			}
 			if c.VoidURL != "" {
-				<a class="btn btn-ghost min-h-11" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger">Отменить движение</a>
 				<dialog data-signals:_voidid__ifmissing="''" class="modal modal-bottom sm:modal-middle" data-ledger={ c.ID } data-effect="$_voidid === el.dataset.ledger ? el.showModal() : el.close()" data-on:close="$_voidid = ''" aria-label="Причина отмены">
 					<div class="modal-box pb-safe">
 						<button type="button" class="btn btn-ghost min-h-11" data-on:click="$_voidid = ''">Закрыть</button>
