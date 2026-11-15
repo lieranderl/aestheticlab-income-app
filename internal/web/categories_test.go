@@ -164,3 +164,29 @@ func TestRevenueAndPaymentListsOfferNoNewCategory(t *testing.T) {
 	wantPage(t, "new form without a kind", s.get("/admin/categories/new", admin), http.StatusOK, `name="kind" value="expense"`)
 	wantRedirect(t, "new expense category", s.post("/admin/categories", url.Values{"kind": {"expense"}, "name": {"Уборка"}}, admin), "/admin/categories?kind=expense")
 }
+
+// 2026-11-15 design review: a creation lists what was set, once, without
+// «— →» and without «Нет» noise, and the link names what it opens.
+func TestCategoryCreationAuditIsShortAndLinksToTheCategory(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	if got := s.post("/admin/categories", url.Values{"kind": {"expense"}, "name": {"Кофе и чай"}}, admin); got.Code != http.StatusSeeOther {
+		t.Fatalf("create: %d", got.Code)
+	}
+	body := s.get("/admin/audit?from=2026-11-20&to=2026-11-20&entity=category", admin).Body.String()
+	card := body[strings.Index(body, "Категория · Создание"):]
+	card = card[:strings.Index(card, "</article>")]
+	for _, unwanted := range []string{"— →", "Доступ", "Учитывать в «Себе»", "Удалена", "Открыть отчёт"} {
+		if strings.Contains(card, unwanted) {
+			t.Errorf("creation card shows %q: %s", unwanted, card)
+		}
+	}
+	for _, want := range []string{"Кофе и чай", "Открыть категорию"} {
+		if !strings.Contains(card, want) {
+			t.Errorf("creation card lacks %q: %s", want, card)
+		}
+	}
+	if n := strings.Count(card, "Продажа сертификата"); n > 1 {
+		t.Errorf("«Продажа сертификата» listed %d times", n)
+	}
+}
