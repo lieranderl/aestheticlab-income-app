@@ -23,6 +23,7 @@ type SettlementData struct {
 	Figures, Expenses                    []MoneyRow
 	People                               []SettlementPerson
 	Blockers                             []string
+	KassaLink                            bool // movements wait for confirmation
 	Warnings, Missing                    []SettlementWarning
 	Action                               MonthActionData
 	MovementForm                         MovementFormData
@@ -78,7 +79,7 @@ func MonthTabs(key string, settlement bool) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/admin/month?m=" + key)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 26, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 27, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -137,7 +138,7 @@ func MonthTabs(key string, settlement bool) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/admin/month?m=" + key + "&tab=settlement")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 33, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 34, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -231,7 +232,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if p.Running {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "До конца месяца прибыль ниже итоговой: зарплаты учтены за весь месяц, а доход — только за прошедшие дни.")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "До конца месяца прибыль ниже итоговой: зарплаты учтены за весь месяц, а доход — только за прошедшие дни. Закрыть месяц можно после его окончания.")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -257,7 +258,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(b)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 64, Col: 8}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 66, Col: 8}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -268,7 +269,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			if len(p.Blockers) > 0 {
+			if p.KassaLink {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<a class=\"btn min-h-11\" href=\"/admin/kassa\">Открыть кассу</a> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -282,7 +283,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(p.Missing)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 73, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 75, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -300,7 +301,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					var templ_7745c5c3_Var12 string
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(warning.Href)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 79, Col: 42}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 81, Col: 42}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 					if templ_7745c5c3_Err != nil {
@@ -313,7 +314,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(warning.Text)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 80, Col: 22}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 82, Col: 22}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -337,7 +338,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(warning.Href)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 88, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 90, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 				if templ_7745c5c3_Err != nil {
@@ -350,7 +351,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(warning.Text)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 89, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 91, Col: 19}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -369,7 +370,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 94, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 96, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -422,7 +423,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(c.Current)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 96, Col: 154}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 98, Col: 154}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -435,7 +436,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(p.AsOf)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 97, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 99, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -453,7 +454,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					var templ_7745c5c3_Var21 string
 					templ_7745c5c3_Var21, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(c.ActionURL)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 101, Col: 41}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 103, Col: 41}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 					if templ_7745c5c3_Err != nil {
@@ -466,7 +467,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					var templ_7745c5c3_Var22 string
 					templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.ActionURL).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 102, Col: 30}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 104, Col: 30}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 					if templ_7745c5c3_Err != nil {
@@ -479,7 +480,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					var templ_7745c5c3_Var23 string
 					templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(loadMovementForm(true)).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 103, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 105, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 					if templ_7745c5c3_Err != nil {
@@ -492,7 +493,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					var templ_7745c5c3_Var24 string
 					templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(onMovementLoad).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 104, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 106, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 					if templ_7745c5c3_Err != nil {
@@ -505,7 +506,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					var templ_7745c5c3_Var25 string
 					templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(c.Action)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 107, Col: 18}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 109, Col: 18}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 					if templ_7745c5c3_Err != nil {
@@ -523,7 +524,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(c.CarryURL)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 111, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 113, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 				if templ_7745c5c3_Err != nil {
@@ -551,7 +552,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(c.Balance)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 121, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 123, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
@@ -564,7 +565,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var28 string
 				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(c.Earned)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 122, Col: 74}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 124, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 				if templ_7745c5c3_Err != nil {

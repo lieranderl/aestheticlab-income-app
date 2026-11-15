@@ -40,6 +40,10 @@ func settlementFigures(result domain.MonthResult) []views.MoneyRow {
 	return rows
 }
 
+// monthNotOver blocks closing, but on the settlement page it is the normal
+// state of the current month and is said in the info notice instead.
+const monthNotOver = "Месяц ещё не закончился"
+
 func (a *app) settlementBlockers(selected store.SettlementMonth, m domain.Month) []string {
 	var blockers []string
 	if selected.PreviewError != nil {
@@ -52,7 +56,7 @@ func (a *app) settlementBlockers(selected store.SettlementMonth, m domain.Month)
 		blockers = append(blockers, "Ожидают подтверждения: "+strconv.Itoa(selected.Pending)+" — откройте кассу")
 	}
 	if !m.Before(a.store.Today().Month()) {
-		blockers = append(blockers, "Месяц ещё не закончился")
+		blockers = append(blockers, monthNotOver)
 	}
 	if !selected.PreviousClosed {
 		blockers = append(blockers, "Сначала закройте предыдущий месяц")
