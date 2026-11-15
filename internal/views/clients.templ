@@ -210,10 +210,10 @@ templ ClientFormView(f ClientForm) {
 						<button type="button" class="btn btn-outline min-h-11 h-auto py-2" disabled data-attr:disabled={ clientFillDisabled } data-on:click={ clientFillCard }>Клиент оплатил картой салона</button>
 						<p class="text-sm text-base-content/70">Кнопки заполняют поля ниже — сумму можно исправить.</p>
 					</div>
-					// One rule for both fields, said once (2026-11-15 design review).
-					<p id="client-payments-hint" class="text-sm text-base-content/70">Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.</p>
 					@clientField(f, "serviceCash", "За услуги — наличными, € (необязательно)", "")
 					@clientField(f, "serviceCard", "За услуги — на карту салона, € (необязательно)", "")
+					// One rule for both fields, said once under them (2026-11-15 design review).
+					<p id="client-payments-hint" class="text-sm text-base-content/70">Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.</p>
 				</div>
 			</section>
 			<section class="card bg-base-100">
@@ -229,7 +229,7 @@ templ ClientFormView(f ClientForm) {
 							<p class="text-sm text-base-content/70">Ваша доля от услуг — { f.SharePct }.</p>
 						}
 						<p class={ "text-base-content/70", templ.KV("hidden", !f.Incomplete) } data-class:hidden="$_clientReady" role="status">Расчёт не завершён — проверьте выделенные поля.</p>
-						<p class={ "text-base-content/70", templ.KV("hidden", f.Incomplete || !clientBlank(f)) } data-class:hidden={ "!$_clientReady || !(" + clientBlankJS + ")" }>Введите стоимость услуг — здесь появится расчёт.</p>
+						<p class={ "text-base-content/70", templ.KV("hidden", f.Incomplete || !clientBlank(f)) } data-class:hidden={ "!$_clientReady || !(" + clientBlankJS + ")" } role="status">Введите суммы — здесь появится расчёт.</p>
 						<div id="client-result-values" class={ templ.KV("hidden", f.Incomplete || clientBlank(f)), "flex flex-col gap-2" } data-class:hidden={ "!$_clientReady || " + clientBlankJS }>
 							<p>«Себе» <strong data-text={ jsEUR("$_clientSelf") }>{ f.Self }</strong></p>
 							<p>«Салону» <strong data-text={ jsEUR("($_cc.services) + $_ce - $_clientSelf") }>{ f.Salon }</strong></p>

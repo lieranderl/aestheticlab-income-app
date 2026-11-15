@@ -830,7 +830,7 @@ func TestABlankClientFormIsShort(t *testing.T) {
 	if n := strings.Count(body, "Сумма взносов — не больше услуг за вычетом сертификата."); n != 1 {
 		t.Errorf("the payment rule is shown %d times, want once", n)
 	}
-	if !strings.Contains(body, "Введите стоимость услуг — здесь появится расчёт.") {
+	if !strings.Contains(body, "Введите суммы — здесь появится расчёт.") {
 		t.Error("a blank form has no prompt where the figures will appear")
 	}
 	if !regexp.MustCompile(`id="client-result-values" class="hidden`).MatchString(body) {

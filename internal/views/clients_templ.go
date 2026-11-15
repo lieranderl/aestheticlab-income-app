@@ -1061,7 +1061,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "\">Клиент оплатил картой салона</button><p class=\"text-sm text-base-content/70\">Кнопки заполняют поля ниже — сумму можно исправить.</p></div><p id=\"client-payments-hint\" class=\"text-sm text-base-content/70\">Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "\">Клиент оплатил картой салона</button><p class=\"text-sm text-base-content/70\">Кнопки заполняют поля ниже — сумму можно исправить.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1073,7 +1073,7 @@ func ClientFormView(f ClientForm) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "</div></section><section class=\"card bg-base-100\"><div class=\"card-body p-4 gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "<p id=\"client-payments-hint\" class=\"text-sm text-base-content/70\">Сумма взносов — не больше услуг за вычетом сертификата. Пустое поле — €0.</p></div></section><section class=\"card bg-base-100\"><div class=\"card-body p-4 gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1199,7 +1199,7 @@ func ClientFormView(f ClientForm) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "\" role=\"status\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -1213,7 +1213,7 @@ func ClientFormView(f ClientForm) templ.Component {
 				}
 				templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, ">Введите стоимость услуг — здесь появится расчёт.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, ">Введите суммы — здесь появится расчёт.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
