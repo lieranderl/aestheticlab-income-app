@@ -63,9 +63,12 @@ func TestMovementListsShowNewestDateFirstAndHideVoided(t *testing.T) {
 	wantPage(t, "voided on request", s.get("/admin/history/movements?status=voided", j), http.StatusOK, "отменённый-расход", "Причина отмены: дубль")
 
 	z := s.login("olga", olgaPass)
+	// Entered first but dated latest: «Мои записи» lists by date (owner,
+	// 2026-11-15).
+	dates := map[string]string{"мой-первый": "2026-11-12", "мой-отменённый": "2026-11-10", "мой-второй": "2026-11-05"}
 	for _, note := range []string{"мой-первый", "мой-отменённый", "мой-второй"} {
 		*s.clock = s.clock.Add(time.Minute)
-		form := url.Values{"type": {"expense"}, "amount": {"5"}, "date": {"2026-11-10"}, "from": {"person:" + s.olga.ID}, "to": {"outside"}, "expenseCategory": {"materials"}, "note": {note}}
+		form := url.Values{"type": {"expense"}, "amount": {"5"}, "date": {dates[note]}, "from": {"person:" + s.olga.ID}, "to": {"outside"}, "expenseCategory": {"materials"}, "note": {note}}
 		wantRedirect(t, note, s.post("/movements", form, z), "/my?saved=pending")
 	}
 	mine, err := s.st.PersonMovementsIn(ctx, s.olga.ID, s.st.StartMonth())
@@ -78,7 +81,7 @@ func TestMovementListsShowNewestDateFirstAndHideVoided(t *testing.T) {
 		}
 	}
 	body := s.get("/my", z).Body.String()
-	wantOrder(t, "/my", body, "мой-второй", "мой-первый")
+	wantOrder(t, "/my", body, "мой-первый", "мой-второй")
 	if strings.Contains(body, "мой-отменённый") {
 		t.Fatal("/my shows a voided movement")
 	}

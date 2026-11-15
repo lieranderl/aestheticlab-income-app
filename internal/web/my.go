@@ -108,7 +108,7 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		a.serverError(w, r, err)
 		return
 	}
-	movements = newestEntered(movements)
+	movements = newestDated(movements)
 	page.Movements, err = a.movementCards(r, u, movements, false)
 	if err != nil {
 		a.serverError(w, r, err)
