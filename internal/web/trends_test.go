@@ -197,3 +197,24 @@ func TestTrendsOverviewDrawsLossesInTheErrorTone(t *testing.T) {
 		t.Error("the legend does not explain the error-tone bars")
 	}
 }
+
+// 2026-11-15 design review: months without data collapse into one line on
+// the phone list, and the metric chips stay on one scrollable row.
+func TestTrendsCollapsesEmptyMonthsAndKeepsChipsOnOneRow(t *testing.T) {
+	s := newSite(t)
+	adminUser, err := s.st.UserByUsername(ctx, "anna")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := domain.ImportedMonth{RevenueTotal: 1200000, SalonIncome: 600000, Expenses: 700000, Profit: -100000}
+	if err := s.st.SaveImportedMonth(ctx, store.Actor{UID: adminUser.ID, Admin: true}, domain.Month{Year: 2026, Mon: 9}, im, "test sheet"); err != nil {
+		t.Fatal(err)
+	}
+	body := s.get("/admin/trends?period=6", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(body, "Июнь — Август 2026: нет данных") {
+		t.Error("June to August are not collapsed into one line")
+	}
+	if !strings.Contains(body, `aria-label="Показатель"`) || !strings.Contains(body, "overflow-x-auto") {
+		t.Error("the metric chips are not one scrollable row")
+	}
+}
