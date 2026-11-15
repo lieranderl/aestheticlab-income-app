@@ -74,3 +74,26 @@ func TestChangeLogHasNoEmptyCards(t *testing.T) {
 		t.Error("the booking link is not shown")
 	}
 }
+
+// 2026-11-15 production review: the admin's movement form preselected the
+// first person (the owner) as «Откуда» for a deposit and «Куда» for a
+// payout. A person must be chosen; accounts and employees' own forms keep
+// their defaults.
+func TestAdminMovementFormMakesYouChooseThePerson(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	for kind, field := range map[string]string{"deposit": "from", "payout": "to"} {
+		body := s.get("/admin/movements/new?type="+kind, admin).Body.String()
+		sel := regexp.MustCompile(`(?s)<select name="`+field+`".*?</select>`).FindString(body)
+		if !strings.Contains(sel, `<option value="" selected disabled>Выберите сотрудника</option>`) {
+			t.Errorf("%s: «%s» does not start with «Выберите сотрудника»: %s", kind, field, sel)
+		}
+		if strings.Contains(sel, `value="person:`) && regexp.MustCompile(`value="person:[^"]+" selected`).MatchString(sel) {
+			t.Errorf("%s: a person is preselected", kind)
+		}
+	}
+	own := s.get("/movements/new?type=deposit", s.login("olga", olgaPass)).Body.String()
+	if strings.Contains(own, "Выберите сотрудника") {
+		t.Error("an employee's own form asks to choose a person")
+	}
+}

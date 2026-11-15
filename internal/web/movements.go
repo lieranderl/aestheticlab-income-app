@@ -109,6 +109,16 @@ func (a *app) movementForm(r *http.Request, u store.User, admin bool, kind strin
 	if len(f.Destinations) > 0 {
 		f.To = f.Destinations[0].Value
 	}
+	// The admin picks the person: preselecting the first one (the owner) put
+	// deposits and payouts on the wrong person (2026-11-15 production review).
+	if admin {
+		switch domain.MovementType(kind) {
+		case domain.Deposit:
+			f.From = ""
+		case domain.Payout:
+			f.To = ""
+		}
+	}
 	if kind == string(domain.Transfer) && len(f.Destinations) > 1 {
 		f.To = f.Destinations[1].Value
 	}

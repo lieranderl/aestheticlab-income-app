@@ -229,6 +229,10 @@ templ movementFieldError(f MovementFormData, name string) {
 
 templ movementSelect(name, selected string, options []FilterOption, bad string) {
 	<select name={ name } class={ "select select-lg w-full text-base", templ.KV("select-error", bad == name) } aria-invalid={ boolText(bad == name) } aria-describedby={ "movement-" + name + "-error" } required>
+		// Admin deposits and payouts start with no person chosen.
+		if selected == "" && (name == "from" || name == "to") {
+			<option value="" selected disabled>Выберите сотрудника</option>
+		}
 		for _, o := range options {
 			<option value={ o.Value } selected?={ selected == o.Value }>{ o.Label }</option>
 		}
