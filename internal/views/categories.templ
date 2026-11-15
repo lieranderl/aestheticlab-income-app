@@ -77,7 +77,7 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 						<div class="card-body min-w-0 gap-3 p-4">
 							<a href={ templ.SafeURL("/admin/categories/" + c.ID) } class="min-h-11 [overflow-wrap:anywhere] text-lg font-semibold underline-offset-2 hover:underline">{ c.Name }</a>
 							if store.IsFixedCategory(c.ID) {
-								<span class="badge badge-soft badge-neutral">Базовая</span>
+								<span class="badge border-transparent bg-base-300 text-base-content">Базовая</span>
 							} else if !c.Active {
 								<span class="badge badge-soft badge-warning">В архиве</span>
 							}

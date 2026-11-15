@@ -54,7 +54,7 @@ templ factCard(lines []MoneyLine) {
 					@Icon("wallet", "size-5")
 					Деньги по записям
 				</h2>
-				<span class="badge badge-neutral badge-soft">Факт</span>
+				<span class="badge border-transparent bg-base-300 text-base-content">Факт</span>
 			</div>
 			@moneyLines(lines, false)
 		</div>
@@ -74,7 +74,7 @@ templ expectedCard(lines []MoneyLine, explain string, frozen bool) {
 				}
 			</h2>
 			if frozen {
-				<span class="badge badge-neutral badge-soft">Закрыто</span>
+				<span class="badge border-transparent bg-base-300 text-base-content">Закрыто</span>
 			} else {
 				<span class="badge badge-ghost border-dashed border-base-content/50">Ожидается</span>
 			}

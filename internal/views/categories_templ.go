@@ -247,7 +247,7 @@ func CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) tem
 					return templ_7745c5c3_Err
 				}
 				if store.IsFixedCategory(c.ID) {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<span class=\"badge badge-soft badge-neutral\">Базовая</span> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<span class=\"badge border-transparent bg-base-300 text-base-content\">Базовая</span> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

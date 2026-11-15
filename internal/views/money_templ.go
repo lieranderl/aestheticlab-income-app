@@ -220,7 +220,7 @@ func factCard(lines []MoneyLine) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " Деньги по записям</h2><span class=\"badge badge-neutral badge-soft\">Факт</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " Деньги по записям</h2><span class=\"badge border-transparent bg-base-300 text-base-content\">Факт</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -281,7 +281,7 @@ func expectedCard(lines []MoneyLine, explain string, frozen bool) templ.Componen
 			return templ_7745c5c3_Err
 		}
 		if frozen {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<span class=\"badge badge-neutral badge-soft\">Закрыто</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<span class=\"badge border-transparent bg-base-300 text-base-content\">Закрыто</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
