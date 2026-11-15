@@ -209,6 +209,16 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 			err = &domain.ValidationError{Field: "date", Problem: problemDateMissing}
 		}
 	}
+	// The admin's deposit and payout start with no person chosen; say so on
+	// that field rather than as a generic parties problem.
+	if err == nil && admin {
+		switch {
+		case kind == string(domain.Deposit) && f.From == "":
+			err = &domain.ValidationError{Field: "from", Problem: problemPersonMissing}
+		case kind == string(domain.Payout) && f.To == "":
+			err = &domain.ValidationError{Field: "to", Problem: problemPersonMissing}
+		}
+	}
 	if err == nil {
 		n := store.NewMovement{
 			Type:            domain.MovementType(kind),
@@ -266,6 +276,7 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 const (
 	problemAmountUnreadable domain.Problem = "amount_unreadable"
 	problemDateMissing      domain.Problem = "date_missing"
+	problemPersonMissing    domain.Problem = "person_missing"
 )
 
 // movementFieldProblem says which field of the movement form is at fault
@@ -296,6 +307,8 @@ func movementFieldProblem(r *http.Request, err error, kind string) (field, messa
 			return "note", "Для расхода нужен комментарий"
 		}
 		return "note", "Укажите комментарий"
+	case problemPersonMissing:
+		return v.Field, "Выберите сотрудника"
 	case store.ProblemUnknownParty:
 		if v.Field == "expenseCategory" {
 			return "expenseCategory", "Выберите категорию расхода из списка"

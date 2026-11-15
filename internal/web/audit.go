@@ -155,6 +155,9 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 				return "не привязана"
 			}
 			value := linked(b) + " → " + linked(v)
+			if b && v {
+				value = "перепривязана к другой записи"
+			}
 			if row.Action == store.ActionCreate {
 				value = linked(v) // a creation lists what was set
 			}

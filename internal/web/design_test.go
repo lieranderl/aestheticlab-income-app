@@ -1,6 +1,8 @@
 package web_test
 
 import (
+	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -147,5 +149,47 @@ func TestAdminDayKeepsThePickerCompactAndHidesEmptySections(t *testing.T) {
 	}
 	if strings.Index(body, "Отчётов за этот день нет.") < strings.Index(body, "Записи за день") {
 		t.Error("the empty note is not under «Записи за день»")
+	}
+}
+
+// Money audit follow-up: a deposit or payout sent without a person is
+// refused on that field and books nothing.
+func TestAdminMovementWithoutAPersonIsRefused(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	for kind, field := range map[string]string{"deposit": "from", "payout": "to"} {
+		form := s.get("/admin/movements/new?type="+kind, admin).Body.String()
+		v := url.Values{"type": {kind}, "amount": {"10"}, "date": {"2026-11-20"}, "token": {hiddenValue(t, form, "token")}}
+		if kind == "deposit" {
+			v.Set("to", "account:"+domain.KassaCash)
+		} else {
+			v.Set("from", "account:"+domain.KassaCash)
+		}
+		res := s.post("/admin/movements", v, admin)
+		if res.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("%s without a person: %d", kind, res.Code)
+		}
+		if !strings.Contains(res.Body.String(), "Выберите сотрудника") || !regexp.MustCompile(`<select name="`+field+`" class="[^"]*select-error`).MatchString(res.Body.String()) {
+			t.Errorf("%s: the error is not on «%s»", kind, field)
+		}
+	}
+	es, err := s.st.LedgerBetween(ctx, domain.Date{Year: 2026, Mon: 11, Day: 1}, domain.Date{Year: 2026, Mon: 11, Day: 30})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(es) != 0 {
+		t.Errorf("a movement without a person was booked: %d rows", len(es))
+	}
+}
+
+// Money audit follow-up: opening balances stay out of Касса's recent list.
+func TestKassaRecentLeavesOutOpenings(t *testing.T) {
+	s := newSite(t)
+	if _, err := s.st.RecordOpenings(ctx, s.anna.Actor(), []store.NewMovement{{Type: domain.Opening, Amount: 10000, From: domain.Salon, To: domain.Account(domain.KassaCash), Date: s.st.StartMonth().FirstDay()}}); err != nil {
+		t.Fatal(err)
+	}
+	body := s.get("/admin/kassa", s.login("anna", annaPass)).Body.String()
+	if strings.Contains(body, "Начальный остаток") {
+		t.Error("an opening balance is listed among recent kassa movements")
 	}
 }
