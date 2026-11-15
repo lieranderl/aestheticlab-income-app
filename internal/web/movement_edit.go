@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
@@ -17,6 +18,16 @@ import (
 func newestEntered(es []store.Entry) []store.Entry {
 	es = slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Voided })
 	byEntry(es)
+	return es
+}
+
+// newestDated drops voided rows and sorts by the movement's date, newest
+// first, then newest entered: Касса's recent list (owner, 2026-11-15).
+func newestDated(es []store.Entry) []store.Entry {
+	es = slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Voided })
+	slices.SortStableFunc(es, func(a, b store.Entry) int {
+		return cmp.Or(strings.Compare(b.Date.String(), a.Date.String()), b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(b.ID, a.ID))
+	})
 	return es
 }
 
