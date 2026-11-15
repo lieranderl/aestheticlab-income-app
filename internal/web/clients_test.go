@@ -565,9 +565,16 @@ func TestClientFormSeparatesServiceRedemptionSalesAndHelp(t *testing.T) {
 		}
 		previous = index
 	}
-	for _, field := range []string{"services", "creams", "oil", "certificates", "certificatePaid", "serviceCash", "serviceCard"} {
-		if !strings.Contains(body, `aria-describedby="client-`+field+`-hint client-`+field+`-error"`) {
-			t.Errorf("client amount %s lacks field-adjacent help association", field)
+	for field, hint := range map[string]string{
+		"services": "client-services-hint ", "certificatePaid": "client-certificatePaid-hint ",
+		"serviceCash": "client-payments-hint ", "serviceCard": "client-payments-hint ",
+		"creams": "", "oil": "", "certificates": "",
+	} {
+		if !strings.Contains(body, `aria-describedby="`+hint+`client-`+field+`-error"`) {
+			t.Errorf("client amount %s lacks its help association", field)
+		}
+		if hint != "" && !strings.Contains(body, `id="`+strings.TrimSpace(hint)+`"`) {
+			t.Errorf("client amount %s points at a missing hint %s", field, hint)
 		}
 	}
 }
@@ -808,4 +815,21 @@ func TestBlankClientFormIsNotSavedAsAClient(t *testing.T) {
 	form := url.Values{"date": {"2026-11-20"}, "token": {"http-blank-client-token"}, "version": {"0"}, "extrasDestination": {"cash"}}
 	wantPage(t, "blank client", s.post("/clients", form, z), http.StatusUnprocessableEntity, "Укажите стоимость услуг или продажу")
 	wantPage(t, "day stays empty", s.get("/?date=2026-11-20", z), http.StatusOK, "Клиентов за этот день нет")
+}
+
+// 2026-11-15 design review: the payment rule is said once for both fields,
+// and a blank form shows a prompt instead of a block of €0 figures.
+func TestABlankClientFormIsShort(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 6500)
+	body := s.get("/clients/new", s.login("olga", olgaPass)).Body.String()
+	if n := strings.Count(body, "Сумма взносов — не больше услуг за вычетом сертификата."); n != 1 {
+		t.Errorf("the payment rule is shown %d times, want once", n)
+	}
+	if !strings.Contains(body, "Введите стоимость услуг — здесь появится расчёт.") {
+		t.Error("a blank form has no prompt where the figures will appear")
+	}
+	if !regexp.MustCompile(`id="client-result-values" class="hidden`).MatchString(body) {
+		t.Error("a blank form shows the €0 figures")
+	}
 }
