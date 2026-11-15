@@ -214,7 +214,12 @@ func TestTrendsCollapsesEmptyMonthsAndKeepsChipsOnOneRow(t *testing.T) {
 	if !strings.Contains(body, "Июнь — Август 2026: нет данных") {
 		t.Error("June to August are not collapsed into one line")
 	}
-	if !strings.Contains(body, `aria-label="Показатель"`) || !strings.Contains(body, "overflow-x-auto") {
-		t.Error("the metric chips are not one scrollable row")
+	if !strings.Contains(body, `role="group" aria-labelledby="trend-metric-label"`) || !strings.Contains(body, "overflow-x-auto") {
+		t.Error("the metric chips are not one labelled scrollable row")
+	}
+	// The chosen metric is named even when its chip is scrolled away.
+	clients := s.get("/admin/trends?period=6&metric=clients", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(clients, `Показатель: <span class="text-base-content">Клиенты</span>`) {
+		t.Error("the label does not name the chosen metric")
 	}
 }

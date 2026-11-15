@@ -79,10 +79,11 @@ templ TrendsPage(nav Nav, d TrendData) {
 			</nav>
 			<!-- Metric Selector -->
 			<div class="flex flex-col gap-2">
-				<p class="text-sm font-semibold text-base-content/80">Показатель</p>
+				// Names the chosen metric: its chip may be scrolled out of view.
+				<p id="trend-metric-label" class="text-sm font-semibold text-base-content/80">Показатель: <span class="text-base-content">{ d.MetricLabel }</span></p>
 				// One scrollable row on the phone instead of five wrapped rows
 				// (2026-11-15 design review); wraps again at lg:.
-				<div class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0" aria-label="Показатель">
+				<div class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-labelledby="trend-metric-label">
 					for _, m := range d.Metrics {
 						<a
 							href={ templ.SafeURL("/admin/trends?period=" + strconv.Itoa(d.Period) + "&metric=" + m.ID + trendPersonParam(d.PersonID)) }
@@ -275,7 +276,7 @@ templ trendValue(v, class string) {
 // month on the chart change it. Without JS it shows the latest month with data.
 templ trendReadout(d TrendData) {
 	<div class="flex items-center gap-2 rounded-box bg-base-200 p-1">
-		<button type="button" class="btn btn-ghost btn-square min-h-11 min-w-11 shrink-0" aria-label="Предыдущий месяц" disabled data-attr:disabled="$_month <= 0" data-on:click="$_month = Math.max(0, $_month - 1)">
+		<button type="button" class={ "btn btn-ghost btn-square min-h-11 min-w-11 shrink-0", templ.KV("invisible", d.Selected <= 0) } aria-label="Предыдущий месяц" disabled data-attr:disabled="$_month <= 0" data-class:invisible="$_month <= 0" data-on:click="$_month = Math.max(0, $_month - 1)">
 			@Icon("chevron-left", "size-6")
 		</button>
 		<div class="min-w-0 flex-1 py-1" aria-live="polite" aria-atomic="true">
@@ -307,7 +308,7 @@ templ trendReadout(d TrendData) {
 				</div>
 			}
 		</div>
-		<button type="button" class="btn btn-ghost btn-square min-h-11 min-w-11 shrink-0" aria-label="Следующий месяц" disabled data-last={ strconv.Itoa(len(d.Rows) - 1) } data-attr:disabled="$_month >= +el.dataset.last" data-on:click="$_month = Math.min(+el.dataset.last, $_month + 1)">
+		<button type="button" class={ "btn btn-ghost btn-square min-h-11 min-w-11 shrink-0", templ.KV("invisible", d.Selected >= len(d.Rows)-1) } aria-label="Следующий месяц" disabled data-last={ strconv.Itoa(len(d.Rows) - 1) } data-attr:disabled="$_month >= +el.dataset.last" data-class:invisible="$_month >= +el.dataset.last" data-on:click="$_month = Math.min(+el.dataset.last, $_month + 1)">
 			@Icon("chevron-right", "size-6")
 		</button>
 	</div>
