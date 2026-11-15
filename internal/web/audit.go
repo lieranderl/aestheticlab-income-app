@@ -334,14 +334,19 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 		}
 	}
 	if row.Action == store.ActionCreate {
-		p.Changes = createdValues(p.Changes)
+		// A revenue category's «Нет» flags say how it counts; keep them.
+		var keep map[string]bool
+		if row.Entity == store.EntityCategory && auditString(after, "kind") == string(store.KindRevenue) {
+			keep = map[string]bool{"Входит в «Себе»": true, "Продажа сертификата": true}
+		}
+		p.Changes = createdValues(p.Changes, keep)
 	}
 	return p
 }
 
 // createdValues turns «— → X» rows into plain values and drops unset ones
-// («Нет», «—»): a creation lists what was set, not every field.
-func createdValues(rows []views.MoneyRow) []views.MoneyRow {
+// («Нет», «—») unless keep names them: a creation lists what was set.
+func createdValues(rows []views.MoneyRow, keep map[string]bool) []views.MoneyRow {
 	kept := rows[:0]
 	for _, r := range rows {
 		v, ok := strings.CutPrefix(r.Value, "— → ")
@@ -349,7 +354,7 @@ func createdValues(rows []views.MoneyRow) []views.MoneyRow {
 			kept = append(kept, r)
 			continue
 		}
-		if v == "Нет" || v == "—" {
+		if (v == "Нет" || v == "—") && !keep[r.Name] {
 			continue
 		}
 		r.Value = v

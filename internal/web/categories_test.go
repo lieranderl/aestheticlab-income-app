@@ -190,3 +190,21 @@ func TestCategoryCreationAuditIsShortAndLinksToTheCategory(t *testing.T) {
 		t.Errorf("«Продажа сертификата» listed %d times", n)
 	}
 }
+
+// Money audit 2026-11-15: for a revenue category «Нет» on its «Себе» and
+// certificate flags is meaningful, so a creation keeps those rows.
+func TestRevenueCategoryCreationKeepsItsFlags(t *testing.T) {
+	s := newSite(t)
+	body := s.get("/admin/audit?from=2026-11-20&to=2026-11-20&entity=category", s.login("anna", annaPass)).Body.String()
+	i := strings.Index(body, "Категория · Создание</h2><p class=\"break-words\">Сертификаты</p>")
+	if i < 0 {
+		t.Fatal("no creation card for the fixed «Сертификаты» category")
+	}
+	card := body[i:]
+	card = card[:strings.Index(card, "</article>")]
+	for _, want := range []string{"Входит в «Себе»", "Нет", "Продажа сертификата", "Да"} {
+		if !strings.Contains(card, want) {
+			t.Errorf("«Сертификаты» creation lacks %q: %s", want, card)
+		}
+	}
+}
