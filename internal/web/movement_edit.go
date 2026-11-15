@@ -13,15 +13,8 @@ import (
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 )
 
-// newestEntered drops voided rows and puts the most recently entered first,
-// so a list reads in the order people typed it in, whatever dates they chose.
-func newestEntered(es []store.Entry) []store.Entry {
-	es = slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Voided })
-	byEntry(es)
-	return es
-}
-
-// newestDated drops voided rows and sorts by date: Касса's recent list.
+// newestDated drops voided rows and sorts by date: Касса, История and
+// «Мои записи».
 func newestDated(es []store.Entry) []store.Entry {
 	es = slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Voided })
 	byDate(es)
@@ -29,17 +22,10 @@ func newestDated(es []store.Entry) []store.Entry {
 }
 
 // byDate sorts rows by the movement's date, newest first, then newest
-// entered: Касса and История (owner, 2026-11-15).
+// entered (owner, 2026-11-15).
 func byDate(es []store.Entry) {
 	slices.SortStableFunc(es, func(a, b store.Entry) int {
 		return cmp.Or(strings.Compare(b.Date.String(), a.Date.String()), b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(b.ID, a.ID))
-	})
-}
-
-// byEntry sorts rows newest entered first.
-func byEntry(es []store.Entry) {
-	slices.SortStableFunc(es, func(a, b store.Entry) int {
-		return cmp.Or(b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(b.ID, a.ID))
 	})
 }
 
