@@ -75,9 +75,7 @@ func (a *app) movementForm(r *http.Request, u store.User, admin bool, kind strin
 		if err != nil {
 			return f, err
 		}
-		for _, p := range users {
-			people = append(people, views.FilterOption{Value: "person:" + p.ID, Label: p.DisplayName})
-		}
+		people = movementPeople(users)
 	} else {
 		people = []views.FilterOption{{Value: "person:" + u.ID, Label: "За свой счёт"}}
 	}
@@ -703,4 +701,19 @@ func enteredNote(entered time.Time, date domain.Date) string {
 		return ""
 	}
 	return "записано " + entered.Format("02.01 · 15:04") // short: it sits in the date column
+}
+
+// movementPeople lists people for the admin's «Откуда»/«Куда»: those who file
+// reports first, then the rest, such as the owner (third production review).
+func movementPeople(users []store.User) []views.FilterOption {
+	var first, last []views.FilterOption
+	for _, p := range users {
+		o := views.FilterOption{Value: "person:" + p.ID, Label: p.DisplayName}
+		if p.SubmitsReports {
+			first = append(first, o)
+		} else {
+			last = append(last, o)
+		}
+	}
+	return append(first, last...)
 }
