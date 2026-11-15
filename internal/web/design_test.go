@@ -114,3 +114,17 @@ func TestRecentKassaMovementsSayWhenTheyWereEntered(t *testing.T) {
 		t.Error("a movement dated 03.11 does not show it was entered on 20.11")
 	}
 }
+
+// 2026-11-15 production review: «Мои записи» said «Расчёт: 0» and showed
+// «Движения за месяц» over nothing.
+func TestMyPageEmptyStatesSaySo(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 6500)
+	body := s.get("/my", s.login("olga", olgaPass)).Body.String()
+	if strings.Contains(body, "Расчёт: 0") || !strings.Contains(body, "Расчёт с салоном: €0") {
+		t.Error("a zero balance does not read «Расчёт с салоном: €0»")
+	}
+	if !strings.Contains(body, "Движений за месяц нет.") {
+		t.Error("an empty movement list shows a heading over nothing")
+	}
+}

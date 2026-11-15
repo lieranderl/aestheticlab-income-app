@@ -49,7 +49,11 @@ templ MyPage(nav Nav, m MyMonth) {
 				</div>
 			}
 			@RevenueDetails(m.Details, "месяц")
-			<section class="flex flex-col gap-3" aria-label="Движения"><h2 class="text-lg font-semibold">Движения за месяц</h2>@movementCards(m.Movements)
+			<section class="flex flex-col gap-3" aria-label="Движения"><h2 class="text-lg font-semibold">Движения за месяц</h2>
+				if len(m.Movements) == 0 {
+					<p class="text-base-content/60">Движений за месяц нет.</p>
+				}
+				@movementCards(m.Movements)
 </section>
 			<section class="flex flex-col gap-3" aria-label="Отчёты">
 				<h2 class="text-lg font-semibold">Отчёты</h2>
