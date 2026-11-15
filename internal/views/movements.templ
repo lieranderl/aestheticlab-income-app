@@ -15,18 +15,18 @@ type MovementFormData struct {
 }
 type MovementCard struct {
 	ID, Title, Date, Amount, Parties, Note, Status, VoidReason, VoidURL, ConfirmURL, EditURL string
-	Version                                                                         int64
+	Version                                                                                  int64
 }
 type AccountCard struct {
 	Name, Balance, Recount, Last string
 	Form                         RecountFormData
 }
 type KassaData struct {
-	Accounts             []AccountCard
+	Accounts                   []AccountCard
 	Certificates, Notice, AsOf string
-	CertificateWarning   bool
-	Pending, Recent      []MovementCard
-	Form                 MovementFormData
+	CertificateWarning         bool
+	Pending, Recent            []MovementCard
+	Form                       MovementFormData
 }
 type MovementActionData struct {
 	ID, Title, Action, Back, Reason, Error string
@@ -291,35 +291,40 @@ templ movementCard(c MovementCard) {
 			if c.VoidReason != "" {
 				<p class="break-words">Причина отмены: { c.VoidReason }</p>
 			}
-			if c.ConfirmURL != "" {
-				<form
-					id={ "movement-action-" + c.ID + "-confirm" }
-					method="post"
-					action={ templ.SafeURL(c.ConfirmURL) }
-					data-on:submit={ sendFinancialForm(c.ConfirmURL) }
-					data-signals:_financialunknown__ifmissing="false"
-					data-on:datastar-fetch__window={ onFinancialFetch }
-				>
-					@FinancialResponseNotice()
-					<input
-						type="hidden"
-						name="version"
-						value={ strconv.FormatInt(c.Version, 10) }
-					/><button class="btn btn-primary min-h-11 w-full">Подтвердить</button>
-				</form>
-			}
-			if c.EditURL != "" || c.VoidURL != "" {
-				// Secondary actions share one row so a pending card is not three
-				// stacked full-width buttons (2026-11-15 design review).
-				<div class="flex flex-wrap gap-2">
-					if c.EditURL != "" {
-						<a class="btn min-h-11 flex-1 basis-32" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
-					}
-					if c.VoidURL != "" {
-						<a class="btn btn-ghost min-h-11 flex-1 basis-32 text-error" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger" aria-label="Отменить движение">Отменить</a>
-					}
-				</div>
-			}
+			// Phone: one full-width primary, secondary actions in a row below.
+			// Desktop: all actions in one right-aligned row.
+			<div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-end">
+				if c.ConfirmURL != "" {
+					<form
+						class="lg:order-last"
+						id={ "movement-action-" + c.ID + "-confirm" }
+						method="post"
+						action={ templ.SafeURL(c.ConfirmURL) }
+						data-on:submit={ sendFinancialForm(c.ConfirmURL) }
+						data-signals:_financialunknown__ifmissing="false"
+						data-on:datastar-fetch__window={ onFinancialFetch }
+					>
+						@FinancialResponseNotice()
+						<input
+							type="hidden"
+							name="version"
+							value={ strconv.FormatInt(c.Version, 10) }
+						/><button class="btn btn-primary min-h-11 w-full lg:w-auto lg:px-8">Подтвердить</button>
+					</form>
+				}
+				if c.EditURL != "" || c.VoidURL != "" {
+					// Secondary actions share one row so a pending card is not three
+					// stacked full-width buttons (2026-11-15 design review).
+					<div class="flex flex-wrap gap-2 lg:flex-nowrap">
+						if c.EditURL != "" {
+							<a class="btn min-h-11 flex-1 basis-32 lg:flex-none lg:basis-auto lg:px-6" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
+						}
+						if c.VoidURL != "" {
+							<a class="btn btn-ghost min-h-11 flex-1 basis-32 text-error lg:flex-none lg:basis-auto lg:px-6" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger" aria-label="Отменить движение">Отменить</a>
+						}
+					</div>
+				}
+			</div>
 			if c.VoidURL != "" {
 				<dialog data-signals:_voidid__ifmissing="''" class="modal modal-bottom sm:modal-middle" data-ledger={ c.ID } data-effect="$_voidid === el.dataset.ledger ? el.showModal() : el.close()" data-on:close="$_voidid = ''" aria-label="Причина отмены">
 					<div class="modal-box pb-safe">
