@@ -1,5 +1,11 @@
 package views
 
+import (
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
+
 // MoneyLine is one row of a «Факт» or «Ожидается» block.
 type MoneyLine struct {
 	Name, Value string
@@ -27,13 +33,27 @@ templ MoneyPanel(v MoneyView) {
 	if v.Status != "" {
 		<section aria-label={ v.StatusLabel } class={ "alert alert-soft flex flex-col items-start gap-1", templ.KV("alert-success", v.Tone > 0), templ.KV("alert-warning", v.Tone < 0), templ.KV("alert-info", v.Tone == 0) }>
 			<span class="text-sm">{ v.StatusLabel }</span>
-			<strong class="text-xl font-semibold">{ v.Status }</strong>
+			// Opposite debts of different people never cancel out: each on its
+			// own line (2026-11-15 design review).
+			for _, line := range statusLines(v.Status) {
+				<strong class="text-xl font-semibold">{ line }</strong>
+			}
 			if v.StatusNote != "" {
 				<span class="text-sm">{ v.StatusNote }</span>
 			}
 		</section>
 		@MoneyBreakdown(v)
 	}
+}
+
+// statusLines splits «A · b» into «A» and «B».
+func statusLines(status string) []string {
+	parts := strings.Split(status, " · ")
+	for i, p := range parts {
+		r, size := utf8.DecodeRuneInString(p)
+		parts[i] = string(unicode.ToUpper(r)) + p[size:]
+	}
+	return parts
 }
 
 // MoneyBreakdown shows the money and shares without a settlement banner.

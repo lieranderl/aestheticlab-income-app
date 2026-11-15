@@ -308,7 +308,7 @@ func TestAdminMonthShowsTheHigherSelfRateInPlace(t *testing.T) {
 		domain.FormatEUR(420000), "Салон должен " + domain.FormatEUR(120000),
 		// The salon: «Себе» €3 972,50 + €4 200, «Салону» €11 687 − €8 172,50.
 		domain.FormatEUR(817250), domain.FormatEUR(351450), "Ожидалось салону " + domain.FormatEUR(351450),
-		"Салон должен сотрудникам " + domain.FormatEUR(120000) + " · сотрудники должны салону " + domain.FormatEUR(36250),
+		"Салон должен сотрудникам " + domain.FormatEUR(120000) + "</strong>", ">Сотрудники должны салону " + domain.FormatEUR(36250),
 	}
 	check := func(label string, body string) {
 		t.Helper()
