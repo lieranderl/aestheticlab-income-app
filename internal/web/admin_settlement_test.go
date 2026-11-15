@@ -371,3 +371,22 @@ func TestMissingReportsAreGroupedByPerson(t *testing.T) {
 		t.Error("the warning does not say days off need nothing")
 	}
 }
+
+// Third production review: the running-month note was five lines on a
+// phone, and «Сначала закройте предыдущий месяц» gave no way to get there.
+func TestSettlementNoteIsShortAndBlockerLinksToTheOpenMonth(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	*s.clock = s.clock.AddDate(0, 2, 0) // January 2027: November and December are open
+	body := s.get("/admin/month?m=2026-12&tab=settlement", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(body, "Сначала закройте предыдущий месяц") {
+		t.Fatal("no previous-month blocker to test")
+	}
+	if !strings.Contains(body, `href="/admin/month?m=2026-11&amp;tab=settlement">Открыть: Ноябрь 2026</a>`) {
+		t.Error("the blocker does not link to November's settlement")
+	}
+	running := s.get("/admin/month?m=2027-01&tab=settlement", s.login("anna", annaPass)).Body.String()
+	if !regexp.MustCompile(`(?s)<summary[^>]*>\s*Почему прибыль ниже\s*</summary>`).MatchString(running) {
+		t.Error("the running-month explanation is not folded")
+	}
+}
