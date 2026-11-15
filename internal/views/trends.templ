@@ -37,6 +37,7 @@ type TrendColumn struct {
 type TrendBar struct {
 	Series     int
 	X, Y, W, H int
+	Loss       bool // below zero: drawn in the error tone
 }
 
 // TrendTick is a horizontal gridline with its value on the axis.
@@ -113,12 +114,20 @@ templ TrendsPage(nav Nav, d TrendData) {
 						@trendReadout(d)
 					}
 					@trendChart(d)
-					if d.HasData && len(d.Series) > 1 {
+					if d.HasData && (len(d.Series) > 1 || hasLoss(d)) {
 						<ul class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/70" aria-label="Обозначения">
-							for j, s := range d.Series {
+							if len(d.Series) > 1 {
+								for j, s := range d.Series {
+									<li class="flex items-center gap-1.5">
+										<span class={ "size-2.5 shrink-0 rounded-sm", seriesSwatch(j) } aria-hidden="true"></span>
+										{ s.Label }
+									</li>
+								}
+							}
+							if hasLoss(d) {
 								<li class="flex items-center gap-1.5">
-									<span class={ "size-2.5 shrink-0 rounded-sm", seriesSwatch(j) } aria-hidden="true"></span>
-									{ s.Label }
+									<span class="size-2.5 shrink-0 rounded-sm bg-error" aria-hidden="true"></span>
+									Ниже нуля
 								</li>
 							}
 						</ul>
@@ -258,12 +267,29 @@ templ trendReadout(d TrendData) {
 	</div>
 }
 
+// Series colours avoid «success» green: a profit series can go below zero,
+// and a green loss reads as good news.
 func seriesSwatch(j int) string {
-	return [...]string{"bg-primary", "bg-warning", "bg-success"}[j%3]
+	return [...]string{"bg-primary", "bg-warning", "bg-info"}[j%3]
 }
 
-func seriesFill(j int) string {
-	return [...]string{"fill-primary", "fill-warning", "fill-success"}[j%3]
+func seriesFill(b TrendBar) string {
+	if b.Loss {
+		return "fill-error"
+	}
+	return [...]string{"fill-primary", "fill-warning", "fill-info"}[b.Series%3]
+}
+
+// hasLoss reports whether any bar on the chart is below zero.
+func hasLoss(d TrendData) bool {
+	for _, r := range d.Rows {
+		for _, b := range r.Column.Bars {
+			if b.Loss {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func chartLabel(d TrendData) string {
@@ -294,7 +320,7 @@ templ trendChart(d TrendData) {
 			for i, r := range d.Rows {
 				<rect x={ strconv.Itoa(r.Column.X) } y="8" width={ strconv.Itoa(r.Column.W) } height="156" rx="4" fill-opacity="0.08" class={ "fill-base-content", templ.KV("hidden", i != d.Selected) } data-month={ strconv.Itoa(i) } data-class:hidden="$_month !== +el.dataset.month"/>
 				for _, b := range r.Column.Bars {
-					<rect x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) } width={ strconv.Itoa(b.W) } height={ strconv.Itoa(b.H) } rx="1.5" fill-opacity={ barOpacity(r.Imported) } class={ seriesFill(b.Series) }/>
+					<rect x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) } width={ strconv.Itoa(b.W) } height={ strconv.Itoa(b.H) } rx="1.5" fill-opacity={ barOpacity(r.Imported) } class={ seriesFill(b) }/>
 				}
 				<text x={ strconv.Itoa(r.Column.LabelX) } y="180" text-anchor="middle" class={ "font-sans text-[11px]", templ.KV("fill-base-content/60", r.HasData), templ.KV("fill-base-content/30", !r.HasData) }>{ r.ShortMonth }</text>
 			}
