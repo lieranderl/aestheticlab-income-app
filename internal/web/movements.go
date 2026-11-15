@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/ru"
@@ -398,6 +399,7 @@ func (a *app) movementCards(r *http.Request, u store.User, es []store.Entry, adm
 			Amount:     domain.FormatEUR(e.Amount),
 			Parties:    names[partyValue(e.From)] + " → " + names[partyValue(e.To)],
 			Note:       e.Note,
+			Entered:    enteredNote(a.store.LocalTime(e.CreatedAt), e.Date),
 			Status:     movementStatus(e.Status),
 			VoidReason: e.VoidReason,
 			Version:    e.Version,
@@ -476,7 +478,8 @@ func (a *app) handleKassa(w http.ResponseWriter, r *http.Request, u store.User) 
 		a.serverError(w, r, err)
 		return
 	}
-	es = newestEntered(slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending }))
+	// Openings are setup, not kassa movements; they stay in История.
+	es = newestEntered(slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending || e.Type == domain.Opening }))
 	if len(es) > 10 {
 		es = es[:10]
 	}
@@ -677,4 +680,14 @@ func kassaName(id string) string {
 		return "Касса — карта салона"
 	}
 	return "Счёт"
+}
+
+// enteredNote says when a movement was entered if that is not its own date:
+// lists run in entry order, so a backfilled October expense otherwise looks
+// out of place above a November one (2026-11-15 production review).
+func enteredNote(entered time.Time, date domain.Date) string {
+	if entered.IsZero() || (domain.Date{Year: entered.Year(), Mon: entered.Month(), Day: entered.Day()}) == date {
+		return ""
+	}
+	return "записано " + entered.Format("02.01.2006 · 15:04")
 }

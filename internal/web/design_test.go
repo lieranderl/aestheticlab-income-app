@@ -84,7 +84,7 @@ func TestAdminMovementFormMakesYouChooseThePerson(t *testing.T) {
 	admin := s.login("anna", annaPass)
 	for kind, field := range map[string]string{"deposit": "from", "payout": "to"} {
 		body := s.get("/admin/movements/new?type="+kind, admin).Body.String()
-		sel := regexp.MustCompile(`(?s)<select name="`+field+`".*?</select>`).FindString(body)
+		sel := regexp.MustCompile(`(?s)<select name="` + field + `".*?</select>`).FindString(body)
 		if !strings.Contains(sel, `<option value="" selected disabled>Выберите сотрудника</option>`) {
 			t.Errorf("%s: «%s» does not start with «Выберите сотрудника»: %s", kind, field, sel)
 		}
@@ -95,5 +95,22 @@ func TestAdminMovementFormMakesYouChooseThePerson(t *testing.T) {
 	own := s.get("/movements/new?type=deposit", s.login("olga", olgaPass)).Body.String()
 	if strings.Contains(own, "Выберите сотрудника") {
 		t.Error("an employee's own form asks to choose a person")
+	}
+}
+
+// 2026-11-15 production review: «Последние движения» read out of date order
+// because it lists what was entered last. It says so, a backfilled
+// movement shows when it was entered, and opening balances stay in История.
+func TestRecentKassaMovementsSayWhenTheyWereEntered(t *testing.T) {
+	s := newSite(t)
+	if _, err := s.st.RecordMovement(ctx, s.anna.Actor(), store.NewMovement{Type: domain.Expense, Amount: 1000, From: domain.Account(domain.KassaCash), To: domain.Outside, Date: domain.Date{Year: 2026, Mon: 11, Day: 3}, Note: "кофе", ExpenseCategory: "materials"}); err != nil {
+		t.Fatal(err)
+	}
+	body := s.get("/admin/kassa", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(body, "Последние записанные") {
+		t.Error("the recent list does not say it is in entry order")
+	}
+	if !strings.Contains(body, "записано 20.11.2026") {
+		t.Error("a movement dated 03.11 does not show it was entered on 20.11")
 	}
 }
