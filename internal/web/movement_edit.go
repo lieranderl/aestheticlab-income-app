@@ -21,14 +21,19 @@ func newestEntered(es []store.Entry) []store.Entry {
 	return es
 }
 
-// newestDated drops voided rows and sorts by the movement's date, newest
-// first, then newest entered: Касса's recent list (owner, 2026-11-15).
+// newestDated drops voided rows and sorts by date: Касса's recent list.
 func newestDated(es []store.Entry) []store.Entry {
 	es = slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Voided })
+	byDate(es)
+	return es
+}
+
+// byDate sorts rows by the movement's date, newest first, then newest
+// entered: Касса and История (owner, 2026-11-15).
+func byDate(es []store.Entry) {
 	slices.SortStableFunc(es, func(a, b store.Entry) int {
 		return cmp.Or(strings.Compare(b.Date.String(), a.Date.String()), b.CreatedAt.Compare(a.CreatedAt), cmp.Compare(b.ID, a.ID))
 	})
-	return es
 }
 
 // byEntry sorts rows newest entered first.

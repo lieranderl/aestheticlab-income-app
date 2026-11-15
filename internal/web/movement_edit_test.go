@@ -41,7 +41,7 @@ func wantOrder(t *testing.T, what, body string, texts ...string) {
 	}
 }
 
-func TestMovementListsShowNewestEnteredFirstAndHideVoided(t *testing.T) {
+func TestMovementListsShowNewestDateFirstAndHideVoided(t *testing.T) {
 	s := newSite(t)
 	j := s.login("anna", annaPass)
 	s.adminExpense("10", "2026-11-18", "первый-расход", j)
@@ -49,10 +49,9 @@ func TestMovementListsShowNewestEnteredFirstAndHideVoided(t *testing.T) {
 	s.adminExpense("20", "2026-11-03", "второй-расход", j)
 	wantRedirect(t, "void", s.post("/movements/"+gone.ID+"/void", url.Values{"version": {"1"}, "reason": {"дубль"}}, j), "/admin/kassa?saved=1")
 
-	// История lists in entry order; Касса by date, newest first (owner,
-	// 2026-11-15).
+	// Касса and История list by date, newest first (owner, 2026-11-15).
 	for path, order := range map[string][]string{
-		"/admin/history/movements": {"второй-расход", "первый-расход"},
+		"/admin/history/movements": {"первый-расход", "второй-расход"},
 		"/admin/kassa":             {"первый-расход", "второй-расход"},
 	} {
 		body := s.get(path, j).Body.String()
