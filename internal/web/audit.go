@@ -64,7 +64,7 @@ func (a *app) handleAudit(w http.ResponseWriter, r *http.Request, u store.User) 
 		return
 	}
 	rows = slices.DeleteFunc(rows, func(row store.AuditEntry) bool {
-		return (f.person != "" && row.ActorID != f.person) || (f.entity != "" && string(row.Entity) != f.entity)
+		return (f.person != "" && row.ActorID != f.person) || (f.entity != "" && string(row.Entity) != f.entity) || usageOnly(row)
 	})
 	p := views.AuditHistory{Filters: filters}
 	paging, first, last := f.paging("/admin/audit", len(rows))
@@ -73,6 +73,29 @@ func (a *app) handleAudit(w http.ResponseWriter, r *http.Request, u store.User) 
 		p.Rows = append(p.Rows, a.auditCard(row, users, cats))
 	}
 	a.render(w, r, views.AuditPage(a.navFor(u, "/admin/audit"), p))
+}
+
+// usageOnly reports a category update that only bumped the usage counter (a
+// client save does that for every category it uses): bookkeeping, not a
+// change anyone made, so the log leaves it out (2026-11-15 production review).
+func usageOnly(row store.AuditEntry) bool {
+	if row.Entity != store.EntityCategory || row.Action != store.ActionUpdate {
+		return false
+	}
+	before, after := snapshotFields(row.Before), snapshotFields(row.After)
+	for _, k := range []string{"usedCount", "version"} {
+		delete(before, k)
+		delete(after, k)
+	}
+	if len(before) == 0 || len(before) != len(after) {
+		return false
+	}
+	for k, v := range before {
+		if string(after[k]) != string(v) {
+			return false
+		}
+	}
+	return true
 }
 
 func snapshotFields(s string) map[string]json.RawMessage {
@@ -124,6 +147,22 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 	before, after := snapshotFields(row.Before), snapshotFields(row.After)
 	if row.Entity == store.EntityReport {
 		bclient, vclient := snapshotFields(string(before["clientInput"])), snapshotFields(string(after["clientInput"]))
+		if b, v := bclient["booking"] != nil, vclient["booking"] != nil; b != v || (b && string(bclient["booking"]) != string(vclient["booking"])) {
+			linked := func(on bool) string {
+				if on {
+					return "привязана"
+				}
+				return "не привязана"
+			}
+			value := linked(b) + " → " + linked(v)
+			if b && v {
+				value = "перепривязана к другой записи"
+			}
+			if row.Action == store.ActionCreate {
+				value = linked(v) // a creation lists what was set
+			}
+			p.Changes = append(p.Changes, views.MoneyRow{Name: "Запись в календаре", Value: value})
+		}
 		for _, field := range []auditField{{key: "services", label: "Услуги"}, {key: "serviceCash", label: "В кассу за услуги — наличные"}, {key: "serviceCard", label: "В кассу за услуги — карта"}, {key: "certificatePaid", label: "Оплачено сертификатом"}} {
 			bc, bok := auditAmount(bclient[field.key])
 			vc, vok := auditAmount(vclient[field.key])

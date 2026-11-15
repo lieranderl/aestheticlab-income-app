@@ -91,7 +91,7 @@ func (a *app) handleMy(w http.ResponseWriter, r *http.Request, u store.User) {
 		return
 	}
 	page.BalanceSign = sign(bal)
-	page.Balance = "Расчёт: 0"
+	page.Balance = "Расчёт с салоном: €0"
 	if bal > 0 {
 		page.Balance = "Салон должен вам " + domain.FormatEUR(bal)
 	} else if bal < 0 {

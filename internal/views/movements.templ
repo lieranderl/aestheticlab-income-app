@@ -15,6 +15,7 @@ type MovementFormData struct {
 }
 type MovementCard struct {
 	ID, Title, Date, Amount, Parties, Note, Status, VoidReason, VoidURL, ConfirmURL, EditURL string
+	Entered                                                                                  string // «записано 14.11.2026 · 14:21» when not entered on its own date
 	Version                                                                                  int64
 }
 type AccountCard struct {
@@ -229,6 +230,10 @@ templ movementFieldError(f MovementFormData, name string) {
 
 templ movementSelect(name, selected string, options []FilterOption, bad string) {
 	<select name={ name } class={ "select select-lg w-full text-base", templ.KV("select-error", bad == name) } aria-invalid={ boolText(bad == name) } aria-describedby={ "movement-" + name + "-error" } required>
+		// Admin deposits and payouts start with no person chosen.
+		if selected == "" && (name == "from" || name == "to") {
+			<option value="" selected disabled>Выберите сотрудника</option>
+		}
 		for _, o := range options {
 			<option value={ o.Value } selected?={ selected == o.Value }>{ o.Label }</option>
 		}
@@ -305,7 +310,10 @@ templ movementItem(c MovementCard, row bool) {
 				<p class={ "min-w-0 max-w-full text-lg font-semibold [overflow-wrap:anywhere]", templ.KV("lg:col-start-3 lg:row-start-1 lg:text-right lg:text-base", row) }>{ c.Amount }</p>
 			</div>
 			<p class={ "min-w-0 text-sm [overflow-wrap:anywhere]", templ.KV("lg:contents", row) }>
-				<span class={ templ.KV("lg:col-start-1 lg:row-start-1", row) }>{ c.Date }</span><span class={ templ.KV("lg:hidden", row) }>{ " · " }</span><span class={ templ.KV("lg:col-start-2 lg:row-start-2 lg:text-base-content/70", row) }>{ c.Parties }</span>
+				<span class={ templ.KV("lg:col-start-1 lg:row-start-1", row) }>{ c.Date }</span>
+				if c.Entered != "" {
+					<span class={ "text-base-content/60", templ.KV("lg:col-start-1 lg:row-start-2 lg:text-xs", row) }>{ " (" + c.Entered + ")" }</span>
+				}<span class={ templ.KV("lg:hidden", row) }>{ " · " }</span><span class={ templ.KV("lg:col-start-2 lg:row-start-2 lg:text-base-content/70", row) }>{ c.Parties }</span>
 			</p>
 			<p class={ "badge badge-soft h-auto whitespace-normal", templ.KV("lg:col-start-2 lg:justify-self-start", row) }>{ c.Status }</p>
 			if c.Note != "" {
@@ -400,7 +408,7 @@ templ KassaPage(nav Nav, p KassaData) {
 			}
 			@movementCards(p.Pending)
 			@MovementSheet(p.Form)
-			<h2 class="text-lg font-semibold">Последние движения</h2>
+			<h2 class="text-lg font-semibold">Последние записанные</h2>
 			@movementCards(p.Recent)
 			<a href="/admin/history/movements" class="btn min-h-11">История движений</a>
 		</div>

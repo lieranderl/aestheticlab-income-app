@@ -351,3 +351,23 @@ func TestARunningMonthIsInfoNotAnError(t *testing.T) {
 		t.Error("«Открыть кассу» is missing while a movement waits for confirmation")
 	}
 }
+
+// 2026-11-15 production review: «Не сдали отчёт: 47» counted every day off
+// of every person. The warning names each person with their number of days,
+// and says days off need nothing.
+func TestMissingReportsAreGroupedByPerson(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	*s.clock = s.clock.AddDate(0, 1, 0)
+	body := s.get("/admin/month?m=2026-11&tab=settlement", s.login("anna", annaPass)).Body.String()
+	summary := regexp.MustCompile(`(?s)<summary[^>]*>\s*(Не сдали отчёт:[^<]*)</summary>`).FindStringSubmatch(body)
+	if len(summary) != 2 {
+		t.Fatal("no «Не сдали отчёт» summary")
+	}
+	if !regexp.MustCompile(`Ольга — \d+ дн\.`).MatchString(summary[1]) {
+		t.Errorf("the summary does not name each person with a day count: %q", summary[1])
+	}
+	if !strings.Contains(body, "Если это выходные, ничего делать не нужно.") {
+		t.Error("the warning does not say days off need nothing")
+	}
+}

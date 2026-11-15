@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/store"
@@ -86,9 +87,10 @@ func activeHref(items []views.NavItem, current string) string {
 	return best
 }
 
-// moreLinks is the admin's «Ещё» list.
-func moreLinks() []views.NavItem {
-	return []views.NavItem{
+// moreLinks is the admin's «Ещё» list. An admin who doesn't report has no
+// «Мои записи» (it would be empty) and already has «История» in the bar.
+func moreLinks(u store.User) []views.NavItem {
+	items := []views.NavItem{
 		{Href: "/admin/trends", Label: "Динамика", Icon: "chart-line"},
 		{Href: "/admin/history", Label: "История", Icon: "history"},
 		{Href: "/my", Label: "Мои записи", Icon: "wallet"},
@@ -98,6 +100,10 @@ func moreLinks() []views.NavItem {
 		{Href: "/admin/export", Label: "Экспорт", Icon: "file-down"},
 		{Href: "/profile", Label: "Профиль", Icon: "user-round"},
 	}
+	if !u.SubmitsReports {
+		items = slices.DeleteFunc(items, func(it views.NavItem) bool { return it.Href == "/my" || it.Href == "/admin/history" })
+	}
+	return items
 }
 
 // handleHome is the daily form for people who report; the admin who
@@ -114,5 +120,5 @@ func (a *app) handleHome(w http.ResponseWriter, r *http.Request, u store.User) {
 }
 
 func (a *app) handleMore(w http.ResponseWriter, r *http.Request, u store.User) {
-	a.render(w, r, views.MorePage(a.navFor(u, "/more"), moreLinks()))
+	a.render(w, r, views.MorePage(a.navFor(u, "/more"), moreLinks(u)))
 }

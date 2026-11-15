@@ -2,8 +2,11 @@ package web
 
 import (
 	"errors"
+	"maps"
 	"net/http"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/ru"
@@ -109,6 +112,7 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 	if err != nil {
 		return p, err
 	}
+	missingDays := map[string]int{}
 	for day := m.FirstDay(); !lastElapsed.Before(day); day = day.AddDays(1) {
 		expected := rosters[day]
 		var rs []domain.PersonReport
@@ -119,8 +123,16 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 		}
 		for _, id := range domain.MissingReporters(expected, rs) {
 			p.Missing = append(p.Missing, views.SettlementWarning{Text: ru.Date(day.Time()) + " · " + personName(users, id), Href: "/admin/reports/" + id + "/" + day.String()})
+			missingDays[personName(users, id)]++
 		}
 	}
+	// Per person, not one big number: a total of 47 mostly counts days off
+	// (2026-11-15 production review).
+	var parts []string
+	for _, name := range slices.Sorted(maps.Keys(missingDays)) {
+		parts = append(parts, name+" — "+strconv.Itoa(missingDays[name])+" дн.")
+	}
+	p.MissingSummary = strings.Join(parts, " · ")
 	accounts, err := a.store.Accounts(r.Context())
 	if err != nil {
 		return p, err

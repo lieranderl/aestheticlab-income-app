@@ -1,7 +1,5 @@
 package views
 
-import "strconv"
-
 type SettlementWarning struct{ Text, Href string }
 type SettlementPerson struct {
 	Name, Balance, Current, Earned, Action, ActionURL, CarryURL string
@@ -16,6 +14,7 @@ type SettlementData struct {
 	Blockers                       []string
 	KassaLink                      bool // movements wait for confirmation
 	Warnings, Missing              []SettlementWarning
+	MissingSummary                 string // «Lera — 12 дн. · Zara — 15 дн.»
 	Action                         MonthActionData
 	MovementForm                   MovementFormData
 }
@@ -72,9 +71,10 @@ templ SettlementPage(nav Nav, p SettlementData) {
 			if len(p.Missing)>0 {
 				<details class="collapse collapse-arrow bg-base-100">
 					<summary class="collapse-title min-h-14">
-						Не сдали отчёт: { strconv.Itoa(len(p.Missing)) } · предупреждение
+						Не сдали отчёт: { p.MissingSummary }
 					</summary>
 					<div class="collapse-content flex flex-col gap-2">
+						<p class="text-sm text-base-content/70">Дни без записей клиентов. Если это выходные, ничего делать не нужно.</p>
 						for _,warning:=range p.Missing {
 							<a
 								class="btn btn-ghost min-h-11 h-auto min-w-0 max-w-full justify-start py-3 text-left whitespace-normal [overflow-wrap:anywhere]"

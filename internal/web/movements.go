@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/ru"
@@ -109,6 +110,16 @@ func (a *app) movementForm(r *http.Request, u store.User, admin bool, kind strin
 	if len(f.Destinations) > 0 {
 		f.To = f.Destinations[0].Value
 	}
+	// The admin picks the person: preselecting the first one (the owner) put
+	// deposits and payouts on the wrong person (2026-11-15 production review).
+	if admin {
+		switch domain.MovementType(kind) {
+		case domain.Deposit:
+			f.From = ""
+		case domain.Payout:
+			f.To = ""
+		}
+	}
 	if kind == string(domain.Transfer) && len(f.Destinations) > 1 {
 		f.To = f.Destinations[1].Value
 	}
@@ -198,6 +209,16 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 			err = &domain.ValidationError{Field: "date", Problem: problemDateMissing}
 		}
 	}
+	// The admin's deposit and payout start with no person chosen; say so on
+	// that field rather than as a generic parties problem.
+	if err == nil && admin {
+		switch {
+		case kind == string(domain.Deposit) && f.From == "":
+			err = &domain.ValidationError{Field: "from", Problem: problemPersonMissing}
+		case kind == string(domain.Payout) && f.To == "":
+			err = &domain.ValidationError{Field: "to", Problem: problemPersonMissing}
+		}
+	}
 	if err == nil {
 		n := store.NewMovement{
 			Type:            domain.MovementType(kind),
@@ -255,6 +276,7 @@ func (a *app) handleRecordMovement(w http.ResponseWriter, r *http.Request, u sto
 const (
 	problemAmountUnreadable domain.Problem = "amount_unreadable"
 	problemDateMissing      domain.Problem = "date_missing"
+	problemPersonMissing    domain.Problem = "person_missing"
 )
 
 // movementFieldProblem says which field of the movement form is at fault
@@ -285,6 +307,8 @@ func movementFieldProblem(r *http.Request, err error, kind string) (field, messa
 			return "note", "Для расхода нужен комментарий"
 		}
 		return "note", "Укажите комментарий"
+	case problemPersonMissing:
+		return v.Field, "Выберите сотрудника"
 	case store.ProblemUnknownParty:
 		if v.Field == "expenseCategory" {
 			return "expenseCategory", "Выберите категорию расхода из списка"
@@ -388,6 +412,7 @@ func (a *app) movementCards(r *http.Request, u store.User, es []store.Entry, adm
 			Amount:     domain.FormatEUR(e.Amount),
 			Parties:    names[partyValue(e.From)] + " → " + names[partyValue(e.To)],
 			Note:       e.Note,
+			Entered:    enteredNote(a.store.LocalTime(e.CreatedAt), e.Date),
 			Status:     movementStatus(e.Status),
 			VoidReason: e.VoidReason,
 			Version:    e.Version,
@@ -466,7 +491,8 @@ func (a *app) handleKassa(w http.ResponseWriter, r *http.Request, u store.User) 
 		a.serverError(w, r, err)
 		return
 	}
-	es = newestEntered(slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending }))
+	// Openings are setup, not kassa movements; they stay in История.
+	es = newestEntered(slices.DeleteFunc(es, func(e store.Entry) bool { return e.Status == domain.Pending || e.Type == domain.Opening }))
 	if len(es) > 10 {
 		es = es[:10]
 	}
@@ -667,4 +693,14 @@ func kassaName(id string) string {
 		return "Касса — карта салона"
 	}
 	return "Счёт"
+}
+
+// enteredNote says when a movement was entered if that is not its own date:
+// lists run in entry order, so a backfilled October expense otherwise looks
+// out of place above a November one (2026-11-15 production review).
+func enteredNote(entered time.Time, date domain.Date) string {
+	if entered.IsZero() || (domain.Date{Year: entered.Year(), Mon: entered.Month(), Day: entered.Day()}) == date {
+		return ""
+	}
+	return "записано " + entered.Format("02.01.2006 · 15:04")
 }

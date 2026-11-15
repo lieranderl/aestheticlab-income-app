@@ -50,7 +50,7 @@ func (a *app) handleStaff(w http.ResponseWriter, r *http.Request, admin store.Us
 			a.serverError(w, r, err)
 			return
 		}
-		terms := "Условия не заданы"
+		terms := noTermsLine(u)
 		if t, ok := history(entries).For(month); ok {
 			terms = termsLine(t)
 		}
@@ -590,4 +590,13 @@ func plainEuros(c domain.Cents) string {
 		s += "," + strings.TrimRight(fmt.Sprintf("%02d", frac), "0")
 	}
 	return s
+}
+
+// noTermsLine is the staff list's line for someone without terms: a warning
+// for a person who reports, plain fact for one who doesn't (the owner).
+func noTermsLine(u store.User) string {
+	if u.SubmitsReports {
+		return "Условия не заданы"
+	}
+	return "Без условий — не сдаёт отчёты"
 }
