@@ -200,7 +200,7 @@ func sendMovementForm(action string) string {
 
 func selectedMovementType(selected, kind string) string {
 	if selected == kind {
-		return "true"
+		return "page"
 	}
 	return "false"
 }
@@ -296,7 +296,6 @@ templ movementCard(c MovementCard) {
 			<div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-end">
 				if c.ConfirmURL != "" {
 					<form
-						class="lg:order-last"
 						id={ "movement-action-" + c.ID + "-confirm" }
 						method="post"
 						action={ templ.SafeURL(c.ConfirmURL) }
@@ -317,10 +316,10 @@ templ movementCard(c MovementCard) {
 					// stacked full-width buttons (2026-11-15 design review).
 					<div class="flex flex-wrap gap-2 lg:flex-nowrap">
 						if c.EditURL != "" {
-							<a class="btn min-h-11 flex-1 basis-32 lg:flex-none lg:basis-auto lg:px-6" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
+							<a class="btn min-h-11 flex-none px-5 lg:px-6" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
 						}
 						if c.VoidURL != "" {
-							<a class="btn btn-ghost min-h-11 flex-1 basis-32 text-error lg:flex-none lg:basis-auto lg:px-6" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger" aria-label="Отменить движение">Отменить</a>
+							<a class="btn btn-ghost min-h-11 flex-1 text-error lg:flex-none lg:px-6" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger" aria-label={ "Отменить движение: " + c.Title + " " + c.Amount + ", " + c.Date }>Отменить движение</a>
 						}
 					</div>
 				}
