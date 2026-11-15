@@ -139,7 +139,7 @@ func TestSettlementWarningsDoNotBlockClosingButPendingAndMonthOrderDo(t *testing
 	s := newSite(t)
 	s.withTerms(s.olga, 7000)
 	cookie := s.login("anna", annaPass)
-	wantPage(t, "running month", s.get("/admin/month?m=2026-11&tab=settlement", cookie), http.StatusOK, "Месяц ещё не закончился", "Не сдали отчёт", "Пересчёта наличных нет")
+	wantPage(t, "running month", s.get("/admin/month?m=2026-11&tab=settlement", cookie), http.StatusOK, "Закрыть месяц можно после его окончания.", "Не сдали отчёт", "Пересчёта наличных нет")
 	*s.clock = s.clock.AddDate(0, 1, 0)
 	cookie = s.login("anna", annaPass)
 	p := s.get("/admin/month?m=2026-11&tab=settlement", cookie)
@@ -323,5 +323,31 @@ func TestARunningMonthExplainsItsProfit(t *testing.T) {
 	s := newSite(t)
 	cookie := s.login("anna", annaPass)
 	page := s.get("/admin/month?m=2026-11&tab=settlement", cookie)
-	wantPage(t, "running month", page, http.StatusOK, "Месяц ещё не закончился", "зарплаты учтены за весь месяц, а доход — только за прошедшие дни")
+	wantPage(t, "running month", page, http.StatusOK, "Закрыть месяц можно после его окончания.", "зарплаты учтены за весь месяц, а доход — только за прошедшие дни")
+}
+
+// 2026-11-15 design review: a running month is the normal state, so it is
+// said in the info notice, not as a red alert, and «Открыть кассу» shows only
+// when movements wait for confirmation.
+func TestARunningMonthIsInfoNotAnError(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	cookie := s.login("anna", annaPass)
+	body := s.get("/admin/month?m=2026-11&tab=settlement", cookie).Body.String()
+	if regexp.MustCompile(`alert-error[^>]*>\s*Месяц ещё не закончился`).MatchString(body) {
+		t.Error("a running month is shown as an error")
+	}
+	if !strings.Contains(body, "Закрыть месяц можно после его окончания.") {
+		t.Error("the info notice does not say when the month can be closed")
+	}
+	if strings.Contains(body, `href="/admin/kassa">Открыть кассу`) {
+		t.Error("«Открыть кассу» shows with nothing to confirm")
+	}
+	if _, err := s.st.RecordMovement(ctx, s.olga.Actor(), store.NewMovement{Type: domain.Deposit, Amount: 100, From: domain.Person(s.olga.ID), To: domain.Account(domain.KassaCash), Date: domain.Date{Year: 2026, Mon: 11, Day: 20}}); err != nil {
+		t.Fatal(err)
+	}
+	body = s.get("/admin/month?m=2026-11&tab=settlement", cookie).Body.String()
+	if !strings.Contains(body, `href="/admin/kassa">Открыть кассу`) {
+		t.Error("«Открыть кассу» is missing while a movement waits for confirmation")
+	}
 }

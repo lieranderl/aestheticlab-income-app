@@ -65,6 +65,16 @@ func TestDashboardSeparatesPeriodContributionsFromCurrentSettlementBalance(t *te
 	if current < 0 || action < current || projected < action {
 		t.Fatal("current balance and its action must precede the projected month balance")
 	}
+	// The admin reads about other people: third person, as on День and Месяц
+	// (2026-11-15 design review).
+	if !strings.Contains(body, "Салон должен сотруднику €20") {
+		t.Error("the person card does not say «Салон должен сотруднику €20»")
+	}
+	for _, second := range []string{"Салон должен вам", "Вы должны салону"} {
+		if strings.Contains(settlement.Body.String(), second) {
+			t.Errorf("the admin settlement says %q about other people", second)
+		}
+	}
 }
 
 func TestLegacyCategoryNamedLikeATotalRemainsInRevenueDetails(t *testing.T) {
@@ -205,10 +215,10 @@ func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
 	res = s.get("/admin/day?date=2026-11-19", anna)
 	day := res.Body.String()
 	row(day, "Наличными у сотрудника", "€100")
-	wantPage(t, "day", res, http.StatusOK, "Салон должен сотрудникам €113,50", "Салон должен €113,50",
+	wantPage(t, "day", res, http.StatusOK, "Салон должен сотрудникам €113,50", "Салон должен сотруднику €113,50",
 		"Факт: в кассу €427 · у сотрудника €100", "Ожидается: «Себе» €213,50 · «Салону» €313,50")
 	wantPage(t, "redeemed", s.get("/admin/day?date=2026-11-18", anna), http.StatusOK,
-		"Факт: в кассу €0 · у сотрудника €0 · сертификатом €100", "Салон должен €50")
+		"Факт: в кассу €0 · у сотрудника €0 · сертификатом €100", "Салон должен сотруднику €50")
 }
 
 func TestTheSalonHeadlineNeverNetsOppositeDebts(t *testing.T) {
@@ -231,7 +241,8 @@ func TestTheSalonHeadlineNeverNetsOppositeDebts(t *testing.T) {
 		}
 	}
 	page := s.get("/admin/day?date=2026-11-20", s.login("anna", annaPass))
-	wantPage(t, "both sides", page, http.StatusOK, "Салон должен сотрудникам €70 · сотрудники должны салону €70")
+	// Each side on its own line (2026-11-15 design review).
+	wantPage(t, "both sides", page, http.StatusOK, ">Салон должен сотрудникам €70</strong>", ">Сотрудники должны салону €70</strong>")
 	if strings.Contains(page.Body.String(), "Всё сдано") {
 		t.Error("opposite debts of two people read as settled")
 	}

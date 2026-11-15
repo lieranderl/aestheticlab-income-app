@@ -1,13 +1,27 @@
 package views
 
+import "strconv"
+
 type AuditCard struct {
 	Entity, Subject, Actor, Action, At, Href string
+	HrefLabel                                string // what Href opens: «Открыть отчёт», «Открыть категорию»…
 	Changes                                  []MoneyRow
 }
 type AuditHistory struct {
 	Filters HistoryFilters
 	Paging  Paging
 	Rows    []AuditCard
+}
+
+// auditFoldAfter is how many changes show before the list folds.
+const auditFoldAfter = 3
+
+templ auditChanges(rows []MoneyRow) {
+	<dl class="flex flex-col gap-2">
+		for _, change := range rows {
+			<div><dt class="text-sm text-base-content/60">{ change.Name }</dt><dd class="break-words font-medium">{ change.Value }</dd></div>
+		}
+	</dl>
 }
 
 templ AuditPage(nav Nav, p AuditHistory) {
@@ -26,15 +40,19 @@ templ AuditPage(nav Nav, p AuditHistory) {
 							<p class="break-words">{ row.Subject }</p>
 						}
 						<p class="text-sm text-base-content/70 break-words">{ row.Actor } · { row.At }</p>
-						if len(row.Changes) > 0 {
-							<dl class="flex flex-col gap-2">
-								for _, change := range row.Changes {
-									<div><dt class="text-sm text-base-content/60">{ change.Name }</dt><dd class="break-words font-medium">{ change.Value }</dd></div>
-								}
-							</dl>
+						if len(row.Changes) > 0 && len(row.Changes) <= auditFoldAfter {
+							@auditChanges(row.Changes)
+						} else if len(row.Changes) > auditFoldAfter {
+							// Long change lists fold so the log stays scannable.
+							<details class="collapse collapse-arrow -mx-2 w-auto bg-base-200">
+								<summary class="collapse-title min-h-11 px-2 py-3 pe-10 text-sm font-medium">Изменения: { strconv.Itoa(len(row.Changes)) }</summary>
+								<div class="collapse-content px-2">
+									@auditChanges(row.Changes)
+								</div>
+							</details>
 						}
 						if row.Href != "" {
-							<a class="btn min-h-11" href={ templ.SafeURL(row.Href) }>Открыть отчёт</a>
+							<a class="btn min-h-11" href={ templ.SafeURL(row.Href) }>{ row.HrefLabel }</a>
 						}
 					</div>
 				</article>

@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/ru"
@@ -48,7 +49,7 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 	if err != nil {
 		return views.SettlementData{}, err
 	}
-	p := views.SettlementData{Key: m.String(), Month: monthLabel(m), AsOf: ru.Date(a.store.Today().Time()), Closed: selected.State.Status == domain.MonthClosed, Running: !m.Before(a.store.Today().Month()), Blockers: a.settlementBlockers(selected, m)}
+	p := views.SettlementData{Key: m.String(), Month: monthLabel(m), AsOf: ru.Date(a.store.Today().Time()), Closed: selected.State.Status == domain.MonthClosed, Running: !m.Before(a.store.Today().Month()), Blockers: slices.DeleteFunc(a.settlementBlockers(selected, m), func(b string) bool { return b == monthNotOver }), KassaLink: selected.Pending > 0 && selected.State.Status != domain.MonthClosed}
 	if !m.Prev().Before(a.store.StartMonth()) {
 		p.Prev = settlementURL(m.Prev())
 	}
@@ -139,14 +140,11 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 	return p, nil
 }
 
+// balanceWords is a person's balance as the admin reads it: third person and
+// gender-neutral, like the badges on День and Месяц.
 func balanceWords(c domain.Cents) string {
-	if c > 0 {
-		return "Салон должен вам " + domain.FormatEUR(c)
-	}
-	if c < 0 {
-		return "Вы должны салону " + domain.FormatEUR(-c)
-	}
-	return "Расчёт: 0"
+	text, _ := statusText(c, staffMoney)
+	return text
 }
 func signedMoney(c domain.Cents) string {
 	if c > 0 {

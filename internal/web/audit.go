@@ -176,10 +176,10 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 		uid, date := auditString(after, "userId"), auditString(after, "date")
 		if d, err := domain.ParseDate(date); err == nil {
 			p.Subject = personName(users, uid) + " · " + ru.Date(d.Time())
-			p.Href = "/admin/reports/" + uid + "/" + d.String()
+			p.Href, p.HrefLabel = "/admin/reports/"+uid+"/"+d.String(), "Открыть отчёт"
 			if n, ok := auditAmount(after["clientNumber"]); ok && n > 0 {
 				p.Subject += " · Клиент " + strconv.FormatInt(int64(n), 10)
-				p.Href = "/clients/" + row.EntityID
+				p.Href, p.HrefLabel = "/clients/"+row.EntityID, "Открыть запись"
 				if row.Action == store.ActionVoid {
 					// The removed client has no page; show what left the totals.
 					p.Href = ""
@@ -216,7 +216,7 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 		p.Subject = auditString(after, "name")
 	case store.EntityCategory:
 		p.Subject = auditString(after, "name")
-		p.Href = "/admin/categories/" + row.EntityID
+		p.Href, p.HrefLabel = "/admin/categories/"+row.EntityID, "Открыть категорию"
 		if string(after["deleted"]) == "true" {
 			p.Action = "Удаление"
 			p.Href = ""
@@ -290,6 +290,10 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 		{key: "isCertificateSale", label: "Продажа сертификата"},
 		{key: "selfOverridden", label: "«Себе» задано вручную"},
 	} {
+		// The category branch above already names these flags.
+		if row.Entity == store.EntityCategory && (field.key == "active" || field.key == "countsTowardSelf" || field.key == "isCertificateSale") {
+			continue
+		}
 		b, bok := before[field.key]
 		v, vok := after[field.key]
 		if !bok && !vok || string(b) == string(v) {
@@ -329,7 +333,39 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 			p.Changes = append(p.Changes, views.MoneyRow{Name: field.label, Value: emptyDash(b) + " → " + emptyDash(v)})
 		}
 	}
+	if row.Action == store.ActionCreate {
+		// A revenue category's «Нет» flags say how it counts; keep them.
+		var keep map[string]bool
+		if row.Entity == store.EntityCategory && auditString(after, "kind") == string(store.KindRevenue) {
+			keep = map[string]bool{"Входит в «Себе»": true, "Продажа сертификата": true}
+		}
+		p.Changes = createdValues(p.Changes, keep)
+	}
 	return p
+}
+
+// createdValues turns «— → X» and «€0 → X» rows into plain values and drops
+// unset ones («Нет», «—», «€0») unless keep names them: a creation lists
+// what was set.
+func createdValues(rows []views.MoneyRow, keep map[string]bool) []views.MoneyRow {
+	kept := rows[:0]
+	for _, r := range rows {
+		// Report rows start from «€0», other rows from «—»: both mean unset.
+		v, ok := strings.CutPrefix(r.Value, "— → ")
+		if !ok {
+			v, ok = strings.CutPrefix(r.Value, "€0 → ")
+		}
+		if !ok {
+			kept = append(kept, r)
+			continue
+		}
+		if (v == "Нет" || v == "—" || v == "€0") && !keep[r.Name] {
+			continue
+		}
+		r.Value = v
+		kept = append(kept, r)
+	}
+	return kept
 }
 
 func auditAmount(raw json.RawMessage) (domain.Cents, bool) {

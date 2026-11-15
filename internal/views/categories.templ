@@ -54,11 +54,11 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 	@Layout("Категории", nav) {
 		@PageHeader("Категории", "/more")
 		<div class="flex flex-col gap-4">
-			<nav class="join w-full" aria-label="Вид категорий">
+			<nav class="tabs tabs-box w-full flex-nowrap" aria-label="Вид категорий">
 				for _, k := range []store.CategoryKind{store.KindExpense, store.KindRevenue, store.KindPayment} {
 					<a
 						href={ templ.SafeURL("/admin/categories?kind=" + string(k)) }
-						class={ "join-item btn min-h-11 flex-1", templ.KV("btn-primary", k == kind) }
+						class={ "tab min-h-11 flex-1", templ.KV("tab-active", k == kind) }
 						aria-current={ ariaCurrent(k == kind) }
 					>{ categoryKindLabel(k) }</a>
 				}
@@ -69,22 +69,23 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 			if kind == store.KindExpense {
 				<a href={ templ.SafeURL("/admin/categories/new?kind=" + string(kind)) } class="btn btn-primary btn-lg w-full">Добавить категорию</a>
 			} else {
-				<p class="text-sm text-base-content/70">Список постоянный: в записи клиента вносятся только эти виды. Название можно изменить.</p>
+				<p class="text-sm text-base-content/70">Список постоянный: новые виды не добавляются. Название можно изменить.</p>
 			}
 			<ul class="flex flex-col gap-3">
 				for i, c := range rows {
 					<li class="card min-w-0 bg-base-100 shadow-sm">
 						<div class="card-body min-w-0 gap-3 p-4">
-							<a href={ templ.SafeURL("/admin/categories/" + c.ID) } class="min-h-11 [overflow-wrap:anywhere] text-lg font-semibold underline-offset-2 hover:underline">{ c.Name }</a>
-							if store.IsFixedCategory(c.ID) {
-								<span class="badge badge-soft badge-neutral">Базовая</span>
-							} else if !c.Active {
-								<span class="badge badge-soft badge-warning">В архиве</span>
-							}
+							<div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+								<a href={ templ.SafeURL("/admin/categories/" + c.ID) } class="flex min-h-11 min-w-0 items-center [overflow-wrap:anywhere] text-lg font-semibold underline-offset-2 hover:underline">{ c.Name }</a>
+								if store.IsFixedCategory(c.ID) {
+									<span class="badge border-transparent bg-base-300 text-base-content">Базовая</span>
+								} else if !c.Active {
+									<span class="badge badge-soft badge-warning">В архиве</span>
+								}
+							</div>
 							if categoryFlag(c) != "" {
 								<p class="text-sm text-base-content/70 [overflow-wrap:anywhere]">{ categoryFlagLine(c) }</p>
 							}
-							<button type="button" class="btn min-h-11 w-full" data-category={ c.ID } data-on:click="$_editcat = el.dataset.category">Изменить</button>
 							<dialog data-signals:_editcat__ifmissing="''" class="modal modal-bottom sm:modal-middle" aria-label={ "Изменить: " + c.Name } data-category={ c.ID } data-effect="$_editcat === el.dataset.category ? el.showModal() : el.close()" data-on:close="$_editcat = ''">
 								<div class="modal-box min-w-0 pb-safe">
 									<div class="mb-3 flex items-center justify-between gap-3">
@@ -98,16 +99,18 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 								</div>
 								<form method="dialog" class="modal-backdrop"><button>Закрыть</button></form>
 							</dialog>
+							// One row: edit and the two order moves (2026-11-15 design review).
 							<div class="flex gap-2">
+								<button type="button" class="btn min-h-11 flex-1" data-category={ c.ID } data-on:click="$_editcat = el.dataset.category">Изменить</button>
 								if i > 0 {
 									@categoryOrderButton(c, rows[i-1], "Выше")
 								} else {
-									<button type="button" class="btn min-h-11 flex-1" disabled>Выше</button>
+									<button type="button" class="btn invisible min-h-11 px-4" disabled aria-hidden="true" tabindex="-1">Выше</button>
 								}
 								if i+1 < len(rows) {
 									@categoryOrderButton(c, rows[i+1], "Ниже")
 								} else {
-									<button type="button" class="btn min-h-11 flex-1" disabled>Ниже</button>
+									<button type="button" class="btn invisible min-h-11 px-4" disabled aria-hidden="true" tabindex="-1">Ниже</button>
 								}
 							</div>
 						</div>
@@ -125,31 +128,36 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 // client entries have fixed rules (system-design, client entries 2026-10-13),
 // and a corrected day report keeps the flags saved on its existing lines.
 templ categoryFlagsScope(kind store.CategoryKind) {
-	<div class="rounded-box bg-base-200 p-3 text-sm text-base-content/70">
-		if kind == store.KindRevenue {
-			Записи клиентов считаются по постоянным правилам: в «Себе» входят только услуги, а кремы, масло и сертификаты целиком идут в кассу, выбранную в записи («Касса — наличные» или «Касса — карта салона»). Категории и настройки ниже нужны только для исправления старых отчётов за день; строки, уже сохранённые в отчёте, не меняются. Новые категории в записях клиентов не появятся.
-		} else {
-			В записях клиентов кассу («Касса — наличные» или «Касса — карта салона») выбирают в каждой записи. Способы оплаты ниже нужны только для исправления старых отчётов за день; строки, уже сохранённые в отчёте, не меняются.
-		}
-	</div>
+	<details class="collapse collapse-arrow rounded-box bg-base-200 text-sm text-base-content/70">
+		<summary class="collapse-title min-h-11 py-3 pe-10 font-medium text-base-content">
+			Настройки ниже — только для старых отчётов за день
+		</summary>
+		<div class="collapse-content">
+			if kind == store.KindRevenue {
+				Записи клиентов считаются по постоянным правилам: в «Себе» входят только услуги, а кремы, масло и сертификаты целиком идут в кассу, выбранную в записи («Касса — наличные» или «Касса — карта салона»). Строки, уже сохранённые в отчёте, не меняются.
+			} else {
+				В записях клиентов кассу («Касса — наличные» или «Касса — карта салона») выбирают в каждой записи. Строки, уже сохранённые в отчёте, не меняются.
+			}
+		</div>
+	</details>
 }
 
 // categoryFlagLine is a list row's setting, named as the day-report setting it is.
 func categoryFlagLine(c store.Category) string {
 	if c.Kind == store.KindPayment {
-		return "В отчётах за день деньги идут: " + categoryFlag(c)
+		return "В старых отчётах за день деньги идут: " + categoryFlag(c)
 	}
 	flag := categoryFlag(c)
 	first, size := utf8.DecodeRuneInString(flag)
-	return "В отчётах за день: " + string(unicode.ToLower(first)) + flag[size:]
+	return "В старых отчётах за день: " + string(unicode.ToLower(first)) + flag[size:]
 }
 
 templ categoryOrderButton(c, neighbor store.Category, label string) {
-	<form method="post" action={ templ.SafeURL("/admin/categories/" + c.ID + "/reorder") } class="flex-1" data-on:submit={ sendForm("/admin/categories/" + c.ID + "/reorder") }>
+	<form method="post" action={ templ.SafeURL("/admin/categories/" + c.ID + "/reorder") } data-on:submit={ sendForm("/admin/categories/" + c.ID + "/reorder") }>
 		<input type="hidden" name="version" value={ strconv.FormatInt(c.Version, 10) }/>
 		<input type="hidden" name="neighbor" value={ neighbor.ID }/>
 		<input type="hidden" name="neighborVersion" value={ strconv.FormatInt(neighbor.Version, 10) }/>
-		<button type="submit" class="btn min-h-11 w-full">{ label }</button>
+		<button type="submit" class="btn min-h-11 px-4">{ label }</button>
 	</form>
 }
 

@@ -287,7 +287,7 @@ func (a *app) buildTrendData(period int, metric, metricLabel, personID string, p
 					bottom = top + 1
 				}
 			}
-			col.Bars = append(col.Bars, views.TrendBar{Series: j, X: start + j*barW, Y: top, W: barW, H: bottom - top})
+			col.Bars = append(col.Bars, views.TrendBar{Series: j, X: start + j*barW, Y: top, W: barW, H: bottom - top, Loss: c.raw < 0})
 		}
 		d.Rows[i].Column = col
 	}

@@ -15,18 +15,18 @@ type MovementFormData struct {
 }
 type MovementCard struct {
 	ID, Title, Date, Amount, Parties, Note, Status, VoidReason, VoidURL, ConfirmURL, EditURL string
-	Version                                                                         int64
+	Version                                                                                  int64
 }
 type AccountCard struct {
 	Name, Balance, Recount, Last string
 	Form                         RecountFormData
 }
 type KassaData struct {
-	Accounts             []AccountCard
+	Accounts                   []AccountCard
 	Certificates, Notice, AsOf string
-	CertificateWarning   bool
-	Pending, Recent      []MovementCard
-	Form                 MovementFormData
+	CertificateWarning         bool
+	Pending, Recent            []MovementCard
+	Form                       MovementFormData
 }
 type MovementActionData struct {
 	ID, Title, Action, Back, Reason, Error string
@@ -79,10 +79,10 @@ templ MovementForm(f MovementFormData) {
 		if f.Edit {
 			<p class="text-base-content/70">Старая запись будет отменена с причиной «Исправлено», исправленная сохранится вместо неё.</p>
 		}
-		<nav class={ "flex flex-wrap gap-2", templ.KV("hidden", f.Edit) } aria-label="Вид движения">
+		<nav class={ "tabs tabs-box w-full", templ.KV("grid grid-cols-2", f.Admin), templ.KV("flex-nowrap", !f.Admin), templ.KV("hidden", f.Edit) } aria-label="Вид движения">
 			if f.Admin {
 				<a
-					class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "payout") }
+					class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "payout") }
 					aria-current={ selectedMovementType(f.Type, "payout") }
 					href="/admin/movements/new?type=payout"
 					data-url="/admin/movements/new?type=payout"
@@ -92,7 +92,7 @@ templ MovementForm(f MovementFormData) {
 					data-attr:tabindex="$_movementloading ? -1 : 0"
 				>Выдать</a>
 				<a
-					class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "transfer") }
+					class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "transfer") }
 					aria-current={ selectedMovementType(f.Type, "transfer") }
 					href="/admin/movements/new?type=transfer"
 					data-url="/admin/movements/new?type=transfer"
@@ -103,7 +103,7 @@ templ MovementForm(f MovementFormData) {
 				>Перевести</a>
 			}
 			<a
-				class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "deposit") }
+				class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "deposit") }
 				aria-current={ selectedMovementType(f.Type, "deposit") }
 				href={ templ.SafeURL(movementNewURL(f, "deposit")) }
 				data-url={ movementNewURL(f, "deposit") }
@@ -113,7 +113,7 @@ templ MovementForm(f MovementFormData) {
 				data-attr:tabindex="$_movementloading ? -1 : 0"
 			>Внести в кассу</a>
 			<a
-				class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "expense") }
+				class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "expense") }
 				aria-current={ selectedMovementType(f.Type, "expense") }
 				href={ templ.SafeURL(movementNewURL(f, "expense")) }
 				data-url={ movementNewURL(f, "expense") }
@@ -200,7 +200,7 @@ func sendMovementForm(action string) string {
 
 func selectedMovementType(selected, kind string) string {
 	if selected == kind {
-		return "true"
+		return "page"
 	}
 	return "false"
 }
@@ -273,46 +273,81 @@ templ MovementSheet(f MovementFormData) {
 	</section>
 }
 
+// movementCards lists movements: cards on the phone, a table at lg: (the
+// same elements laid out as grid rows under one header, so each movement keeps
+// its single confirm form and void dialog).
 templ movementCards(cards []MovementCard) {
-	for _, c := range cards {
-		@movementCard(c)
+	if len(cards) > 0 {
+		<div class="flex flex-col gap-3 lg:gap-0 lg:overflow-hidden lg:rounded-box lg:bg-base-100 lg:shadow-sm">
+			<div class={ "hidden text-sm font-semibold text-base-content/70 lg:grid lg:border-b lg:border-base-200", movementGrid } aria-hidden="true">
+				<span>Дата</span><span>Движение</span><span class="text-right">Сумма</span><span></span>
+			</div>
+			for _, c := range cards {
+				@movementItem(c, true)
+			}
+		</div>
 	}
 }
 
+// movementGrid is the desktop column layout shared by the header and rows:
+// date, the movement (title, parties, status, note), amount, actions.
+const movementGrid = "lg:grid-cols-[6rem_minmax(0,1fr)_6rem_18rem] lg:items-start lg:gap-x-4 lg:gap-y-1 lg:px-4 lg:py-3"
+
 templ movementCard(c MovementCard) {
-	<article class="card bg-base-100 shadow-sm">
-		<div class="card-body min-w-0 gap-2 p-4">
-			<div class="flex flex-wrap justify-between gap-2"><h3 class="font-semibold">{ c.Title }</h3><p class="min-w-0 max-w-full text-lg font-semibold [overflow-wrap:anywhere]">{ c.Amount }</p></div>
-			<p class="min-w-0 text-sm [overflow-wrap:anywhere]">{ c.Date } · { c.Parties }</p>
-			<p class="badge badge-soft h-auto whitespace-normal">{ c.Status }</p>
+	@movementItem(c, false)
+}
+
+templ movementItem(c MovementCard, row bool) {
+	<article class={ "card bg-base-100 shadow-sm", templ.KV("lg:rounded-none lg:shadow-none lg:border-b lg:border-base-200 lg:last:border-b-0", row) }>
+		<div class={ "card-body min-w-0 gap-2 p-4", templ.KV("lg:grid " + movementGrid, row) }>
+			<div class={ "flex flex-wrap justify-between gap-2", templ.KV("lg:contents", row) }>
+				<h3 class={ "font-semibold", templ.KV("lg:col-start-2 lg:row-start-1", row) }>{ c.Title }</h3>
+				<p class={ "min-w-0 max-w-full text-lg font-semibold [overflow-wrap:anywhere]", templ.KV("lg:col-start-3 lg:row-start-1 lg:text-right lg:text-base", row) }>{ c.Amount }</p>
+			</div>
+			<p class={ "min-w-0 text-sm [overflow-wrap:anywhere]", templ.KV("lg:contents", row) }>
+				<span class={ templ.KV("lg:col-start-1 lg:row-start-1", row) }>{ c.Date }</span><span class={ templ.KV("lg:hidden", row) }>{ " · " }</span><span class={ templ.KV("lg:col-start-2 lg:row-start-2 lg:text-base-content/70", row) }>{ c.Parties }</span>
+			</p>
+			<p class={ "badge badge-soft h-auto whitespace-normal", templ.KV("lg:col-start-2 lg:justify-self-start", row) }>{ c.Status }</p>
 			if c.Note != "" {
-				<p class="break-words">{ c.Note }</p>
+				<p class={ "break-words", templ.KV("lg:col-start-2 lg:text-sm", row) }>{ c.Note }</p>
 			}
 			if c.VoidReason != "" {
-				<p class="break-words">Причина отмены: { c.VoidReason }</p>
+				<p class={ "break-words", templ.KV("lg:col-start-2 lg:text-sm", row) }>Причина отмены: { c.VoidReason }</p>
 			}
-			if c.ConfirmURL != "" {
-				<form
-					id={ "movement-action-" + c.ID + "-confirm" }
-					method="post"
-					action={ templ.SafeURL(c.ConfirmURL) }
-					data-on:submit={ sendFinancialForm(c.ConfirmURL) }
-					data-signals:_financialunknown__ifmissing="false"
-					data-on:datastar-fetch__window={ onFinancialFetch }
-				>
-					@FinancialResponseNotice()
-					<input
-						type="hidden"
-						name="version"
-						value={ strconv.FormatInt(c.Version, 10) }
-					/><button class="btn btn-primary min-h-11 w-full">Подтвердить</button>
-				</form>
-			}
-			if c.EditURL != "" {
-				<a class="btn min-h-11" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
-			}
+			// Phone: one full-width primary, secondary actions in a row below.
+			// Desktop: all actions in one right-aligned row.
+			<div class={ "flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-end", templ.KV("lg:col-start-4 lg:row-start-1 lg:row-span-5 lg:flex-wrap", row) }>
+				if c.ConfirmURL != "" {
+					<form
+						id={ "movement-action-" + c.ID + "-confirm" }
+						method="post"
+						action={ templ.SafeURL(c.ConfirmURL) }
+						data-on:submit={ sendFinancialForm(c.ConfirmURL) }
+						data-signals:_financialunknown__ifmissing="false"
+						data-on:datastar-fetch__window={ onFinancialFetch }
+					>
+						@FinancialResponseNotice()
+						<input
+							type="hidden"
+							name="version"
+							value={ strconv.FormatInt(c.Version, 10) }
+						/><button class="btn btn-primary min-h-11 w-full lg:w-auto lg:px-6">Подтвердить</button>
+					</form>
+				}
+				if c.EditURL != "" || c.VoidURL != "" {
+					// Secondary actions share one row so a pending card is not three
+					// stacked full-width buttons (2026-11-15 design review).
+					<div class="flex flex-wrap gap-2 lg:flex-nowrap">
+						if c.EditURL != "" {
+							<a class="btn min-h-11 flex-none px-5" href={ templ.SafeURL(c.EditURL) }>Изменить</a>
+						}
+						if c.VoidURL != "" {
+							<a class="btn btn-ghost min-h-11 flex-1 text-error lg:flex-none lg:px-4" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger" aria-label={ "Отменить движение: " + c.Title + " " + c.Amount + ", " + c.Date }>Отменить движение</a>
+						}
+					</div>
+				}
+			</div>
 			if c.VoidURL != "" {
-				<a class="btn btn-ghost min-h-11" href={ templ.SafeURL(c.VoidURL) } data-ledger={ c.ID } data-on:click__prevent="$_voidid = el.dataset.ledger">Отменить движение</a>
 				<dialog data-signals:_voidid__ifmissing="''" class="modal modal-bottom sm:modal-middle" data-ledger={ c.ID } data-effect="$_voidid === el.dataset.ledger ? el.showModal() : el.close()" data-on:close="$_voidid = ''" aria-label="Причина отмены">
 					<div class="modal-box pb-safe">
 						<button type="button" class="btn btn-ghost min-h-11" data-on:click="$_voidid = ''">Закрыть</button>
@@ -448,13 +483,15 @@ templ RecountForm(p RecountFormData) {
 }
 
 templ historyTabs(movements bool) {
-	<nav class="tabs tabs-box" aria-label="Раздел истории">
+	<nav class="tabs tabs-box w-full flex-nowrap" aria-label="Раздел истории">
 		<a
 			href="/admin/history"
-			class={ "tab min-h-11", templ.KV("tab-active", !movements) }
+			class={ "tab min-h-11 flex-1", templ.KV("tab-active", !movements) }
+			aria-current={ ariaCurrent(!movements) }
 		>Записи</a><a
 	href="/admin/history/movements"
-	class={ "tab min-h-11", templ.KV("tab-active", movements) }
+	class={ "tab min-h-11 flex-1", templ.KV("tab-active", movements) }
+	aria-current={ ariaCurrent(movements) }
 >Движения</a>
 	</nav>
 }

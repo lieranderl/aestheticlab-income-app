@@ -173,3 +173,58 @@ func TestTrendsSplitMoneyByServicesCertificatesAndSales(t *testing.T) {
 		wantPage(t, metric, res, http.StatusOK, append(want, ">Услуги<", ">Сертификаты<", ">Продажи<")...)
 	}
 }
+
+// A loss never looks like good news: no series is drawn in the «success»
+// green, and a bar below zero is drawn in the error tone.
+func TestTrendsOverviewDrawsLossesInTheErrorTone(t *testing.T) {
+	s := newSite(t)
+	adminUser, err := s.st.UserByUsername(ctx, "anna")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := domain.ImportedMonth{RevenueTotal: 1200000, SalonIncome: 600000, Expenses: 700000, Profit: -100000}
+	if err := s.st.SaveImportedMonth(ctx, store.Actor{UID: adminUser.ID, Admin: true}, domain.Month{Year: 2026, Mon: 9}, im, "test sheet"); err != nil {
+		t.Fatal(err)
+	}
+	body := s.get("/admin/trends?period=3&m=2026-09", s.login("anna", annaPass)).Body.String()
+	if strings.Contains(body, "fill-success") || strings.Contains(body, "bg-success") {
+		t.Error("a trend series is drawn in the success green")
+	}
+	// The bar keeps its series fill (so it matches the legend) and gains an
+	// error outline (2026-11-15 mobile review).
+	if strings.Contains(body, `class="fill-error"`) {
+		t.Error("a loss bar loses its series colour")
+	}
+	if got := strings.Count(body, `stroke-error`); got != 1 {
+		t.Errorf("want exactly one loss bar outlined in the error tone, got %d", got)
+	}
+	if !strings.Contains(body, "Ниже нуля") {
+		t.Error("the legend does not explain the error-tone bars")
+	}
+}
+
+// 2026-11-15 design review: months without data collapse into one line on
+// the phone list, and the metric chips stay on one scrollable row.
+func TestTrendsCollapsesEmptyMonthsAndKeepsChipsOnOneRow(t *testing.T) {
+	s := newSite(t)
+	adminUser, err := s.st.UserByUsername(ctx, "anna")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := domain.ImportedMonth{RevenueTotal: 1200000, SalonIncome: 600000, Expenses: 700000, Profit: -100000}
+	if err := s.st.SaveImportedMonth(ctx, store.Actor{UID: adminUser.ID, Admin: true}, domain.Month{Year: 2026, Mon: 9}, im, "test sheet"); err != nil {
+		t.Fatal(err)
+	}
+	body := s.get("/admin/trends?period=6", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(body, "Июнь — Август 2026: нет данных") {
+		t.Error("June to August are not collapsed into one line")
+	}
+	if !strings.Contains(body, `role="group" aria-labelledby="trend-metric-label"`) || !strings.Contains(body, "overflow-x-auto") {
+		t.Error("the metric chips are not one labelled scrollable row")
+	}
+	// The chosen metric is named even when its chip is scrolled away.
+	clients := s.get("/admin/trends?period=6&metric=clients", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(clients, `Показатель: <span class="text-base-content">Клиенты</span>`) {
+		t.Error("the label does not name the chosen metric")
+	}
+}

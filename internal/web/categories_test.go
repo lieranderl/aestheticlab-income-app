@@ -3,6 +3,7 @@ package web_test
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -134,8 +135,12 @@ func TestCategoryFlagsSayTheyOnlyApplyToLegacyDayReports(t *testing.T) {
 			t.Errorf("%s lacks %q", path, want)
 		}
 	}
-	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !strings.Contains(body, "В отчётах за день: входит в «Себе»") {
-		t.Error("the list doesn't name the services setting as a day-report one")
+	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !strings.Contains(body, "В старых отчётах за день: входит в «Себе»") {
+		t.Error("the list doesn't name the services setting as a legacy day-report one")
+	}
+	// The long explanation is folded so the list starts near the top.
+	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !regexp.MustCompile(`<details[^>]*>\s*<summary[^>]*>\s*Настройки ниже — только для старых отчётов за день`).MatchString(body) {
+		t.Error("the legacy-only rule is not the visible summary of the folded explanation")
 	}
 }
 
@@ -158,4 +163,48 @@ func TestRevenueAndPaymentListsOfferNoNewCategory(t *testing.T) {
 	wantPage(t, "expenses", s.get("/admin/categories?kind=expense", admin), http.StatusOK, "Добавить категорию")
 	wantPage(t, "new form without a kind", s.get("/admin/categories/new", admin), http.StatusOK, `name="kind" value="expense"`)
 	wantRedirect(t, "new expense category", s.post("/admin/categories", url.Values{"kind": {"expense"}, "name": {"Уборка"}}, admin), "/admin/categories?kind=expense")
+}
+
+// 2026-11-15 design review: a creation lists what was set, once, without
+// «— →» and without «Нет» noise, and the link names what it opens.
+func TestCategoryCreationAuditIsShortAndLinksToTheCategory(t *testing.T) {
+	s := newSite(t)
+	admin := s.login("anna", annaPass)
+	if got := s.post("/admin/categories", url.Values{"kind": {"expense"}, "name": {"Кофе и чай"}}, admin); got.Code != http.StatusSeeOther {
+		t.Fatalf("create: %d", got.Code)
+	}
+	body := s.get("/admin/audit?from=2026-11-20&to=2026-11-20&entity=category", admin).Body.String()
+	card := body[strings.Index(body, "Категория · Создание"):]
+	card = card[:strings.Index(card, "</article>")]
+	for _, unwanted := range []string{"— →", "Доступ", "Учитывать в «Себе»", "Удалена", "Открыть отчёт"} {
+		if strings.Contains(card, unwanted) {
+			t.Errorf("creation card shows %q: %s", unwanted, card)
+		}
+	}
+	for _, want := range []string{"Кофе и чай", "Открыть категорию"} {
+		if !strings.Contains(card, want) {
+			t.Errorf("creation card lacks %q: %s", want, card)
+		}
+	}
+	if n := strings.Count(card, "Продажа сертификата"); n > 1 {
+		t.Errorf("«Продажа сертификата» listed %d times", n)
+	}
+}
+
+// Money audit 2026-11-15: for a revenue category «Нет» on its «Себе» and
+// certificate flags is meaningful, so a creation keeps those rows.
+func TestRevenueCategoryCreationKeepsItsFlags(t *testing.T) {
+	s := newSite(t)
+	body := s.get("/admin/audit?from=2026-11-20&to=2026-11-20&entity=category", s.login("anna", annaPass)).Body.String()
+	i := strings.Index(body, "Категория · Создание</h2><p class=\"break-words\">Сертификаты</p>")
+	if i < 0 {
+		t.Fatal("no creation card for the fixed «Сертификаты» category")
+	}
+	card := body[i:]
+	card = card[:strings.Index(card, "</article>")]
+	for _, want := range []string{"Входит в «Себе»", "Нет", "Продажа сертификата", "Да"} {
+		if !strings.Contains(card, want) {
+			t.Errorf("«Сертификаты» creation lacks %q: %s", want, card)
+		}
+	}
 }

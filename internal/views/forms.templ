@@ -56,7 +56,17 @@ templ Field(label, hint string) {
 }
 
 // SubmitButton is the form's main action, disabled while a request runs.
+// SubmitButton spans the phone width; on a desktop it keeps a button's
+// width instead of stretching across the column (2026-11-15 design review).
 templ SubmitButton(label string) {
+	<button type="submit" class="btn btn-primary btn-lg btn-block lg:w-auto lg:min-w-56 lg:px-8" data-attr:disabled="$_busy">
+		<span class="loading loading-spinner loading-sm" data-show="$_busy"></span>
+		{ label }
+	</button>
+}
+
+// SubmitButtonBlock always fills its (narrow) card, as on the sign-in page.
+templ SubmitButtonBlock(label string) {
 	<button type="submit" class="btn btn-primary btn-lg btn-block" data-attr:disabled="$_busy">
 		<span class="loading loading-spinner loading-sm" data-show="$_busy"></span>
 		{ label }
