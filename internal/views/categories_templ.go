@@ -369,7 +369,7 @@ func CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) tem
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<button type=\"button\" class=\"btn min-h-11 px-4\" disabled>Выше</button> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<button type=\"button\" class=\"btn invisible min-h-11 px-4\" disabled aria-hidden=\"true\" tabindex=\"-1\">Выше</button> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -380,7 +380,7 @@ func CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) tem
 						return templ_7745c5c3_Err
 					}
 				} else {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<button type=\"button\" class=\"btn min-h-11 px-4\" disabled>Ниже</button>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<button type=\"button\" class=\"btn invisible min-h-11 px-4\" disabled aria-hidden=\"true\" tabindex=\"-1\">Ниже</button>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

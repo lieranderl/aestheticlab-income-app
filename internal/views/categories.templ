@@ -105,12 +105,12 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 								if i > 0 {
 									@categoryOrderButton(c, rows[i-1], "Выше")
 								} else {
-									<button type="button" class="btn min-h-11 px-4" disabled>Выше</button>
+									<button type="button" class="btn invisible min-h-11 px-4" disabled aria-hidden="true" tabindex="-1">Выше</button>
 								}
 								if i+1 < len(rows) {
 									@categoryOrderButton(c, rows[i+1], "Ниже")
 								} else {
-									<button type="button" class="btn min-h-11 px-4" disabled>Ниже</button>
+									<button type="button" class="btn invisible min-h-11 px-4" disabled aria-hidden="true" tabindex="-1">Ниже</button>
 								}
 							</div>
 						</div>
