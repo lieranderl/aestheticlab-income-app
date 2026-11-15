@@ -54,11 +54,11 @@ templ CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) {
 	@Layout("Категории", nav) {
 		@PageHeader("Категории", "/more")
 		<div class="flex flex-col gap-4">
-			<nav class="join w-full" aria-label="Вид категорий">
+			<nav class="tabs tabs-box w-full flex-nowrap" aria-label="Вид категорий">
 				for _, k := range []store.CategoryKind{store.KindExpense, store.KindRevenue, store.KindPayment} {
 					<a
 						href={ templ.SafeURL("/admin/categories?kind=" + string(k)) }
-						class={ "join-item btn min-h-11 flex-1", templ.KV("btn-primary", k == kind) }
+						class={ "tab min-h-11 flex-1", templ.KV("tab-active", k == kind) }
 						aria-current={ ariaCurrent(k == kind) }
 					>{ categoryKindLabel(k) }</a>
 				}

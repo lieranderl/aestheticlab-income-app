@@ -131,3 +131,12 @@
 /* The app opened from the Home Screen. */
 @custom-variant standalone (@media (display-mode: standalone));
 
+/* View switchers (Месяц, История, Категории, period, movement type) share one
+   tab box: a visible track on the base-200 page and readable inactive tabs
+   (2026-11-15 design review). */
+.tabs-box {
+  background-color: var(--color-base-300);
+}
+.tabs-box > .tab:not(.tab-active) {
+  color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+}

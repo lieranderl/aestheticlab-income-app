@@ -68,11 +68,11 @@ templ TrendsPage(nav Nav, d TrendData) {
 		@PageHeader("Динамика", "/more")
 		<div class="flex flex-col gap-4">
 			<!-- Period Switcher -->
-			<nav class="join w-full" aria-label="Период">
+			<nav class="tabs tabs-box w-full flex-nowrap" aria-label="Период">
 				for _, p := range []int{3, 6, 12} {
 					<a
 						href={ templ.SafeURL("/admin/trends?period=" + strconv.Itoa(p) + "&metric=" + d.Metric + trendPersonParam(d.PersonID)) }
-						class={ "join-item btn min-h-11 flex-1", templ.KV("btn-primary", d.Period == p) }
+						class={ "tab min-h-11 flex-1", templ.KV("tab-active", d.Period == p) }
 						aria-current={ ariaCurrent(d.Period == p) }
 					>{ strconv.Itoa(p) } мес</a>
 				}

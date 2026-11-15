@@ -79,10 +79,10 @@ templ MovementForm(f MovementFormData) {
 		if f.Edit {
 			<p class="text-base-content/70">Старая запись будет отменена с причиной «Исправлено», исправленная сохранится вместо неё.</p>
 		}
-		<nav class={ "flex flex-wrap gap-2", templ.KV("hidden", f.Edit) } aria-label="Вид движения">
+		<nav class={ "tabs tabs-box w-full", templ.KV("grid grid-cols-2", f.Admin), templ.KV("flex-nowrap", !f.Admin), templ.KV("hidden", f.Edit) } aria-label="Вид движения">
 			if f.Admin {
 				<a
-					class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "payout") }
+					class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "payout") }
 					aria-current={ selectedMovementType(f.Type, "payout") }
 					href="/admin/movements/new?type=payout"
 					data-url="/admin/movements/new?type=payout"
@@ -92,7 +92,7 @@ templ MovementForm(f MovementFormData) {
 					data-attr:tabindex="$_movementloading ? -1 : 0"
 				>Выдать</a>
 				<a
-					class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "transfer") }
+					class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "transfer") }
 					aria-current={ selectedMovementType(f.Type, "transfer") }
 					href="/admin/movements/new?type=transfer"
 					data-url="/admin/movements/new?type=transfer"
@@ -103,7 +103,7 @@ templ MovementForm(f MovementFormData) {
 				>Перевести</a>
 			}
 			<a
-				class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "deposit") }
+				class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "deposit") }
 				aria-current={ selectedMovementType(f.Type, "deposit") }
 				href={ templ.SafeURL(movementNewURL(f, "deposit")) }
 				data-url={ movementNewURL(f, "deposit") }
@@ -113,7 +113,7 @@ templ MovementForm(f MovementFormData) {
 				data-attr:tabindex="$_movementloading ? -1 : 0"
 			>Внести в кассу</a>
 			<a
-				class={ "btn min-h-11", templ.KV("btn-primary", f.Type == "expense") }
+				class={ "tab min-h-11 flex-1", templ.KV("tab-active", f.Type == "expense") }
 				aria-current={ selectedMovementType(f.Type, "expense") }
 				href={ templ.SafeURL(movementNewURL(f, "expense")) }
 				data-url={ movementNewURL(f, "expense") }
@@ -456,13 +456,15 @@ templ RecountForm(p RecountFormData) {
 }
 
 templ historyTabs(movements bool) {
-	<nav class="tabs tabs-box" aria-label="Раздел истории">
+	<nav class="tabs tabs-box w-full flex-nowrap" aria-label="Раздел истории">
 		<a
 			href="/admin/history"
-			class={ "tab min-h-11", templ.KV("tab-active", !movements) }
+			class={ "tab min-h-11 flex-1", templ.KV("tab-active", !movements) }
+			aria-current={ ariaCurrent(!movements) }
 		>Записи</a><a
 	href="/admin/history/movements"
-	class={ "tab min-h-11", templ.KV("tab-active", movements) }
+	class={ "tab min-h-11 flex-1", templ.KV("tab-active", movements) }
+	aria-current={ ariaCurrent(movements) }
 >Движения</a>
 	</nav>
 }

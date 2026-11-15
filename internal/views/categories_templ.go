@@ -92,7 +92,7 @@ func CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) tem
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col gap-4\"><nav class=\"join w-full\" aria-label=\"Вид категорий\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col gap-4\"><nav class=\"tabs tabs-box w-full flex-nowrap\" aria-label=\"Вид категорий\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -118,7 +118,7 @@ func CategoriesPage(nav Nav, kind store.CategoryKind, rows []store.Category) tem
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var4 = []any{"join-item btn min-h-11 flex-1", templ.KV("btn-primary", k == kind)}
+					var templ_7745c5c3_Var4 = []any{"tab min-h-11 flex-1", templ.KV("tab-active", k == kind)}
 					templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var4...)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err

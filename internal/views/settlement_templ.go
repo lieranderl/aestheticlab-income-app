@@ -46,7 +46,7 @@ func MonthTabs(key string, settlement bool) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<nav class=\"tabs tabs-box\" aria-label=\"Раздел месяца\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<nav class=\"tabs tabs-box w-full flex-nowrap\" aria-label=\"Раздел месяца\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -58,7 +58,7 @@ func MonthTabs(key string, settlement bool) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var2 = []any{"tab min-h-11", templ.KV("tab-active", !settlement)}
+			var templ_7745c5c3_Var2 = []any{"tab min-h-11 flex-1", templ.KV("tab-active", !settlement)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var2...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -117,7 +117,7 @@ func MonthTabs(key string, settlement bool) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 = []any{"tab min-h-11", templ.KV("tab-active", settlement)}
+			var templ_7745c5c3_Var5 = []any{"tab min-h-11 flex-1", templ.KV("tab-active", settlement)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_Var5...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
