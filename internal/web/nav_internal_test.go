@@ -26,3 +26,14 @@ func TestMoreLinksFitTheAdmin(t *testing.T) {
 		t.Errorf("reporting admin's «Ещё» lost an item: %v", reporter)
 	}
 }
+
+// 2026-11-15 production review: the owner's card said «Условия не заданы»,
+// which reads as a problem for someone who doesn't report.
+func TestNoTermsLineFitsWhetherThePersonReports(t *testing.T) {
+	if got := noTermsLine(store.User{}); got != "Без условий — не сдаёт отчёты" {
+		t.Errorf("non-reporter: %q", got)
+	}
+	if got := noTermsLine(store.User{SubmitsReports: true}); got != "Условия не заданы" {
+		t.Errorf("reporter: %q", got)
+	}
+}

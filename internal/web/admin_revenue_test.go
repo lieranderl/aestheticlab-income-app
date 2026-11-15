@@ -124,8 +124,13 @@ func TestAdminSeesTheDaysTotalsAndMissingReporters(t *testing.T) {
 	if res := s.get("/admin/day", s.login("olga", olgaPass)); res.Code != http.StatusForbidden {
 		t.Fatalf("staff sees day: %d", res.Code)
 	}
-	// The next day is empty, rather than silently showing the previous day's totals.
-	wantPage(t, "empty day", s.get("/admin/day?date=2026-11-02", anna), http.StatusOK, "Отчётов за этот день нет", "€0")
+	// The next day is empty, rather than silently showing the previous day's totals
+	// (its empty breakdown sections are hidden, 2026-11-15 production review).
+	empty := s.get("/admin/day?date=2026-11-02", anna)
+	wantPage(t, "empty day", empty, http.StatusOK, "Отчётов за этот день нет")
+	if strings.Contains(empty.Body.String(), ">Услуги и продажи<") {
+		t.Error("an empty day shows the previous day's breakdown")
+	}
 	wantPage(t, "current missing reporters", s.get("/admin/day?date=2026-11-20", anna), http.StatusOK, "Не сдали отчёт", "Мария")
 }
 

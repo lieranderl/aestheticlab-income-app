@@ -128,3 +128,24 @@ func TestMyPageEmptyStatesSaySo(t *testing.T) {
 		t.Error("an empty movement list shows a heading over nothing")
 	}
 }
+
+// 2026-11-15 production review: on «День» the client picker (one big button
+// per person) sat between the totals and the breakdown, and an empty day
+// showed «Услуги и продажи», «Сертификаты» and «Клиенты 0».
+func TestAdminDayKeepsThePickerCompactAndHidesEmptySections(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 6500)
+	body := s.get("/admin/day?date=2026-11-20", s.login("anna", annaPass)).Body.String()
+	picker := strings.Index(body, `<summary id="add-client-title" class="btn btn-primary btn-lg w-full`)
+	if picker < 0 || picker > strings.Index(body, "Сверка дня по записям") && strings.Contains(body, "Сверка дня по записям") {
+		t.Error("the client picker is not one control above the day's totals")
+	}
+	for _, empty := range []string{">Услуги и продажи<", ">Сертификаты<"} {
+		if strings.Contains(body, empty) {
+			t.Errorf("an empty day shows %s", empty)
+		}
+	}
+	if strings.Index(body, "Отчётов за этот день нет.") < strings.Index(body, "Записи за день") {
+		t.Error("the empty note is not under «Записи за день»")
+	}
+}
