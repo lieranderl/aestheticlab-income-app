@@ -213,6 +213,20 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 	switch row.Entity {
 	case store.EntityReport:
 		uid, date := auditString(after, "userId"), auditString(after, "date")
+		if row.Action == store.ActionUpdate {
+			// A move to another person or day is a real change the amounts
+			// don't show (third production review, 2026-11-15).
+			if b := auditString(before, "userId"); b != "" && b != uid {
+				p.Changes = append(p.Changes, views.MoneyRow{Name: "Сотрудник", Value: personName(users, b) + " → " + personName(users, uid)})
+			}
+			if b := auditString(before, "date"); b != "" && b != date {
+				from, errB := domain.ParseDate(b)
+				to, errA := domain.ParseDate(date)
+				if errB == nil && errA == nil {
+					p.Changes = append(p.Changes, views.MoneyRow{Name: "Дата", Value: ru.Date(from.Time()) + " → " + ru.Date(to.Time())})
+				}
+			}
+		}
 		if d, err := domain.ParseDate(date); err == nil {
 			p.Subject = personName(users, uid) + " · " + ru.Date(d.Time())
 			p.Href, p.HrefLabel = "/admin/reports/"+uid+"/"+d.String(), "Открыть отчёт"
@@ -371,6 +385,11 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 		if b != v {
 			p.Changes = append(p.Changes, views.MoneyRow{Name: field.label, Value: emptyDash(b) + " → " + emptyDash(v)})
 		}
+	}
+	// An edit that changed nothing the card lists says so rather than
+	// showing an empty card (third production review, 2026-11-15).
+	if row.Entity == store.EntityReport && row.Action == store.ActionUpdate && len(p.Changes) == 0 {
+		p.Changes = []views.MoneyRow{{Name: "Суммы", Value: "не изменились"}}
 	}
 	if row.Action == store.ActionCreate {
 		// A revenue category's «Нет» flags say how it counts; keep them.
