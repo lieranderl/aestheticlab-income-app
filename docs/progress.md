@@ -277,3 +277,7 @@ Repository security turned on: private vulnerability reporting, CodeQL default s
 
 ## Missing reports by calendar; Касса by date (2026-11-15)
 `fix/working-days-kassa-order`, owner decisions: «Не сдали отчёт» counts only a day the person had a customer in their calendar (`bookings.Reader.BookedDays`, one calendar read per person for the period), on «Итоги и расчёт» and «День», within the existing roster; people without a calendar don't count, and a calendar outage reads «Календарь недоступен — пропущенные отчёты не проверены.» Without calendars (local runs) the roster rule stays. Касса's «Последние движения», История → Движения and «Мои записи» → «Движения за месяц» are sorted by date, newest first (История and «Мои записи» followed the same day, by owner request); a backfilled movement still shows «(записано …)».
+
+## Third production review (2026-11-15)
+`fix/third-critique`: a third read-only critique of production confirmed the earlier fixes and found the rest. Change log: 15 of 50 «Отчёт · Изменение» cards were still empty; an edit now shows a move to another person or day and otherwise «Суммы: не изменились». Desktop movement table: «записано 09.11 · 16:24» without the year, actions column 12rem with wrapping buttons. «Откуда»/«Куда»: people who file reports first, the owner last. Итоги и расчёт: one-sentence note with «Почему прибыль ниже» folded, and «Сначала закройте предыдущий месяц» links to that month. Display only, no money change.
+
