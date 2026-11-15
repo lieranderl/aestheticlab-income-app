@@ -279,3 +279,45 @@ func (a *app) linkFailed(w http.ResponseWriter, r *http.Request, u store.User, r
 	}
 	a.renderStatus(w, r, http.StatusUnprocessableEntity, views.LinkFailedPage(a.navFor(u, "/"), msg, dayURL(u, rep)))
 }
+
+// missingFilter decides which missing reports count (owner, 2026-11-15): with
+// calendars on, only a day the person had a customer booked. People without
+// a calendar never count then. Without calendars (local runs) every day of
+// the roster counts as before. unavailable means a calendar could not be
+// read, and the caller says so instead of guessing.
+type missingFilter struct {
+	on          bool
+	booked      map[string]map[domain.Date]bool
+	unavailable bool
+}
+
+func (f missingFilter) counts(uid string, day domain.Date) bool {
+	return !f.on || f.booked[uid][day]
+}
+
+func (a *app) missingFilter(ctx context.Context, users []store.User, from, to domain.Date) missingFilter {
+	f := missingFilter{on: a.cfg.Bookings.Enabled(), booked: map[string]map[domain.Date]bool{}}
+	if !f.on {
+		return f
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, p := range users {
+		if _, ok := a.cfg.Bookings.CalendarFor(p.ID); !ok || p.Removed {
+			continue
+		}
+		wg.Go(func() {
+			days, err := a.cfg.Bookings.BookedDays(ctx, p.ID, from, to)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				slog.WarnContext(ctx, "bookings unavailable", "error", logError(err))
+				f.unavailable = true
+				return
+			}
+			f.booked[p.ID] = days
+		})
+	}
+	wg.Wait()
+	return f
+}

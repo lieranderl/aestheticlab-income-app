@@ -151,6 +151,40 @@ func (r *Reader) Day(ctx context.Context, uid string, day domain.Date) (Day, err
 	return out, nil
 }
 
+// BookedDays reads the person's calendar once for [from, to] (whole days in
+// Brussels) and returns the days with at least one confirmed customer
+// booking. «Не сдали отчёт» counts only those days (owner, 2026-11-15). A
+// failed read is ErrUnavailable, never a partial set.
+func (r *Reader) BookedDays(ctx context.Context, uid string, from, to domain.Date) (map[domain.Date]bool, error) {
+	cal, ok := r.CalendarFor(uid)
+	if !ok {
+		return nil, ErrNoCalendar
+	}
+	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	defer cancel()
+	start, _ := from.Window(r.loc)
+	_, end := to.Window(r.loc)
+	events, err := r.src.List(ctx, cal, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
+	}
+	days := map[domain.Date]bool{}
+	for _, ev := range events {
+		if ev.Cancelled || ev.Start.IsZero() {
+			continue
+		}
+		if domain.ClassifyEvent(ev.Summary, ev.Description).Kind != domain.EventBooking {
+			continue
+		}
+		day := domain.Today(ev.Start, r.loc)
+		if day.Before(from) || to.Before(day) {
+			continue
+		}
+		days[day] = true
+	}
+	return days, nil
+}
+
 // Check resolves an event ID against the person's own calendar before it is
 // linked: it must exist, be a readable confirmed booking and start on day.
 // Nothing about another calendar can pass, so a forged ID is refused.

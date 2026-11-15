@@ -226,3 +226,39 @@ func TestATimelyEventWithoutATimeCountsAsUnreadable(t *testing.T) {
 		t.Fatalf("day = %+v, want one unreadable", day)
 	}
 }
+
+// Owner, 2026-11-15: a report is missing only on a day the person had a
+// customer in their calendar. BookedDays reads a whole period in one call
+// and keeps the days with a confirmed booking (not «Busy Time», own events
+// or cancellations).
+func TestBookedDaysAreTheDaysWithACustomer(t *testing.T) {
+	src := bookings.NewMemory()
+	src.Put(mariaCal, booking("a", at("2026-11-03", "10:00"), "Wax Price: €10.00 with Maria Test (Confirmed)"))
+	src.Put(mariaCal, booking("b", at("2026-11-03", "15:00"), "Wax Price: €10.00 with Maria Test (Confirmed)"))
+	src.Put(mariaCal, booking("c", at("2026-11-05", "09:00"), "Wax Price: €10.00 with Maria Test (Confirmed)"))
+	src.Put(mariaCal, bookings.Event{ID: "busy", Summary: "Busy Time with Maria Test", Start: at("2026-11-04", "12:00")})
+	src.Put(mariaCal, bookings.Event{ID: "own", Summary: "Репетитор", Start: at("2026-11-06", "13:00")})
+	cancelled := booking("d", at("2026-11-07", "10:00"), "Wax Price: €10.00 with Maria Test (Confirmed)")
+	cancelled.Cancelled = true
+	src.Put(mariaCal, cancelled)
+	src.Put(mariaCal, booking("out", at("2026-11-11", "10:00"), "Wax Price: €10.00 with Maria Test (Confirmed)"))
+
+	days, err := newReader(t, src).BookedDays(context.Background(), "maria", mustDate(t, "2026-11-01"), mustDate(t, "2026-11-10"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[domain.Date]bool{mustDate(t, "2026-11-03"): true, mustDate(t, "2026-11-05"): true}
+	if len(days) != len(want) || !days[mustDate(t, "2026-11-03")] || !days[mustDate(t, "2026-11-05")] {
+		t.Fatalf("booked days = %v, want 3 and 5 November", days)
+	}
+	if src.Lists() != 1 {
+		t.Errorf("read the calendar %d times, want once for the period", src.Lists())
+	}
+	src.Fail(errors.New("boom"))
+	if _, err := newReader(t, src).BookedDays(context.Background(), "maria", mustDate(t, "2026-11-01"), mustDate(t, "2026-11-10")); !errors.Is(err, bookings.ErrUnavailable) {
+		t.Fatalf("err = %v, want ErrUnavailable", err)
+	}
+	if _, err := newReader(t, src).BookedDays(context.Background(), "olga", mustDate(t, "2026-11-01"), mustDate(t, "2026-11-10")); !errors.Is(err, bookings.ErrNoCalendar) {
+		t.Fatalf("err = %v, want ErrNoCalendar", err)
+	}
+}

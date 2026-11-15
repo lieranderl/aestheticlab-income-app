@@ -22,7 +22,10 @@ type AdminDay struct {
 	Figures []MoneyRow
 	Reports []AdminReport
 	Missing []string
-	Notice  string
+	// MissingUnavailable: a calendar could not be read, so missing reports
+	// were not checked.
+	MissingUnavailable bool
+	Notice             string
 	// Bookings is each mapped person's calendar section.
 	Bookings []BookingsView
 	// AddClient lets the admin enter a client for anyone who reports.
@@ -72,6 +75,9 @@ templ AdminDayPage(nav Nav, p AdminDay) {
 			@MoneyPanel(p.Money)
 			if len(p.Reports) > 0 {
 				@RevenueDetails(p.Figures, "день")
+			}
+			if p.MissingUnavailable {
+				<p class="alert alert-soft" role="status">Календарь недоступен — пропущенные отчёты не проверены.</p>
 			}
 			if len(p.Missing) > 0 {
 				<section class="card bg-base-100 shadow-sm">
@@ -126,17 +132,20 @@ templ RevenueDetails(rows []MoneyRow, period string) {
 	if details := revenueDetailRows(rows); len(details) > 0 {
 		<details class="collapse collapse-arrow bg-base-100 shadow-sm">
 			<summary class="collapse-title min-h-14 font-semibold">Услуги и продажи</summary>
-			<div class="collapse-content">@moneyRows(details)</div>
+			<div class="collapse-content">@moneyRows(details)
+</div>
 		</details>
 	}
 	if certificates := namedMoneyRows(rows, "Продажа сертификатов", "Оплачено сертификатами"); len(certificates) > 0 {
 		<details class="collapse collapse-arrow bg-base-100 shadow-sm">
 			<summary class="collapse-title min-h-14 font-semibold">Сертификаты</summary>
-			<div class="collapse-content">@moneyRows(certificates)</div>
+			<div class="collapse-content">@moneyRows(certificates)
+</div>
 		</details>
 	}
 	if counts := namedMoneyRows(rows, "Клиенты", "Рабочие дни"); len(counts) > 0 {
-		<div class="px-1 text-sm">@moneyRows(counts)</div>
+		<div class="px-1 text-sm">@moneyRows(counts)
+</div>
 	}
 }
 
@@ -226,9 +235,9 @@ type MonthPerson struct {
 type AdminMonth struct {
 	Money                              MoneyView
 	Key, Month, Prev, Next, RecordsURL string
-	Figures, Categories, Payments []MoneyRow
-	People                        []MonthPerson
-	Closed                        bool
+	Figures, Categories, Payments      []MoneyRow
+	People                             []MonthPerson
+	Closed                             bool
 }
 
 templ AdminMonthPage(nav Nav, p AdminMonth) {

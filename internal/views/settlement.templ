@@ -15,6 +15,8 @@ type SettlementData struct {
 	KassaLink                      bool // movements wait for confirmation
 	Warnings, Missing              []SettlementWarning
 	MissingSummary                 string // «Lera — 12 дн. · Zara — 15 дн.»
+	MissingUnavailable             bool   // a calendar could not be read
+	MissingByCalendar              bool   // only days with a customer in the calendar count
 	Action                         MonthActionData
 	MovementForm                   MovementFormData
 }
@@ -68,13 +70,20 @@ templ SettlementPage(nav Nav, p SettlementData) {
 			if p.KassaLink {
 				<a class="btn min-h-11" href="/admin/kassa">Открыть кассу</a>
 			}
+			if p.MissingUnavailable {
+				<p class="alert alert-soft" role="status">Календарь недоступен — пропущенные отчёты не проверены.</p>
+			}
 			if len(p.Missing)>0 {
 				<details class="collapse collapse-arrow bg-base-100">
 					<summary class="collapse-title min-h-14">
 						Не сдали отчёт: { p.MissingSummary }
 					</summary>
 					<div class="collapse-content flex flex-col gap-2">
-						<p class="text-sm text-base-content/70">Дни без записей клиентов. Если это выходные, ничего делать не нужно.</p>
+						if p.MissingByCalendar {
+							<p class="text-sm text-base-content/70">Дни, когда в календаре был клиент, а записи в кассе нет.</p>
+						} else {
+							<p class="text-sm text-base-content/70">Дни без записей клиентов. Если это выходные, ничего делать не нужно.</p>
+						}
 						for _,warning:=range p.Missing {
 							<a
 								class="btn btn-ghost min-h-11 h-auto min-w-0 max-w-full justify-start py-3 text-left whitespace-normal [overflow-wrap:anywhere]"
