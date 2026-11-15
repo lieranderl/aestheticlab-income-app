@@ -608,6 +608,10 @@ func TestClientDayLockingAndInstallBanner(t *testing.T) {
 		"kassa_install_banner_dismissed",
 		`data-show="!$_installDismissed"`,
 	)
+	// The hint never pushes the day and «Добавить клиента» down (2026-11-15 design review).
+	if body := openDayRes.Body.String(); strings.Index(body, "Установите приложение") < strings.Index(body, "Добавить клиента") {
+		t.Error("the install hint sits above «Добавить клиента»")
+	}
 
 	// 2. Closed month shows lock notice and does NOT show "Добавить клиента"
 	*s.clock = s.clock.AddDate(0, 0, 15)

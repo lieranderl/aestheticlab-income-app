@@ -345,7 +345,6 @@ templ InstallBanner() {
 
 templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, money MoneyView, notice string, booked BookingsView) {
 	@Layout("Клиенты", nav) {
-		@InstallBanner()
 		if notice != "" {
 			<div class="mb-3">
 				@Alert("", notice)
@@ -383,6 +382,10 @@ templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, 
 				<p class="p-4 text-base-content/60">Клиентов за этот день нет.</p>
 			}
 		</section>
+		// Last, so the day and «Добавить клиента» stay at the top.
+		<div class="mt-4">
+			@InstallBanner()
+		</div>
 	}
 }
 
