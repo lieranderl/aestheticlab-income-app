@@ -9,8 +9,6 @@ package views
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "strconv"
-
 type SettlementWarning struct{ Text, Href string }
 type SettlementPerson struct {
 	Name, Balance, Current, Earned, Action, ActionURL, CarryURL string
@@ -25,6 +23,7 @@ type SettlementData struct {
 	Blockers                             []string
 	KassaLink                            bool // movements wait for confirmation
 	Warnings, Missing                    []SettlementWarning
+	MissingSummary                       string // «Lera — 12 дн. · Zara — 15 дн.»
 	Action                               MonthActionData
 	MovementForm                         MovementFormData
 }
@@ -79,7 +78,7 @@ func MonthTabs(key string, settlement bool) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/admin/month?m=" + key)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 27, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 26, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -138,7 +137,7 @@ func MonthTabs(key string, settlement bool) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/admin/month?m=" + key + "&tab=settlement")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 34, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 33, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -258,7 +257,7 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(b)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 66, Col: 8}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 65, Col: 8}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -281,15 +280,15 @@ func SettlementPage(nav Nav, p SettlementData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var11 string
-				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(p.Missing)))
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(p.MissingSummary)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 75, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/views/settlement.templ`, Line: 74, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, " · предупреждение</summary><div class=\"collapse-content flex flex-col gap-2\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</summary><div class=\"collapse-content flex flex-col gap-2\"><p class=\"text-sm text-base-content/70\">Дни без записей клиентов. Если это выходные, ничего делать не нужно.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
