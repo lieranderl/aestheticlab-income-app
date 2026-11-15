@@ -38,7 +38,7 @@ type TrendColumn struct {
 type TrendBar struct {
 	Series     int
 	X, Y, W, H int
-	Loss       bool // below zero: drawn in the error tone
+	Loss       bool // below zero: outlined in the error tone
 }
 
 // TrendTick is a horizontal gridline with its value on the axis.
@@ -127,7 +127,7 @@ templ TrendsPage(nav Nav, d TrendData) {
 							}
 							if hasLoss(d) {
 								<li class="flex items-center gap-1.5">
-									<span class="size-2.5 shrink-0 rounded-sm bg-error" aria-hidden="true"></span>
+									<span class="size-2.5 shrink-0 rounded-sm border-2 border-error" aria-hidden="true"></span>
 									Ниже нуля
 								</li>
 							}
@@ -320,11 +320,21 @@ func seriesSwatch(j int) string {
 	return [...]string{"bg-primary", "bg-warning", "bg-info"}[j%3]
 }
 
+// seriesFill keeps the series colour so a bar always matches its legend
+// swatch; a bar below zero adds an error outline.
 func seriesFill(b TrendBar) string {
+	fill := [...]string{"fill-primary", "fill-warning", "fill-info"}[b.Series%3]
 	if b.Loss {
-		return "fill-error"
+		return fill + " stroke-error"
 	}
-	return [...]string{"fill-primary", "fill-warning", "fill-info"}[b.Series%3]
+	return fill
+}
+
+func lossStroke(b TrendBar) string {
+	if b.Loss {
+		return "2"
+	}
+	return "0"
 }
 
 // hasLoss reports whether any bar on the chart is below zero.
@@ -367,7 +377,7 @@ templ trendChart(d TrendData) {
 			for i, r := range d.Rows {
 				<rect x={ strconv.Itoa(r.Column.X) } y="8" width={ strconv.Itoa(r.Column.W) } height="156" rx="4" fill-opacity="0.08" class={ "fill-base-content", templ.KV("hidden", i != d.Selected) } data-month={ strconv.Itoa(i) } data-class:hidden="$_month !== +el.dataset.month"></rect>
 				for _, b := range r.Column.Bars {
-					<rect x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) } width={ strconv.Itoa(b.W) } height={ strconv.Itoa(b.H) } rx="1.5" fill-opacity={ barOpacity(r.Imported) } class={ seriesFill(b) }></rect>
+					<rect x={ strconv.Itoa(b.X) } y={ strconv.Itoa(b.Y) } width={ strconv.Itoa(b.W) } height={ strconv.Itoa(b.H) } rx="1.5" fill-opacity={ barOpacity(r.Imported) } stroke-width={ lossStroke(b) } class={ seriesFill(b) }></rect>
 				}
 				<text x={ strconv.Itoa(r.Column.LabelX) } y="180" text-anchor="middle" class={ "font-sans text-[11px]", templ.KV("fill-base-content/60", r.HasData), templ.KV("fill-base-content/30", !r.HasData) }>{ r.ShortMonth }</text>
 			}

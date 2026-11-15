@@ -190,8 +190,13 @@ func TestTrendsOverviewDrawsLossesInTheErrorTone(t *testing.T) {
 	if strings.Contains(body, "fill-success") || strings.Contains(body, "bg-success") {
 		t.Error("a trend series is drawn in the success green")
 	}
-	if got := strings.Count(body, `class="fill-error"`); got != 1 {
-		t.Errorf("want exactly one loss bar in the error tone, got %d", got)
+	// The bar keeps its series fill (so it matches the legend) and gains an
+	// error outline (2026-11-15 mobile review).
+	if strings.Contains(body, `class="fill-error"`) {
+		t.Error("a loss bar loses its series colour")
+	}
+	if got := strings.Count(body, `stroke-error`); got != 1 {
+		t.Errorf("want exactly one loss bar outlined in the error tone, got %d", got)
 	}
 	if !strings.Contains(body, "Ниже нуля") {
 		t.Error("the legend does not explain the error-tone bars")
