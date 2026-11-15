@@ -136,6 +136,11 @@
    (2026-11-15 design review). */
 .tabs-box {
   background-color: var(--color-base-300);
+  /* Dark: a darker track so the active tab reads as raised, not pressed. */
+  background-color: light-dark(var(--color-base-300), var(--color-base-100));
+}
+.tabs-box > .tab.tab-active {
+  background-color: light-dark(var(--color-base-100), var(--color-base-300));
 }
 .tabs-box > .tab:not(.tab-active) {
   color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
