@@ -358,3 +358,18 @@ func TestMissingReportsCountOnlyDaysWithACustomer(t *testing.T) {
 		t.Error("a calendar outage is not said on «День»")
 	}
 }
+
+// Review (PR 62): removing someone later must not erase the reports they
+// missed on booked days while they were on staff.
+func TestMissingReportsSurviveALaterRemoval(t *testing.T) {
+	s, src := bookedSite(t)
+	src.Put(olgaCal, timely("b1", "2026-11-20", "10:00", "Wax Price: €10.00 with Olga Test (Confirmed)"))
+	*s.clock = s.clock.AddDate(0, 0, 1) // the 21st: the 20th has passed
+	if err := s.st.RemoveUser(ctx, s.anna.Actor(), s.olga.ID); err != nil {
+		t.Fatal(err)
+	}
+	month := s.get("/admin/month?m=2026-11&tab=settlement", s.login("anna", annaPass)).Body.String()
+	if !strings.Contains(month, "20.11.2026 · Ольга") {
+		t.Error("a removed employee's missed booked day disappeared")
+	}
+}

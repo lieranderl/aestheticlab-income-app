@@ -302,8 +302,11 @@ func (a *app) missingFilter(ctx context.Context, users []store.User, from, to do
 	}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	// Every mapped calendar, whatever the person's status today: the
+	// historical roster decides who was expected on each day, so a later
+	// removal keeps the reports missed while on staff.
 	for _, p := range users {
-		if _, ok := a.cfg.Bookings.CalendarFor(p.ID); !ok || p.Removed {
+		if _, ok := a.cfg.Bookings.CalendarFor(p.ID); !ok {
 			continue
 		}
 		wg.Go(func() {
