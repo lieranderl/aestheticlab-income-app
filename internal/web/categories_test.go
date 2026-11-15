@@ -3,6 +3,7 @@ package web_test
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -134,8 +135,12 @@ func TestCategoryFlagsSayTheyOnlyApplyToLegacyDayReports(t *testing.T) {
 			t.Errorf("%s lacks %q", path, want)
 		}
 	}
-	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !strings.Contains(body, "В отчётах за день: входит в «Себе»") {
-		t.Error("the list doesn't name the services setting as a day-report one")
+	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !strings.Contains(body, "В старых отчётах за день: входит в «Себе»") {
+		t.Error("the list doesn't name the services setting as a legacy day-report one")
+	}
+	// The long explanation is folded so the list starts near the top.
+	if body := s.get("/admin/categories?kind=revenue", cookies).Body.String(); !regexp.MustCompile(`<details[^>]*>\s*<summary[^>]*>\s*Записи клиентов считаются по постоянным правилам`).MatchString(body) {
+		t.Error("the revenue explanation is not folded behind its summary")
 	}
 }
 
