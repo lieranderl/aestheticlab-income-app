@@ -344,17 +344,22 @@ func (a *app) auditCard(row store.AuditEntry, users []store.User, cats []store.C
 	return p
 }
 
-// createdValues turns «— → X» rows into plain values and drops unset ones
-// («Нет», «—») unless keep names them: a creation lists what was set.
+// createdValues turns «— → X» and «€0 → X» rows into plain values and drops
+// unset ones («Нет», «—», «€0») unless keep names them: a creation lists
+// what was set.
 func createdValues(rows []views.MoneyRow, keep map[string]bool) []views.MoneyRow {
 	kept := rows[:0]
 	for _, r := range rows {
+		// Report rows start from «€0», other rows from «—»: both mean unset.
 		v, ok := strings.CutPrefix(r.Value, "— → ")
+		if !ok {
+			v, ok = strings.CutPrefix(r.Value, "€0 → ")
+		}
 		if !ok {
 			kept = append(kept, r)
 			continue
 		}
-		if (v == "Нет" || v == "—") && !keep[r.Name] {
+		if (v == "Нет" || v == "—" || v == "€0") && !keep[r.Name] {
 			continue
 		}
 		r.Value = v
