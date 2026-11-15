@@ -118,7 +118,7 @@ func ExportPage(nav Nav, d ExportFormData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "><div class=\"flex min-w-0 flex-col\"><span class=\"font-medium text-sm\">CSV (.csv) — Записи</span> <span class=\"text-xs text-base-content/60\">Поклиентские записи выручки, оплат и отчислений мастера</span></div></label> <label class=\"label cursor-pointer justify-start gap-3 p-2 rounded-lg hover:bg-base-200 min-h-11 whitespace-normal\"><input type=\"radio\" name=\"format\" value=\"csv_movements\" class=\"radio radio-primary\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "><div class=\"flex min-w-0 flex-col\"><span class=\"font-medium text-sm\">CSV (.csv) — Записи</span> <span class=\"text-xs text-base-content/60\">Записи клиентов: выручка, взносы в кассу, «Себе» и «Салону»</span></div></label> <label class=\"label cursor-pointer justify-start gap-3 p-2 rounded-lg hover:bg-base-200 min-h-11 whitespace-normal\"><input type=\"radio\" name=\"format\" value=\"csv_movements\" class=\"radio radio-primary\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

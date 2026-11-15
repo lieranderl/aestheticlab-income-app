@@ -273,7 +273,7 @@ func isFullMonth(m domain.Month, from, to domain.Date) bool {
 func writeMonthResultsSheet(f *excelize.File, d Data, hStyle, cStyle int) {
 	sheet := "Итоги месяца"
 	headers := []string{
-		"Месяц", "Выручка", "Себе мастера",
+		"Месяц", "Выручка", "Себе сотрудников",
 		"Доход салона", "Расходы салона", "Зарплаты",
 		"Прибыль", "Дивиденды", "Касса наличные, остаток на конец",
 		"Касса карта, остаток на конец", "Клиентов всего",
