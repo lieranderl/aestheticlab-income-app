@@ -150,7 +150,7 @@ func (a *app) monthReports(ctx context.Context, u store.User, selected domain.Da
 	if missingDays > 0 {
 		out.Missing = "Не сдан отчёт: " + strconv.Itoa(missingDays) + " дн. · " + ru.Count(missingBookings, "запись", "записи", "записей")
 		if missingPrice > 0 {
-			out.Missing += " ≈ " + domain.FormatEUR(missingPrice)
+			out.Missing += " ≈\u00a0" + domain.FormatEUR(missingPrice)
 		}
 	}
 	return out, nil
@@ -163,7 +163,7 @@ func bookingsNote(b bookings.DayBookings) string {
 	if b.Unpriced == b.Count {
 		return s + " · без цены"
 	}
-	s += " · ≈ " + domain.FormatEUR(b.Price) + " по прайсу"
+	s += " · ≈\u00a0" + domain.FormatEUR(b.Price) + " по прайсу"
 	if b.Unpriced > 0 {
 		s += " (у " + strconv.Itoa(b.Unpriced) + " цены нет)"
 	}

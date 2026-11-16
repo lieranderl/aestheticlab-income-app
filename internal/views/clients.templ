@@ -403,7 +403,7 @@ templ monthReports(m MonthReports) {
 							}
 						</a>
 						if d.AddHref != "" {
-							<a href={ templ.SafeURL(d.AddHref) } class="btn btn-sm min-h-11 shrink-0" aria-label={ "Добавить клиента за " + d.Label }>
+							<a href={ templ.SafeURL(d.AddHref) } class="btn btn-outline btn-sm min-h-11 shrink-0" aria-label={ "Добавить клиента за " + d.Label }>
 								@Icon("user-plus", "size-4")
 								Добавить
 							</a>
