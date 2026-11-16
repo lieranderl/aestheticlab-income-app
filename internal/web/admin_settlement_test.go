@@ -448,3 +448,22 @@ func TestTodaysBalanceWaitsForEveryFinishedMonthToClose(t *testing.T) {
 		t.Error("settlement movement recorded while October is open")
 	}
 }
+
+// 2026-11-16 production feedback: the netted «Отчёты · изменение баланса» row
+// hid «Себе» and the cash kept, so «Всего заработано» did not trace to the
+// balance. Maria kept €7 421 in cash; her «Себе» at 65% is €4 823,65.
+func TestSettlementBreakdownShowsSelfAndCashKept(t *testing.T) {
+	s := settlementSite(t)
+	body := s.get("/admin/month?m=2026-10&tab=settlement", s.login("anna", annaPass)).Body.String()
+	row := func(name, value string) *regexp.Regexp {
+		return regexp.MustCompile(`<dt[^>]*>\s*` + regexp.QuoteMeta(name) + `\s*</dt>\s*<dd[^>]*>\s*` + regexp.QuoteMeta(value) + `\s*</dd>`)
+	}
+	for _, r := range []*regexp.Regexp{row("«Себе»", "+"+domain.FormatEUR(482365)), row("Наличными у сотрудника", domain.FormatEUR(-742100))} {
+		if !r.MatchString(body) {
+			t.Errorf("no breakdown row %s", r)
+		}
+	}
+	if strings.Contains(body, "Отчёты · изменение баланса") {
+		t.Error("the netted reports row is still shown")
+	}
+}

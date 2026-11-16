@@ -2,8 +2,10 @@ package domain
 
 // SettlementBreakdown explains a person's signed change during one month.
 // Accrual ledger rows are excluded: the frozen or provisional result supplies them once.
+// Reports is the sum of the report deltas; it splits into Self («Себе») and
+// CashKept (≤ 0, the clients' cash the person kept), so Self + CashKept == Reports.
 type SettlementBreakdown struct {
-	Opening, Reports, Deposits, StaffExpenses, Salary, SelfBonus, Dividend, Payouts, Closing Cents
+	Opening, Reports, Self, CashKept, Deposits, StaffExpenses, Salary, SelfBonus, Dividend, Payouts, Closing Cents
 }
 
 func BreakdownFor(uid string, opening Cents, reports []PersonReport, moves []Movement, result PersonResult) SettlementBreakdown {
@@ -11,6 +13,8 @@ func BreakdownFor(uid string, opening Cents, reports []PersonReport, moves []Mov
 	for _, r := range reports {
 		if r.Person == uid {
 			b.Reports += r.Report.BalanceDelta
+			b.Self += r.Report.SelfAmount
+			b.CashKept -= r.Report.CashKept()
 		}
 	}
 	for _, m := range moves {
