@@ -53,6 +53,13 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 		return views.SettlementData{}, err
 	}
 	p := views.SettlementData{Key: m.String(), Month: monthLabel(m), AsOf: ru.Date(a.store.Today().Time()), Closed: selected.State.Status == domain.MonthClosed, Running: !m.Before(a.store.Today().Month()), Blockers: slices.DeleteFunc(a.settlementBlockers(selected, m), func(b string) bool { return b == monthNotOver }), KassaLink: selected.Pending > 0 && selected.State.Status != domain.MonthClosed}
+	p.MonthEnd = ru.Date(m.LastDay().Time())
+	if p.Running {
+		p.MonthEnd = p.AsOf
+	}
+	// Before a finished month is closed, today's balance lacks its accruals and
+	// includes later months: no balance or payout action until it is closed.
+	p.ShowCurrent = p.Running || p.Closed
 	if !m.Prev().Before(a.store.StartMonth()) {
 		p.Prev, p.PrevLabel = settlementURL(m.Prev()), monthLabel(m.Prev())
 	}
@@ -69,12 +76,17 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 				continue
 			}
 			b := selected.Breakdowns[u.ID]
+			c := views.SettlementPerson{Name: u.DisplayName, Balance: balanceWords(pr.Closing), Earned: domain.FormatEUR(pr.Earned), Sign: sign(pr.Closing)}
+			c.Breakdown = []views.MoneyRow{{Name: "Начальный остаток", Value: signedMoney(b.Opening)}, {Name: "Отчёты · изменение баланса", Value: signedMoney(b.Reports)}, {Name: "Внесения", Value: signedMoney(b.Deposits)}, {Name: "Расход за свой счёт", Value: signedMoney(b.StaffExpenses)}, {Name: "Зарплата", Value: signedMoney(b.Salary)}, {Name: "Доплата «Себе»", Value: signedMoney(b.SelfBonus)}, {Name: "Дивиденды", Value: signedMoney(b.Dividend)}, {Name: "Выплаты", Value: signedMoney(b.Payouts)}, {Name: "Итоговый баланс", Value: signedMoney(b.Closing)}}
+			if !p.ShowCurrent {
+				p.People = append(p.People, c)
+				continue
+			}
 			current, err := a.store.PersonBalance(r.Context(), u.ID)
 			if err != nil {
 				return p, err
 			}
-			c := views.SettlementPerson{Name: u.DisplayName, Balance: balanceWords(pr.Closing), Current: balanceWords(current), Earned: domain.FormatEUR(pr.Earned), Sign: sign(pr.Closing), CurrentSign: sign(current)}
-			c.Breakdown = []views.MoneyRow{{Name: "Начальный остаток", Value: signedMoney(b.Opening)}, {Name: "Отчёты · изменение баланса", Value: signedMoney(b.Reports)}, {Name: "Внесения", Value: signedMoney(b.Deposits)}, {Name: "Расход за свой счёт", Value: signedMoney(b.StaffExpenses)}, {Name: "Зарплата", Value: signedMoney(b.Salary)}, {Name: "Доплата «Себе»", Value: signedMoney(b.SelfBonus)}, {Name: "Дивиденды", Value: signedMoney(b.Dividend)}, {Name: "Выплаты", Value: signedMoney(b.Payouts)}, {Name: "Итоговый баланс", Value: signedMoney(b.Closing)}}
+			c.Current, c.CurrentSign = balanceWords(current), sign(current)
 			action := domain.SuggestAction(current)
 			if action.Kind != domain.Settled {
 				kind := "payout"

@@ -7,7 +7,9 @@ type SettlementPerson struct {
 	Breakdown                                                   []MoneyRow
 }
 type SettlementData struct {
-	Key, Month, Prev, Next, Notice, AsOf string
+	Key, Month, Prev, Next, Notice, AsOf string // AsOf: today, for the current balance
+	MonthEnd                             string // the month's last day, or today while it runs
+	ShowCurrent                          bool   // today's balance belongs here: the running month, or a closed one
 	PrevLabel                            string // «Ноябрь 2026», for the «close the previous month» link
 	Closed, Running                      bool   // Running: the month has not ended yet
 	Figures, Expenses                    []MoneyRow
@@ -57,6 +59,8 @@ templ SettlementPage(nav Nav, p SettlementData) {
 						Предварительный расчёт. Зарплаты, доплата «Себе» и дивиденды ещё не начислены.
 						if p.Running {
 							Закрыть месяц можно после его окончания.
+						} else {
+							Проверьте итоги и закройте месяц.
 						}
 					</p>
 					if p.Running {
@@ -66,6 +70,10 @@ templ SettlementPage(nav Nav, p SettlementData) {
 						</details>
 					}
 				</div>
+				// A finished month's main task is closing it: first, not under the people.
+				if p.Action.Action!="" {
+					@MonthActionSheet(p.Action)
+				}
 			}
 			@adminFigures(p.Figures)
 			@breakdown("Расходы по категориям", p.Expenses)
@@ -113,54 +121,76 @@ templ SettlementPage(nav Nav, p SettlementData) {
 				<article class="card bg-base-100 shadow-sm">
 					<div class="card-body p-4 gap-3">
 						<h2 class="font-semibold break-words">{ c.Name }</h2>
-						<h3 class="font-semibold">Текущий остаток</h3>
-						<p class={ "text-xl font-semibold break-words", templ.KV("text-success", c.CurrentSign > 0), templ.KV("text-error", c.CurrentSign < 0) }>{ c.Current }</p>
-						<p class="text-sm text-base-content/60">На { p.AsOf }</p>
-						if c.ActionURL!="" {
-							<a
-								class="btn btn-primary min-h-11"
-								href={ templ.SafeURL(c.ActionURL) }
-								data-url={ c.ActionURL }
-								data-on:click__prevent={ loadMovementForm(true) }
-								data-on:datastar-fetch__window={ onMovementLoad }
-								data-attr:aria-disabled="$_movementloading"
-								data-attr:tabindex="$_movementloading ? -1 : 0"
-							>{ c.Action }</a>
+						// The running month leads with today's balance and its action; a
+						// finished month leads with its own result, as of its last day.
+						if p.Running {
+							@settlementCurrent(p, c, "Текущий остаток")
+							@settlementResult(p, c)
+						} else {
+							@settlementResult(p, c)
+							if p.ShowCurrent {
+								<section class="flex flex-col gap-3 border-t border-base-200 pt-3">
+									@settlementCurrent(p, c, "Остаток сегодня")
+								</section>
+							}
 						}
-						<a
-							class="btn btn-ghost min-h-11"
-							href={ templ.SafeURL(c.CarryURL) }
-						>Перенести</a>
-						<section class="rounded-box bg-base-200 p-4">
-							<h3 class="font-semibold">
-								if p.Closed {
-									Зафиксированный итог месяца
-								} else {
-									Предварительный итог месяца
-								}
-							</h3>
-							<p class="mt-2 break-words">{ c.Balance }</p>
-							<p class="mt-2 text-sm">Всего заработано: { c.Earned }</p>
-							<p class="mt-2 text-sm text-base-content/70">
-								if p.Closed {
-									На конец выбранного месяца. Последующие выплаты и внесения отражены в текущем остатке.
-								} else {
-									С учётом ожидаемых начислений при закрытии месяца.
-								}
-							</p>
-							<details class="collapse collapse-arrow">
-								<summary class="collapse-title min-h-14">Из чего складывается итог месяца</summary>
-								<div class="collapse-content">@moneyRows(c.Breakdown)
-</div>
-							</details>
-						</section>
 					</div>
 				</article>
 			}
 			@MovementSheet(p.MovementForm)
-			if p.Action.Action!="" {
+			if p.Closed && p.Action.Action!="" {
 				@MonthActionSheet(p.Action)
 			}
 		</div>
 	}
+}
+
+templ settlementCurrent(p SettlementData, c SettlementPerson, title string) {
+	<h3 class="font-semibold">{ title }</h3>
+	<p class={ "text-xl font-semibold break-words", templ.KV("text-success", c.CurrentSign > 0), templ.KV("text-error", c.CurrentSign < 0) }>{ c.Current }</p>
+	<p class="text-sm text-base-content/60">На { p.AsOf }</p>
+	if c.ActionURL!="" {
+		<a
+			class="btn btn-primary min-h-11"
+			href={ templ.SafeURL(c.ActionURL) }
+			data-url={ c.ActionURL }
+			data-on:click__prevent={ loadMovementForm(true) }
+			data-on:datastar-fetch__window={ onMovementLoad }
+			data-attr:aria-disabled="$_movementloading"
+			data-attr:tabindex="$_movementloading ? -1 : 0"
+		>{ c.Action }</a>
+	}
+	<a
+		class="btn btn-ghost min-h-11"
+		href={ templ.SafeURL(c.CarryURL) }
+	>Перенести</a>
+}
+
+templ settlementResult(p SettlementData, c SettlementPerson) {
+	<section class="rounded-box bg-base-200 p-4">
+		<h3 class="font-semibold">
+			if p.Closed {
+				Зафиксированный итог месяца
+			} else {
+				Предварительный итог месяца
+			}
+		</h3>
+		<p class={ "mt-2 break-words", templ.KV("text-xl font-semibold", !p.Running) }>{ c.Balance }</p>
+		if !p.Running {
+			<p class="text-sm text-base-content/60">На { p.MonthEnd }</p>
+		}
+		<p class="mt-2 text-sm">Всего заработано: { c.Earned }</p>
+		<p class="mt-2 text-sm text-base-content/70">
+			if p.Closed {
+				Последующие выплаты и внесения отражены в остатке на сегодня.
+			} else {
+				С учётом ожидаемых начислений при закрытии месяца.
+			}
+		</p>
+		<details class="collapse collapse-arrow">
+			<summary class="collapse-title min-h-14">Из чего складывается итог месяца</summary>
+			<div class="collapse-content">@moneyRows(c.Breakdown)
+</div>
+		</details>
+	</section>
 }
