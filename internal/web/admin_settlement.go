@@ -57,9 +57,10 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 	if p.Running {
 		p.MonthEnd = p.AsOf
 	}
-	// Before a finished month is closed, today's balance lacks its accruals and
-	// includes later months: no balance or payout action until it is closed.
-	p.ShowCurrent = p.Running || p.Closed
+	// Today's balance lacks a finished month's accruals until it is closed, and
+	// for a past month it also includes later ones: no balance or payout action
+	// until every finished month is closed (2026-11-16 money audit).
+	p.ShowCurrent = (p.Running || p.Closed) && selected.FinishedClosed
 	if !m.Prev().Before(a.store.StartMonth()) {
 		p.Prev, p.PrevLabel = settlementURL(m.Prev()), monthLabel(m.Prev())
 	}

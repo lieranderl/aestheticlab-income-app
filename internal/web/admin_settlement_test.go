@@ -418,3 +418,33 @@ func TestPastMonthSettlementShowsMonthEndFiguresAndCloseFirst(t *testing.T) {
 		t.Error("the fixed month result must precede today's balance")
 	}
 }
+
+// Today's balance has a finished month's salary, «Себе» bonus and dividends
+// only once that month is closed: until every finished month is, no page
+// offers a payout or deposit from it and the server refuses one
+// (2026-11-16 money audit).
+func TestTodaysBalanceWaitsForEveryFinishedMonthToClose(t *testing.T) {
+	s := settlementSite(t)
+	cookie := s.login("anna", annaPass)
+	running := s.get("/admin/month?m=2026-11&tab=settlement", cookie)
+	wantPage(t, "running month after an open one", running, http.StatusOK, "Сначала закройте предыдущий месяц")
+	for _, today := range []string{"Текущий остаток", "Выплатить €", "Внести в кассу €"} {
+		if strings.Contains(running.Body.String(), today) {
+			t.Errorf("running month shows %q while October is open", today)
+		}
+	}
+	for _, kind := range []string{"payout", "deposit"} {
+		for _, m := range []string{"2026-10", "2026-11"} {
+			p := s.get("/admin/movements/new?type="+kind+"&settlement="+m+"&person="+s.olga.ID, cookie)
+			if p.Code == http.StatusOK {
+				t.Errorf("%s prefill for %s offered while October is open", kind, m)
+			}
+		}
+	}
+	if _, err := s.st.SettlementSuggestion(ctx, s.olga.ID, domain.Month{Year: 2026, Mon: 10}); err == nil {
+		t.Error("suggestion from a balance without October's accruals")
+	}
+	if _, err := s.st.RecordSettlementMovement(ctx, s.anna.Actor(), domain.Month{Year: 2026, Mon: 10}, s.olga.ID, "any", store.NewMovement{Type: domain.Deposit, Amount: 100, From: domain.Person(s.olga.ID), To: domain.Account(domain.KassaCard), Date: domain.Date{Year: 2026, Mon: 11, Day: 20}}); err == nil {
+		t.Error("settlement movement recorded while October is open")
+	}
+}

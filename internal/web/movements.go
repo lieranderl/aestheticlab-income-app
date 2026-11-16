@@ -294,6 +294,8 @@ func movementFieldProblem(r *http.Request, err error, kind string) (field, messa
 		return "amount", "Сумма должна быть больше €0"
 	case store.ProblemSettlementAmount:
 		return "amount", movementProblem(r, err)
+	case store.ProblemFinishedMonthOpen:
+		return "", "Сначала закройте прошедший месяц: без его начислений остаток неполный"
 	case problemDateMissing:
 		return "date", "Укажите дату"
 	case domain.ProblemFutureDate:

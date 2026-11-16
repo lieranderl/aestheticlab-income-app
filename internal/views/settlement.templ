@@ -9,7 +9,7 @@ type SettlementPerson struct {
 type SettlementData struct {
 	Key, Month, Prev, Next, Notice, AsOf string // AsOf: today, for the current balance
 	MonthEnd                             string // the month's last day, or today while it runs
-	ShowCurrent                          bool   // today's balance belongs here: the running month, or a closed one
+	ShowCurrent                          bool   // today's balance belongs here: the running or a closed month, every finished month closed
 	PrevLabel                            string // «Ноябрь 2026», for the «close the previous month» link
 	Closed, Running                      bool   // Running: the month has not ended yet
 	Figures, Expenses                    []MoneyRow
@@ -124,7 +124,9 @@ templ SettlementPage(nav Nav, p SettlementData) {
 						// The running month leads with today's balance and its action; a
 						// finished month leads with its own result, as of its last day.
 						if p.Running {
-							@settlementCurrent(p, c, "Текущий остаток")
+							if p.ShowCurrent {
+								@settlementCurrent(p, c, "Текущий остаток")
+							}
 							@settlementResult(p, c)
 						} else {
 							@settlementResult(p, c)
