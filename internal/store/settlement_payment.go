@@ -14,6 +14,10 @@ import (
 // ProblemSettlementAmount rejects a contextual payment above the realized remaining balance.
 const ProblemSettlementAmount domain.Problem = "settlement_amount_exceeds_balance"
 
+// ProblemFinishedMonthOpen refuses a settlement payment while a finished
+// month is open: today's balance still lacks that month's accruals.
+const ProblemFinishedMonthOpen domain.Problem = "finished_month_open"
+
 // SettlementPayment is a realized balance and a revision of its source records.
 type SettlementPayment struct {
 	Balance  domain.Cents
@@ -39,6 +43,9 @@ func (s *Store) settlementSuggestion(t tx, uid string, m domain.Month) (Settleme
 		return SettlementPayment{}, err
 	}
 	months, reports, ledger := replay.months, replay.reports, replay.ledger
+	if !s.finishedClosed(months) {
+		return SettlementPayment{}, &domain.ValidationError{Field: "month", Problem: ProblemFinishedMonthOpen}
+	}
 	slices.SortFunc(reports, compareReport)
 	slices.SortFunc(ledger, func(a, b Entry) int { return strings.Compare(a.ID, b.ID) })
 	monthKeys := map[string]monthRecord{}

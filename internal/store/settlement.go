@@ -23,7 +23,10 @@ type SettlementMonth struct {
 	Revision                     string
 	Pending                      int
 	PreviousClosed, NewestClosed bool
-	PreviewError                 error
+	// FinishedClosed: every month before today's is closed, so today's
+	// balance is complete enough to settle up from.
+	FinishedClosed bool
+	PreviewError   error
 }
 
 func (s *Store) Settlement(ctx context.Context, m domain.Month) (SettlementMonth, error) {
@@ -113,6 +116,7 @@ func (s *Store) settlement(t tx, m domain.Month) (SettlementMonth, error) {
 	out := SettlementMonth{State: months[m].state(m), Breakdowns: map[string]domain.SettlementBreakdown{}, PreviousClosed: m == s.start || months[m.Prev()].Status == string(domain.MonthClosed)}
 	newest := newestClosed(months)
 	out.NewestClosed = newest != nil && *newest == m
+	out.FinishedClosed = s.finishedClosed(months)
 	for _, e := range ledger {
 		if e.Status == domain.Pending {
 			out.Pending++

@@ -228,6 +228,14 @@ func newestClosed(months map[domain.Month]monthRecord) *domain.Month {
 	return newest
 }
 
+// finishedClosed is whether every month before today's is closed: only then
+// does today's balance include their salary, «Себе» bonus and dividends.
+// Months close in order, so the previous month decides.
+func (s *Store) finishedClosed(months map[domain.Month]monthRecord) bool {
+	prev := s.Today().Month().Prev()
+	return prev.Before(s.start) || months[prev].Status == string(domain.MonthClosed)
+}
+
 // Month is a month's state; a month without a document is open.
 func (s *Store) Month(ctx context.Context, m domain.Month) (MonthState, error) {
 	var out MonthState

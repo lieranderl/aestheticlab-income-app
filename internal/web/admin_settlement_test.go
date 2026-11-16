@@ -390,3 +390,61 @@ func TestSettlementNoteIsShortAndBlockerLinksToTheOpenMonth(t *testing.T) {
 		t.Error("the running-month explanation is not folded")
 	}
 }
+
+// A past month is read as of its last day: today's balance includes later
+// months and, before closing, misses the month's accruals, so it and its
+// payout action wait for the close (2026-11-16 production feedback).
+func TestPastMonthSettlementShowsMonthEndFiguresAndCloseFirst(t *testing.T) {
+	s := settlementSite(t)
+	cookie := s.login("anna", annaPass)
+	open := s.get("/admin/month?m=2026-10&tab=settlement", cookie)
+	wantPage(t, "past open month", open, http.StatusOK, "Предварительный итог месяца", "На 31.10.2026", ">Закрыть месяц</a>")
+	body := open.Body.String()
+	for _, today := range []string{"Текущий остаток", "На 20.11.2026", "Выплатить €", "Внести в кассу €", "Перенести"} {
+		if strings.Contains(body, today) {
+			t.Errorf("past open month shows %q", today)
+		}
+	}
+	if closeAt, card := strings.Index(body, ">Закрыть месяц</a>"), strings.Index(body, "<article"); closeAt < 0 || card < closeAt {
+		t.Error("the close action must come before the person cards")
+	}
+	if _, err := s.st.CloseMonth(ctx, s.anna.Actor(), domain.Month{Year: 2026, Mon: 10}); err != nil {
+		t.Fatal(err)
+	}
+	closed := s.get("/admin/month?m=2026-10&tab=settlement", cookie)
+	wantPage(t, "past closed month", closed, http.StatusOK, "Зафиксированный итог месяца", "На 31.10.2026", "Остаток сегодня", "На 20.11.2026", "Выплатить")
+	body = closed.Body.String()
+	if fixed, today := strings.Index(body, "Зафиксированный итог месяца"), strings.Index(body, "Остаток сегодня"); fixed < 0 || today < fixed {
+		t.Error("the fixed month result must precede today's balance")
+	}
+}
+
+// Today's balance has a finished month's salary, «Себе» bonus and dividends
+// only once that month is closed: until every finished month is, no page
+// offers a payout or deposit from it and the server refuses one
+// (2026-11-16 money audit).
+func TestTodaysBalanceWaitsForEveryFinishedMonthToClose(t *testing.T) {
+	s := settlementSite(t)
+	cookie := s.login("anna", annaPass)
+	running := s.get("/admin/month?m=2026-11&tab=settlement", cookie)
+	wantPage(t, "running month after an open one", running, http.StatusOK, "Сначала закройте предыдущий месяц")
+	for _, today := range []string{"Текущий остаток", "Выплатить €", "Внести в кассу €"} {
+		if strings.Contains(running.Body.String(), today) {
+			t.Errorf("running month shows %q while October is open", today)
+		}
+	}
+	for _, kind := range []string{"payout", "deposit"} {
+		for _, m := range []string{"2026-10", "2026-11"} {
+			p := s.get("/admin/movements/new?type="+kind+"&settlement="+m+"&person="+s.olga.ID, cookie)
+			if p.Code == http.StatusOK {
+				t.Errorf("%s prefill for %s offered while October is open", kind, m)
+			}
+		}
+	}
+	if _, err := s.st.SettlementSuggestion(ctx, s.olga.ID, domain.Month{Year: 2026, Mon: 10}); err == nil {
+		t.Error("suggestion from a balance without October's accruals")
+	}
+	if _, err := s.st.RecordSettlementMovement(ctx, s.anna.Actor(), domain.Month{Year: 2026, Mon: 10}, s.olga.ID, "any", store.NewMovement{Type: domain.Deposit, Amount: 100, From: domain.Person(s.olga.ID), To: domain.Account(domain.KassaCard), Date: domain.Date{Year: 2026, Mon: 11, Day: 20}}); err == nil {
+		t.Error("settlement movement recorded while October is open")
+	}
+}
