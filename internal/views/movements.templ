@@ -490,14 +490,14 @@ templ RecountForm(p RecountFormData) {
 	</form>
 }
 
-templ historyTabs(movements bool) {
+templ historyTabs(movements bool, f HistoryFilters) {
 	<nav class="tabs tabs-box w-full flex-nowrap" aria-label="Раздел истории">
 		<a
-			href="/admin/history"
+			href={ templ.SafeURL(f.RecordsHref) }
 			class={ "tab min-h-11 flex-1", templ.KV("tab-active", !movements) }
 			aria-current={ ariaCurrent(!movements) }
 		>Записи</a><a
-	href="/admin/history/movements"
+	href={ templ.SafeURL(f.MovementsHref) }
 	class={ "tab min-h-11 flex-1", templ.KV("tab-active", movements) }
 	aria-current={ ariaCurrent(movements) }
 >Движения</a>
@@ -508,7 +508,7 @@ templ MovementHistoryPage(nav Nav, p MovementHistoryData) {
 	@Layout("История движений", nav) {
 		@PageHeader("История", "/more")
 		<div class="flex flex-col gap-4">
-			@historyTabs(true)
+			@historyTabs(true, p.Filters)
 			@historyFilters(p.Filters)
 			if len(p.Cards)==0 {
 				<p>По этим фильтрам движений нет.</p>
