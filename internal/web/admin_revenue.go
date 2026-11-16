@@ -122,6 +122,7 @@ func (a *app) handleAdminMonth(w http.ResponseWriter, r *http.Request, u store.U
 					bonuses[person.ID] = bonus
 				}
 			}
+			recordsOnly(&personMoney)
 			p.People = append(p.People, views.MonthPerson{
 				Name: person.DisplayName, Days: strconv.Itoa(s.WorkingDays), Clients: clients, Details: detail,
 				Money: personMoney,

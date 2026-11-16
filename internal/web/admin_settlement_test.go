@@ -467,3 +467,19 @@ func TestSettlementBreakdownShowsSelfAndCashKept(t *testing.T) {
 		t.Error("the netted reports row is still shown")
 	}
 }
+
+// 2026-11-16 production feedback: «Месяц» read «Салон должен сотруднику
+// €528,50» while «Итоги и расчёт» read €672,70 for the same person. The month
+// card counts the records only, so it says so and names what it leaves out.
+func TestMonthPersonCardSaysItCountsRecordsOnly(t *testing.T) {
+	s := settlementSite(t)
+	body := s.get("/admin/month?m=2026-10", s.login("anna", annaPass)).Body.String()
+	for _, want := range []string{"По записям: долг перед салоном " + domain.FormatEUR(259735), "Без расходов за свой счёт, зарплаты, дивидендов и выплат — полный итог в «Итоги и расчёт»."} {
+		if !strings.Contains(body, want) {
+			t.Errorf("month card lacks %q", want)
+		}
+	}
+	if strings.Contains(body, ">Долг перед салоном "+domain.FormatEUR(259735)) {
+		t.Error("the person card still reads like the month's balance")
+	}
+}
