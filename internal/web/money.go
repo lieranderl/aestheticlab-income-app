@@ -1,6 +1,9 @@
 package web
 
 import (
+	"unicode"
+	"unicode/utf8"
+
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
 	"github.com/lieranderl/aestheticlab-income-app/internal/views"
 )
@@ -134,6 +137,18 @@ func salonStatus(toStaff, toSalon domain.Cents) (string, int) {
 		return "Сотрудники должны салону " + domain.FormatEUR(toSalon), -1
 	}
 	return "Всё сдано: долгов нет", 0
+}
+
+// recordsOnly marks an admin month person card as the records' result: the
+// month's balance adds expenses paid by the person, salary, dividends and
+// payouts, and lives on «Итоги и расчёт» (2026-11-16 production feedback).
+func recordsOnly(v *views.MoneyView) {
+	if v.Status == "" {
+		return
+	}
+	r, size := utf8.DecodeRuneInString(v.Status)
+	v.Status = "По записям: " + string(unicode.ToLower(r)) + v.Status[size:]
+	v.StatusNote = "Без расходов за свой счёт, зарплаты, дивидендов и выплат — полный итог в «Итоги и расчёт»."
 }
 
 // statusText is what records leave between a person and the salon, worded

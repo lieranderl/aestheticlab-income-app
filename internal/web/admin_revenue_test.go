@@ -309,8 +309,8 @@ func TestAdminMonthShowsTheHigherSelfRateInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"«Себе» за ставку 70%", domain.FormatEUR(397250), domain.FormatEUR(171450), "Долг перед салоном " + domain.FormatEUR(36250),
-		domain.FormatEUR(420000), "Салон должен сотруднику " + domain.FormatEUR(120000),
+		"«Себе» за ставку 70%", domain.FormatEUR(397250), domain.FormatEUR(171450), "По записям: долг перед салоном " + domain.FormatEUR(36250),
+		domain.FormatEUR(420000), "По записям: салон должен сотруднику " + domain.FormatEUR(120000),
 		// The salon: «Себе» €3 972,50 + €4 200, «Салону» €11 687 − €8 172,50.
 		domain.FormatEUR(817250), domain.FormatEUR(351450), "Ожидалось салону " + domain.FormatEUR(351450),
 		"Салон должен сотрудникам " + domain.FormatEUR(120000) + "</strong>", ">Сотрудники должны салону " + domain.FormatEUR(36250),

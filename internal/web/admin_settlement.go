@@ -78,7 +78,7 @@ func (a *app) settlementPage(r *http.Request, m domain.Month) (views.SettlementD
 			}
 			b := selected.Breakdowns[u.ID]
 			c := views.SettlementPerson{Name: u.DisplayName, Balance: balanceWords(pr.Closing), Earned: domain.FormatEUR(pr.Earned), Sign: sign(pr.Closing)}
-			c.Breakdown = []views.MoneyRow{{Name: "Начальный остаток", Value: signedMoney(b.Opening)}, {Name: "Отчёты · изменение баланса", Value: signedMoney(b.Reports)}, {Name: "Внесения", Value: signedMoney(b.Deposits)}, {Name: "Расход за свой счёт", Value: signedMoney(b.StaffExpenses)}, {Name: "Зарплата", Value: signedMoney(b.Salary)}, {Name: "Доплата «Себе»", Value: signedMoney(b.SelfBonus)}, {Name: "Дивиденды", Value: signedMoney(b.Dividend)}, {Name: "Выплаты", Value: signedMoney(b.Payouts)}, {Name: "Итоговый баланс", Value: signedMoney(b.Closing)}}
+			c.Breakdown = []views.MoneyRow{{Name: "Начальный остаток", Value: signedMoney(b.Opening)}, {Name: "«Себе»", Value: signedMoney(b.Self)}, {Name: "Наличными у сотрудника", Value: signedMoney(b.CashKept)}, {Name: "Внесения", Value: signedMoney(b.Deposits)}, {Name: "Расход за свой счёт", Value: signedMoney(b.StaffExpenses)}, {Name: "Зарплата", Value: signedMoney(b.Salary)}, {Name: "Доплата «Себе»", Value: signedMoney(b.SelfBonus)}, {Name: "Дивиденды", Value: signedMoney(b.Dividend)}, {Name: "Выплаты", Value: signedMoney(b.Payouts)}, {Name: "Итоговый баланс", Value: signedMoney(b.Closing)}}
 			if !p.ShowCurrent {
 				p.People = append(p.People, c)
 				continue

@@ -206,7 +206,7 @@ func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
 	anna := s.login("anna", annaPass)
 	res := s.get("/admin/month?m=2026-11", anna)
 	wantPage(t, "month", res, http.StatusOK, "Сверка месяца по записям", "Сотрудники должны салону €19",
-		"Ожидалось салону €546 · зачтено €527 (из них сертификатами €100)", "Долг перед салоном €19")
+		"Ожидалось салону €546 · зачтено €527 (из них сертификатами €100)", "По записям: долг перед салоном €19")
 	month := res.Body.String()
 	row(month, "Внесено в кассу", "€427")
 	row(month, "Наличными у сотрудников", "€465")

@@ -130,6 +130,9 @@ templ PersonMoneyCard(name string, v MoneyView, details []MoneyRow, period strin
 				<h3 class="min-w-0 font-semibold [overflow-wrap:anywhere]">{ name }</h3>
 				@statusChip(v.Status, v.Tone)
 			</div>
+			if v.StatusNote != "" {
+				<p class="text-sm text-base-content/70">{ v.StatusNote }</p>
+			}
 			<div>
 				<p class="mb-1 flex items-center gap-2 text-sm font-semibold">Факт</p>
 				@moneyLines(v.Fact, false)

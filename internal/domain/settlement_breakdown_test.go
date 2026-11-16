@@ -18,3 +18,16 @@ func TestBreakdownCountsOpeningAndAccrualsExactlyOnce(t *testing.T) {
 		t.Fatalf("breakdown %+v", b)
 	}
 }
+
+// 2026-11-16 production feedback: a netted «Отчёты» row hid «Себе» and the
+// cash the person kept, so «Всего заработано» could not be traced to the
+// balance. The breakdown keeps both; «Себе» − cash kept == the report deltas.
+func TestBreakdownSplitsSelfFromCashKept(t *testing.T) {
+	kept := domain.PersonReport{Person: "julia", Report: domain.Report{SelfAmount: 5250, Cash: 10500, BalanceDelta: -5250}}
+	card := domain.PersonReport{Person: "julia", Report: domain.Report{SelfAmount: 16350, CardIn: 42700, BalanceDelta: 16350}}
+	other := domain.PersonReport{Person: "olga", Report: domain.Report{SelfAmount: 999, Cash: 999}}
+	b := domain.BreakdownFor("julia", 0, []domain.PersonReport{kept, card, other}, nil, domain.PersonResult{})
+	if b.Self != 21600 || b.CashKept != -10500 || b.Reports != 11100 || b.Self+b.CashKept != b.Reports || b.Closing != 11100 {
+		t.Fatalf("breakdown %+v", b)
+	}
+}
