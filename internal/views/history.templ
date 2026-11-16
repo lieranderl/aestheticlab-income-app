@@ -10,6 +10,8 @@ type HistoryFilters struct {
 	People, Categories, Entities               []FilterOption
 	Chips                                      []FilterChip
 	Audit                                      bool
+	Reset                                      string // «Сбросить»: the default filter, forgetting the remembered one
+	RecordsHref, MovementsHref                 string // history tabs, keeping the period and person
 }
 type Paging struct{ Label, Prev, Next string }
 type ReportHistory struct {
@@ -22,7 +24,7 @@ templ ReportHistoryPage(nav Nav, p ReportHistory) {
 	@Layout("История", nav) {
 		@PageHeader("История", "/more")
 		<div class="flex flex-col gap-4">
-			@historyTabs(false)
+			@historyTabs(false, p.Filters)
 			@historyFilters(p.Filters)
 			if len(p.Reports) == 0 {
 				<p class="rounded-box bg-base-100 p-4 text-base-content/60">По этим фильтрам записей нет.</p>
@@ -40,7 +42,7 @@ templ historyFilters(f HistoryFilters) {
 				@Icon("filter", "size-5")
 				Фильтры
 			</button>
-			<a href={ templ.SafeURL(f.Action) } class="btn btn-ghost min-h-11">Сбросить</a>
+			<a href={ templ.SafeURL(f.Reset) } class="btn btn-ghost min-h-11">Сбросить</a>
 		</div>
 		<div class="flex flex-wrap gap-2" aria-label="Активные фильтры">
 			for _, chip := range f.Chips {

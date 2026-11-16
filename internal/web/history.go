@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lieranderl/aestheticlab-income-app/internal/domain"
@@ -21,10 +22,121 @@ type historyFilter struct {
 	page                     int
 }
 
-func (a *app) readHistoryFilter(r *http.Request) (historyFilter, bool) {
+// filterPage is one filtered list: «Записи», «Движения» or the change log.
+// Each remembers the filter last used on it (2026-11-16 request), in a
+// cookie tied to the person, so opening it from the menu shows that filter.
+type filterPage struct {
+	path, cookie string
+	own          []string // its own filter keys besides the period and person
+}
+
+var (
+	recordsPage   = filterPage{path: "/admin/history", cookie: "kassa_filter_records", own: []string{"category"}}
+	movementsPage = filterPage{path: "/admin/history/movements", cookie: "kassa_filter_movements", own: []string{"type", "status"}}
+	auditPage     = filterPage{path: "/admin/audit", cookie: "kassa_filter_audit", own: []string{"entity"}}
+)
+
+// sharedFilterKeys carry over between «Записи» and «Движения».
+var sharedFilterKeys = []string{"from", "to", "person"}
+
+const filterCookieAge = 90 * 24 * 60 * 60
+
+// remembered is the filter u last used on p, limited to p's keys.
+func (p filterPage) remembered(r *http.Request, u store.User) url.Values {
+	q := url.Values{}
+	c, err := r.Cookie(p.cookie)
+	if err != nil {
+		return q
+	}
+	uid, raw, ok := strings.Cut(c.Value, "|")
+	if !ok || uid != u.ID {
+		return q
+	}
+	saved, err := url.ParseQuery(raw)
+	if err != nil {
+		return q
+	}
+	for _, k := range append(slices.Clone(sharedFilterKeys), p.own...) {
+		if v := saved.Get(k); v != "" {
+			q.Set(k, v)
+		}
+	}
+	return q
+}
+
+// readFilter reads p's filter from the address, or, when p is opened
+// without one (menu, bottom bar), the filter last used on it.
+func (a *app) readFilter(r *http.Request, u store.User, p filterPage) (historyFilter, bool) {
+	q := r.URL.Query()
+	if r.URL.RawQuery == "" {
+		q = p.remembered(r, u)
+	}
+	return a.readHistoryFilter(q)
+}
+
+// rememberFilter keeps f as the filter last used on p. A period equal to
+// the default (this month so far) is left out so it moves on with the
+// calendar; a filter with nothing set forgets the cookie.
+func (a *app) rememberFilter(w http.ResponseWriter, r *http.Request, u store.User, p filterPage, f historyFilter) {
+	today := a.store.Today()
+	all := f.values()
+	q := url.Values{}
+	for _, k := range append(slices.Clone(sharedFilterKeys), p.own...) {
+		if v := all.Get(k); v != "" {
+			q.Set(k, v)
+		}
+	}
+	if f.from == today.Month().FirstDay() && f.to == today {
+		q.Del("from")
+		q.Del("to")
+	}
+	if len(q) == 0 {
+		if _, err := r.Cookie(p.cookie); err == nil {
+			a.forgetFilter(w, p)
+		}
+		return
+	}
+	value := u.ID + "|" + q.Encode()
+	if c, err := r.Cookie(p.cookie); err == nil && c.Value == value {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure is set whenever the app is served over HTTPS (always in production)
+		Name: p.cookie, Value: value, Path: "/admin", MaxAge: filterCookieAge,
+		HttpOnly: true, Secure: a.secure(), SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func (a *app) forgetFilter(w http.ResponseWriter, p filterPage) {
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure is set whenever the app is served over HTTPS (always in production)
+		Name: p.cookie, Value: "", Path: "/admin", MaxAge: -1,
+		HttpOnly: true, Secure: a.secure(), SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// badFilter answers a filter the page can't show and forgets it, so a
+// remembered filter that went stale doesn't stick.
+func (a *app) badFilter(w http.ResponseWriter, r *http.Request, p filterPage, message string) {
+	a.forgetFilter(w, p)
+	a.problem(w, r, http.StatusBadRequest, message)
+}
+
+// tabHref opens the other history tab with the same period and person,
+// plus that tab's own filter last used.
+func (a *app) tabHref(r *http.Request, u store.User, to filterPage, f historyFilter) string {
+	q := to.remembered(r, u)
+	all := f.values()
+	for _, k := range sharedFilterKeys {
+		q.Del(k)
+		if v := all.Get(k); v != "" {
+			q.Set(k, v)
+		}
+	}
+	return to.path + "?" + q.Encode()
+}
+
+func (a *app) readHistoryFilter(q url.Values) (historyFilter, bool) {
 	today := a.store.Today()
 	f := historyFilter{from: today.Month().FirstDay(), to: today, page: 1}
-	q := r.URL.Query()
 	var err error
 	if q.Get("from") != "" {
 		f.from, err = domain.ParseDate(q.Get("from"))
@@ -73,8 +185,14 @@ func (f historyFilter) values() url.Values {
 }
 
 func (f historyFilter) view(path string, users []store.User, cats []store.Category) (views.HistoryFilters, bool) {
-	p := views.HistoryFilters{Action: path, From: f.from.String(), To: f.to.String(), Person: f.person, Category: f.category, Entity: f.entity}
-	p.Chips = append(p.Chips, views.FilterChip{Label: ru.Date(f.from.Time()) + " — " + ru.Date(f.to.Time()), Href: path})
+	p := views.HistoryFilters{Action: path, Reset: path + "?reset=1", From: f.from.String(), To: f.to.String(), Person: f.person, Category: f.category, Entity: f.entity}
+	period := f.values()
+	period.Del("from")
+	period.Del("to")
+	if len(period) == 0 {
+		period.Set("reset", "1") // an address without a query would bring the remembered filter back
+	}
+	p.Chips = append(p.Chips, views.FilterChip{Label: ru.Date(f.from.Time()) + " — " + ru.Date(f.to.Time()), Href: path + "?" + period.Encode()})
 	validPerson, validCategory := f.person == "", f.category == ""
 	for _, u := range users {
 		p.People = append(p.People, views.FilterOption{Value: u.ID, Label: u.DisplayName})
@@ -122,9 +240,9 @@ func (f historyFilter) paging(path string, count int) (views.Paging, int, int) {
 }
 
 func (a *app) handleHistory(w http.ResponseWriter, r *http.Request, u store.User) {
-	f, ok := a.readHistoryFilter(r)
+	f, ok := a.readFilter(r, u, recordsPage)
 	if !ok {
-		a.problem(w, r, http.StatusBadRequest, "Проверьте период: не больше года, начало не позже конца")
+		a.badFilter(w, r, recordsPage, "Проверьте период: не больше года, начало не позже конца")
 		return
 	}
 	users, err := a.store.Users(r.Context())
@@ -139,9 +257,11 @@ func (a *app) handleHistory(w http.ResponseWriter, r *http.Request, u store.User
 	}
 	filters, ok := f.view("/admin/history", users, cats)
 	if !ok {
-		a.problem(w, r, http.StatusBadRequest, "Проверьте сотрудника и категорию")
+		a.badFilter(w, r, recordsPage, "Проверьте сотрудника и категорию")
 		return
 	}
+	a.rememberFilter(w, r, u, recordsPage, f)
+	filters.RecordsHref, filters.MovementsHref = recordsPage.path, a.tabHref(r, u, movementsPage, f)
 	reports, err := a.store.ReportsBetween(r.Context(), f.from, f.to)
 	if err != nil {
 		a.serverError(w, r, err)

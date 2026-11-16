@@ -9,9 +9,9 @@ import (
 )
 
 func (a *app) handleMovementHistory(w http.ResponseWriter, r *http.Request, u store.User) {
-	f, ok := a.readHistoryFilter(r)
+	f, ok := a.readFilter(r, u, movementsPage)
 	if !ok {
-		a.problem(w, r, http.StatusBadRequest, "Проверьте период: не больше года, начало не позже конца")
+		a.badFilter(w, r, movementsPage, "Проверьте период: не больше года, начало не позже конца")
 		return
 	}
 	users, err := a.store.Users(r.Context())
@@ -21,7 +21,7 @@ func (a *app) handleMovementHistory(w http.ResponseWriter, r *http.Request, u st
 	}
 	filters, ok := f.view("/admin/history/movements", users, nil)
 	if !ok || f.category != "" || f.entity != "" {
-		a.problem(w, r, http.StatusBadRequest, "Проверьте сотрудника и фильтры")
+		a.badFilter(w, r, movementsPage, "Проверьте сотрудника и фильтры")
 		return
 	}
 	filters.Movements = true
@@ -47,9 +47,11 @@ func (a *app) handleMovementHistory(w http.ResponseWriter, r *http.Request, u st
 		}
 	}
 	if !validType || !validStatus {
-		a.problem(w, r, http.StatusBadRequest, "Проверьте вид и статус движения")
+		a.badFilter(w, r, movementsPage, "Проверьте вид и статус движения")
 		return
 	}
+	a.rememberFilter(w, r, u, movementsPage, f)
+	filters.RecordsHref, filters.MovementsHref = a.tabHref(r, u, recordsPage, f), movementsPage.path
 	es, err := a.store.LedgerBetween(r.Context(), f.from, f.to)
 	if err != nil {
 		a.serverError(w, r, err)
