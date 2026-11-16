@@ -1,9 +1,11 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -72,7 +74,100 @@ func (a *app) handleClientsDay(w http.ResponseWriter, r *http.Request, u store.U
 		notice = "Клиент удалён"
 	}
 	booked := a.bookingsView(r.Context(), u, u, day, selected, picker.Locked != "", false)
-	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, dayMoney, notice, booked))
+	month, err := a.monthReports(r.Context(), u, day, picker.Locked != "")
+	if err != nil {
+		a.serverError(w, r, err)
+		return
+	}
+	a.render(w, r, views.ClientDayPage(a.navFor(u, "/"), picker, cards, figures, dayMoney, notice, booked, month))
+}
+
+// monthReports is the collapsed list of the selected day's month on
+// «Сегодня»: every day up to today, newest first, with what was entered. A
+// day without a report is checked against the calendar, as «Не сдали отчёт»
+// is for the admin: bookings make it missing, none make it a day off.
+// locked hides «Добавить» (a closed month, or saving paused).
+func (a *app) monthReports(ctx context.Context, u store.User, selected domain.Date, locked bool) (views.MonthReports, error) {
+	m := selected.Month()
+	first, last := m.FirstDay(), m.LastDay()
+	if start := a.store.StartMonth().FirstDay(); first.Before(start) {
+		first = start
+	}
+	if today := a.store.Today(); today.Before(last) {
+		last = today
+	}
+	out := views.MonthReports{Title: "Отчёты за " + strings.ToLower(ru.MonthName(m.Mon))}
+	reports, err := a.store.PersonReportsIn(ctx, u.ID, m)
+	if err != nil {
+		return out, err
+	}
+	byDay := map[domain.Date][]store.SavedReport{}
+	for _, rep := range reports {
+		byDay[rep.Date] = append(byDay[rep.Date], rep)
+	}
+	var booked map[domain.Date]bookings.DayBookings
+	calendar := false
+	if _, ok := a.cfg.Bookings.CalendarFor(u.ID); ok && !last.Before(first) {
+		booked, err = a.cfg.Bookings.BookingDays(ctx, u.ID, first, last)
+		if err != nil {
+			slog.WarnContext(ctx, "bookings unavailable", "error", logError(err))
+			out.Unavailable = true
+		} else {
+			calendar = true
+		}
+	}
+	var clients, workDays, missingDays, missingBookings int
+	var total, missingPrice domain.Cents
+	for day := last; !day.Before(first); day = day.AddDays(-1) {
+		d := views.MonthReportDay{Label: ru.DayWithWeekday(day.Time()), Href: "/?date=" + day.String(), Selected: day == selected}
+		if reps := byDay[day]; len(reps) > 0 {
+			sum := domain.Summarize(personReports(reps))
+			n := countClients(reps)
+			d.Records, d.Total = "Отчёт за день", domain.FormatEUR(sum.Total)
+			if n > 0 {
+				d.Records = ru.Count(n, "клиент", "клиента", "клиентов")
+			}
+			clients, workDays, total = clients+n, workDays+1, total+sum.Total
+			out.Days = append(out.Days, d)
+			continue
+		}
+		if !locked {
+			d.AddHref = "/clients/new?date=" + day.String()
+		}
+		switch b, ok := booked[day]; {
+		case !calendar:
+			d.Note = "Отчёта нет"
+		case ok:
+			d.Missing = true
+			d.Note = bookingsNote(b)
+			missingDays, missingBookings, missingPrice = missingDays+1, missingBookings+b.Count, missingPrice+b.Price
+		default:
+			d.Note, d.AddHref = "Выходной — в календаре записей нет", ""
+		}
+		out.Days = append(out.Days, d)
+	}
+	out.Summary = ru.Count(clients, "клиент", "клиента", "клиентов") + " · " + domain.FormatEUR(total) + " · " + strconv.Itoa(workDays) + " дн."
+	if missingDays > 0 {
+		out.Missing = "Не сдан отчёт: " + strconv.Itoa(missingDays) + " дн. · " + ru.Count(missingBookings, "запись", "записи", "записей")
+		if missingPrice > 0 {
+			out.Missing += " ≈ " + domain.FormatEUR(missingPrice)
+		}
+	}
+	return out, nil
+}
+
+// bookingsNote is «В календаре 3 записи · ≈ €270 по прайсу», saying how many
+// had no list price; prices are Timely's suggestion, never money.
+func bookingsNote(b bookings.DayBookings) string {
+	s := "В календаре " + ru.Count(b.Count, "запись", "записи", "записей")
+	if b.Unpriced == b.Count {
+		return s + " · без цены"
+	}
+	s += " · ≈ " + domain.FormatEUR(b.Price) + " по прайсу"
+	if b.Unpriced > 0 {
+		s += " (у " + strconv.Itoa(b.Unpriced) + " цены нет)"
+	}
+	return s
 }
 
 func clientSummary(s domain.Summary) []views.MoneyRow {

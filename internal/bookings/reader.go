@@ -156,6 +156,29 @@ func (r *Reader) Day(ctx context.Context, uid string, day domain.Date) (Day, err
 // booking. «Не сдали отчёт» counts only those days (owner, 2026-11-15). A
 // failed read is ErrUnavailable, never a partial set.
 func (r *Reader) BookedDays(ctx context.Context, uid string, from, to domain.Date) (map[domain.Date]bool, error) {
+	counts, err := r.BookingDays(ctx, uid, from, to)
+	if err != nil {
+		return nil, err
+	}
+	days := make(map[domain.Date]bool, len(counts))
+	for day := range counts {
+		days[day] = true
+	}
+	return days, nil
+}
+
+// DayBookings is one day's confirmed customer bookings: how many, the sum of
+// the list prices Timely gave, and how many had no price. List prices are a
+// suggestion, never money.
+type DayBookings struct {
+	Count    int
+	Price    domain.Cents
+	Unpriced int
+}
+
+// BookingDays is BookedDays with each day's count and list prices
+// (2026-11-16: the staff month shows them on days without a report).
+func (r *Reader) BookingDays(ctx context.Context, uid string, from, to domain.Date) (map[domain.Date]DayBookings, error) {
 	cal, ok := r.CalendarFor(uid)
 	if !ok {
 		return nil, ErrNoCalendar
@@ -168,19 +191,27 @@ func (r *Reader) BookedDays(ctx context.Context, uid string, from, to domain.Dat
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
 	}
-	days := map[domain.Date]bool{}
+	days := map[domain.Date]DayBookings{}
 	for _, ev := range events {
 		if ev.Cancelled || ev.Start.IsZero() {
 			continue
 		}
-		if domain.ClassifyEvent(ev.Summary, ev.Description).Kind != domain.EventBooking {
+		c := domain.ClassifyEvent(ev.Summary, ev.Description)
+		if c.Kind != domain.EventBooking {
 			continue
 		}
 		day := domain.Today(ev.Start, r.loc)
 		if day.Before(from) || to.Before(day) {
 			continue
 		}
-		days[day] = true
+		d := days[day]
+		d.Count++
+		if c.Booking.PriceKnown {
+			d.Price += c.Booking.Price
+		} else {
+			d.Unpriced++
+		}
+		days[day] = d
 	}
 	return days, nil
 }

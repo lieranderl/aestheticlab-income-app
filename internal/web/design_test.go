@@ -142,8 +142,8 @@ func TestAdminDayKeepsThePickerCompactAndHidesEmptySections(t *testing.T) {
 	s.withTerms(s.olga, 6500)
 	body := s.get("/admin/day?date=2026-11-20", s.login("anna", annaPass)).Body.String()
 	picker := strings.Index(body, `<summary id="add-client-title" class="btn btn-primary btn-lg w-full`)
-	if picker < 0 || picker > strings.Index(body, "Сверка дня по записям") && strings.Contains(body, "Сверка дня по записям") {
-		t.Error("the client picker is not one control above the day's totals")
+	if picker < 0 || picker > strings.Index(body, "Записи за день") {
+		t.Error("the client picker is not one control above the day's records")
 	}
 	for _, empty := range []string{">Услуги и продажи<", ">Сертификаты<"} {
 		if strings.Contains(body, empty) {
@@ -152,6 +152,28 @@ func TestAdminDayKeepsThePickerCompactAndHidesEmptySections(t *testing.T) {
 	}
 	if strings.Index(body, "Отчётов за этот день нет.") < strings.Index(body, "Записи за день") {
 		t.Error("the empty note is not under «Записи за день»")
+	}
+}
+
+// 2026-11-16 production feedback: «День» leads with who has not reported,
+// and shows the money cards without the salon's reconciliation banner.
+func TestAdminDayLeadsWithMissingReportsWithoutReconciliation(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 6500)
+	s.saveDay(s.olga, 20, map[string]domain.Cents{"services": 10000}, map[string]domain.Cents{"cash": 10000})
+	body := s.get("/admin/day?date=2026-11-20", s.login("anna", annaPass)).Body.String()
+	for _, gone := range []string{"Сверка дня по записям", "Ожидалось салону", "Сотрудники должны салону"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("«День» still shows %q", gone)
+		}
+	}
+	missing := strings.Index(body, "Не сдали отчёт")
+	picker := strings.Index(body, `id="add-client-title"`)
+	if missing < 0 || picker < 0 || missing > picker {
+		t.Errorf("«Не сдали отчёт» (%d) is not above «Добавить клиента» (%d)", missing, picker)
+	}
+	if !strings.Contains(body, "Деньги по записям") || !strings.Contains(body, "Доли по ставке") {
+		t.Error("the day's money cards are gone")
 	}
 }
 

@@ -48,6 +48,24 @@ templ AdminDayPage(nav Nav, p AdminDay) {
 			<div role="status" class="alert alert-soft">{ p.Date.Locked }</div>
 		}
 		<div class="flex flex-col gap-4">
+			// Who has not reported comes first (2026-11-16 production feedback).
+			if p.MissingUnavailable {
+				<p class="alert alert-soft" role="status">Календарь недоступен — пропущенные отчёты не проверены.</p>
+			}
+			if len(p.Missing) > 0 {
+				<section class="card bg-base-100 shadow-sm">
+					<div class="card-body gap-2 p-4">
+						<h2 class="font-semibold">Не сдали отчёт</h2>
+						<ul class="flex flex-wrap gap-2">
+							for _, name := range p.Missing {
+								<li class="badge badge-soft badge-warning h-auto min-h-6 max-w-full [overflow-wrap:anywhere]">
+									{ name }
+								</li>
+							}
+						</ul>
+					</div>
+				</section>
+			}
 			// One control under the date that opens the list of people, instead
 			// of a block of name buttons between the totals and the breakdown
 			// (2026-11-15 production review).
@@ -72,26 +90,11 @@ templ AdminDayPage(nav Nav, p AdminDay) {
 					</div>
 				</details>
 			}
-			@MoneyPanel(p.Money)
+			// The money cards without the salon's reconciliation banner
+			// (2026-11-16 production feedback).
+			@MoneyBreakdown(p.Money)
 			if len(p.Reports) > 0 {
 				@RevenueDetails(p.Figures, "день")
-			}
-			if p.MissingUnavailable {
-				<p class="alert alert-soft" role="status">Календарь недоступен — пропущенные отчёты не проверены.</p>
-			}
-			if len(p.Missing) > 0 {
-				<section class="card bg-base-100 shadow-sm">
-					<div class="card-body gap-2 p-4">
-						<h2 class="font-semibold">Не сдали отчёт</h2>
-						<ul class="flex flex-wrap gap-2">
-							for _, name := range p.Missing {
-								<li class="badge badge-soft badge-warning h-auto min-h-6 max-w-full [overflow-wrap:anywhere]">
-									{ name }
-								</li>
-							}
-						</ul>
-					</div>
-				</section>
 			}
 			if len(p.Bookings) > 0 {
 				<details class="collapse collapse-arrow bg-base-100 shadow-sm" aria-label="Записи в календаре">

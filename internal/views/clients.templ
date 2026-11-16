@@ -343,7 +343,79 @@ templ InstallBanner() {
 	</section>
 }
 
-templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, money MoneyView, notice string, booked BookingsView) {
+// MonthReports is the collapsed «Отчёты за ноябрь» list on «Сегодня»: the
+// selected month's days, newest first (2026-11-16 production feedback).
+type MonthReports struct {
+	Title       string // «Отчёты за ноябрь»
+	Summary     string // «12 клиентов · €1 740 · 9 дн.»
+	Missing     string // «Не сдан отчёт: 2 дн. · 5 записей ≈ €430»; "" when none
+	Unavailable bool   // the calendar could not be read
+	Days        []MonthReportDay
+}
+
+// MonthReportDay is one day of the list.
+type MonthReportDay struct {
+	Label    string // «пт, 20.11»
+	Href     string // the day on «Сегодня»
+	AddHref  string // a new client on the day; "" when it can't be added
+	Selected bool
+	Records  string // «2 клиента»; "" when the day has none
+	Total    string
+	Missing  bool   // booked in the calendar without a report
+	Note     string // «В календаре 3 записи · ≈ €270 по прайсу», «Выходной — …», «Отчёта нет»
+}
+
+templ monthReports(m MonthReports) {
+	<details id="month-reports" class="collapse collapse-arrow mb-4 bg-base-100 shadow-sm">
+		<summary class="collapse-title min-h-14">
+			<span class="block font-semibold">{ m.Title }</span>
+			<span class="block text-sm text-base-content/70">{ m.Summary }</span>
+			if m.Missing != "" {
+				<span class="badge badge-soft badge-warning mt-1 h-auto min-h-6 max-w-full [overflow-wrap:anywhere]">{ m.Missing }</span>
+			}
+		</summary>
+		<div class="collapse-content">
+			if m.Unavailable {
+				<p class="alert alert-soft mb-2" role="status">Календарь недоступен — пропущенные отчёты не проверены.</p>
+			}
+			<ul class="flex flex-col">
+				for _, d := range m.Days {
+					<li class={ "flex min-h-11 items-center gap-2 border-t border-base-content/10 first:border-t-0", templ.KV("rounded-box bg-base-200", d.Selected) }>
+						<a href={ templ.SafeURL(d.Href) } class="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 px-2 py-2" aria-current?={ d.Selected }>
+							<span class="min-w-0">
+								<span class="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+									{ d.Label }
+									if d.Missing {
+										<span class="badge badge-soft badge-warning font-normal">Не сдан отчёт</span>
+									}
+								</span>
+								if d.Records != "" {
+									<span class="block text-sm text-base-content/70">{ d.Records }</span>
+								} else {
+									<span class="block text-sm text-base-content/70 [overflow-wrap:anywhere]">{ d.Note }</span>
+								}
+							</span>
+							if d.Records != "" {
+								<span class="shrink-0 font-semibold">{ d.Total }</span>
+							}
+							if d.AddHref == "" {
+								@Icon("chevron-right", "size-4 shrink-0 text-base-content/50")
+							}
+						</a>
+						if d.AddHref != "" {
+							<a href={ templ.SafeURL(d.AddHref) } class="btn btn-sm min-h-11 shrink-0" aria-label={ "Добавить клиента за " + d.Label }>
+								@Icon("user-plus", "size-4")
+								Добавить
+							</a>
+						}
+					</li>
+				}
+			</ul>
+		</div>
+	</details>
+}
+
+templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, money MoneyView, notice string, booked BookingsView, month MonthReports) {
 	@Layout("Клиенты", nav) {
 		if notice != "" {
 			<div class="mb-3">
@@ -360,8 +432,11 @@ templ ClientDayPage(nav Nav, f ReportForm, cards []MyReport, totals []MoneyRow, 
 		if f.Locked == "" {
 			<a class="btn btn-primary btn-lg w-full" href={ templ.SafeURL("/clients/new?date=" + f.Date) }>Добавить клиента</a>
 		}
+		<div class="mt-4">
+			@monthReports(month)
+		</div>
 		if len(cards) > 0 {
-			<div class="my-4 flex flex-col gap-4">
+			<div class="mb-4 flex flex-col gap-4">
 				<h2 class="font-semibold">Итоги дня</h2>
 				@MoneyBreakdown(money)
 				@RevenueDetails(totals, "день")

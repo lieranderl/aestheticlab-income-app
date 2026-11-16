@@ -215,7 +215,7 @@ func TestAdminPagesShowTheMoneyAsItActuallyMoved(t *testing.T) {
 	res = s.get("/admin/day?date=2026-11-19", anna)
 	day := res.Body.String()
 	row(day, "Наличными у сотрудника", "€100")
-	wantPage(t, "day", res, http.StatusOK, "Салон должен сотрудникам €113,50", "Салон должен сотруднику €113,50",
+	wantPage(t, "day", res, http.StatusOK, "Салон должен сотруднику €113,50",
 		"Факт: в кассу €427 · у сотрудника €100", "Ожидается: «Себе» €213,50 · «Салону» €313,50")
 	wantPage(t, "redeemed", s.get("/admin/day?date=2026-11-18", anna), http.StatusOK,
 		"Факт: в кассу €0 · у сотрудника €0 · сертификатом €100", "Салон должен сотруднику €50")
@@ -240,7 +240,8 @@ func TestTheSalonHeadlineNeverNetsOppositeDebts(t *testing.T) {
 			t.Fatalf("save %s: %d %s", c.login, res.Code, res.Body.String())
 		}
 	}
-	page := s.get("/admin/day?date=2026-11-20", s.login("anna", annaPass))
+	// «День» has no salon headline since 2026-11-16; «Месяц» keeps it.
+	page := s.get("/admin/month?m=2026-11", s.login("anna", annaPass))
 	// Each side on its own line (2026-11-15 design review).
 	wantPage(t, "both sides", page, http.StatusOK, ">Салон должен сотрудникам €70</strong>", ">Сотрудники должны салону €70</strong>")
 	if strings.Contains(page.Body.String(), "Всё сдано") {
