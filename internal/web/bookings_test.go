@@ -373,3 +373,74 @@ func TestMissingReportsSurviveALaterRemoval(t *testing.T) {
 		t.Error("a removed employee's missed booked day disappeared")
 	}
 }
+
+// 2026-11-16 production feedback: «Сегодня» has a collapsed «Отчёты за
+// <месяц>» list of the selected month's days. A day without a report says
+// whether the calendar had customers (how many, at what list price) and
+// offers «Добавить»; a day without bookings reads as a day off.
+func TestStaffDayListsTheMonthsDaysAgainstTheCalendar(t *testing.T) {
+	s, src := bookedSite(t)
+	src.Put(olgaCal, timely("b1", "2026-11-18", "10:00", "Wax Price: €40.00 with Olga Test (Confirmed)"))
+	src.Put(olgaCal, timely("b2", "2026-11-18", "12:00", "Consultation with Olga Test (Confirmed)"))
+	olga := s.login("olga", olgaPass)
+	if res := s.post("/clients", clientForm("month-list-client-token", "120"), olga); res.Code != http.StatusSeeOther {
+		t.Fatalf("save: %d %s", res.Code, res.Body.String())
+	}
+	res := s.get("/?date=2026-11-20", olga)
+	body := res.Body.String()
+	section := regexp.MustCompile(`(?s)<details[^>]*id="month-reports".*?</details>`).FindString(body)
+	if section == "" {
+		t.Fatal("no «Отчёты за ноябрь» section")
+	}
+	if regexp.MustCompile(`<details[^>]*id="month-reports"[^>]*\sopen`).MatchString(section) {
+		t.Error("the month list is open by default")
+	}
+	for _, want := range []string{
+		"Отчёты за ноябрь", "1 клиент · €120 · 1 дн.",
+		"Не сдан отчёт: 1 дн. · 2 записи ≈\u00a0€40",
+		"пт, 20.11", "€120", `href="/?date=2026-11-20"`,
+		"ср, 18.11", "В календаре 2 записи · ≈\u00a0€40 по прайсу (у 1 цены нет)", `href="/clients/new?date=2026-11-18"`,
+		"чт, 19.11", "Выходной — в календаре записей нет", `href="/?date=2026-11-19"`,
+		"вс, 01.11",
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("month list lacks %q", want)
+		}
+	}
+	for _, unwanted := range []string{"сб, 21.11", `href="/clients/new?date=2026-11-19"`, `href="/clients/new?date=2026-11-20"`} {
+		if strings.Contains(section, unwanted) {
+			t.Errorf("month list has %q", unwanted)
+		}
+	}
+	if strings.Index(section, "пт, 20.11") > strings.Index(section, "вс, 01.11") {
+		t.Error("days are not newest first")
+	}
+	noClientData(t, "month list", body)
+
+	src.Fail(errors.New("calendar down"))
+	down := s.get("/?date=2026-11-20", olga).Body.String()
+	for _, want := range []string{"Календарь недоступен — пропущенные отчёты не проверены.", "Отчёта нет", `href="/clients/new?date=2026-11-18"`} {
+		if !strings.Contains(down, want) {
+			t.Errorf("calendar outage: month list lacks %q", want)
+		}
+	}
+}
+
+// Without a calendar every day without a report offers «Добавить»; a closed
+// month offers nothing to add.
+func TestStaffMonthListWithoutACalendar(t *testing.T) {
+	s := newSite(t)
+	s.withTerms(s.olga, 7000)
+	olga := s.login("olga", olgaPass)
+	body := s.get("/?date=2026-11-20", olga).Body.String()
+	for _, want := range []string{"Отчёты за ноябрь", "Отчёта нет", `href="/clients/new?date=2026-11-19"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("month list lacks %q", want)
+		}
+	}
+	for _, unwanted := range []string{"Выходной", "Не сдан отчёт"} {
+		if strings.Contains(body, unwanted) {
+			t.Errorf("without a calendar the month list says %q", unwanted)
+		}
+	}
+}

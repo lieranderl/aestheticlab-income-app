@@ -262,3 +262,28 @@ func TestBookedDaysAreTheDaysWithACustomer(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNoCalendar", err)
 	}
 }
+
+// 2026-11-16: a staff month lists, for each day without a report, how many
+// customers the calendar had and their list prices; a booking without a
+// readable price is counted apart, never as €0.
+func TestBookingDaysCountCustomersAndListPrices(t *testing.T) {
+	src := bookings.NewMemory()
+	src.Put(mariaCal, booking("a", at("2026-11-03", "10:00"), "Wax Price: €10.00 with Maria Test (Confirmed)"))
+	src.Put(mariaCal, booking("b", at("2026-11-03", "15:00"), "Facial Price: €65.50 with Maria Test (Confirmed)"))
+	src.Put(mariaCal, booking("c", at("2026-11-05", "09:00"), "Consultation with Maria Test (Confirmed)"))
+	src.Put(mariaCal, bookings.Event{ID: "busy", Summary: "Busy Time with Maria Test", Start: at("2026-11-04", "12:00")})
+
+	days, err := newReader(t, src).BookingDays(context.Background(), "maria", mustDate(t, "2026-11-01"), mustDate(t, "2026-11-10"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := days[mustDate(t, "2026-11-03")], (bookings.DayBookings{Count: 2, Price: 7550}); got != want {
+		t.Errorf("3 November = %+v, want %+v", got, want)
+	}
+	if got, want := days[mustDate(t, "2026-11-05")], (bookings.DayBookings{Count: 1, Unpriced: 1}); got != want {
+		t.Errorf("5 November = %+v, want %+v", got, want)
+	}
+	if len(days) != 2 {
+		t.Errorf("days = %v, want 3 and 5 November only", days)
+	}
+}
